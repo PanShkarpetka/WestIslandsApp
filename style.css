@@ -1,0 +1,46 @@
+body {
+    font-family: Roboto, sans-serif;
+    margin: auto;
+    background: #fafafa;
+    padding: 2rem 2rem 3rem;
+}
+
+mwc-textfield, mwc-button {
+    display: block;
+    margin: 1rem 0;
+}
+
+#log {
+    font-size: 0.9em;
+    background: #eee;
+    padding: 1em;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.container { margin-top: 2rem; }
+.title-icon { width: 24px; height: 24px; vertical-align: middle; margin: 0 8px; }
+#shipEditor { display: none; }
+#shipEditorContainer {
+    position: sticky;
+    top: 1rem;
+    z-index: 2;
+}
+body.dark-theme {
+    background-color: #1b1d1f;
+    color: #e0e0e0;
+}
+body.dark-theme .card-panel {
+    background-color: #1e1e1e;
+}
+body.dark-theme .modal-content {
+    background-color: #1e1e1e;
+}
+body.dark-theme .input-field input,
+body.dark-theme .input-field textarea {
+    color: #e0e0e0;
+}
+body.dark-theme div.collapsible-header {
+    background-color: #2a2c2e;
+}

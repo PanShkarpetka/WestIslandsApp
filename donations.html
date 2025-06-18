@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Збори коштів</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"/>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+  <div id="navbar"></div>
+
+  <div class="container">
+    <h4 class="center-align">💰 Збір коштів</h4>
+
+    <div class="card-panel">
+      <h5>Створити новий збір</h5>
+
+      <div class="input-field">
+        <select id="goalType">
+          <option value="other" selected>Інше</option>
+          <option value="building">Будівля</option>
+        </select>
+        <label for="goalType">Тип збору</label>
+      </div>
+
+      <div class="input-field"><input id="goalTitle" type="text"><label for="goalTitle">Назва збору</label></div>
+      <div class="input-field" id="buildingSelectWrapper" style="display:none;">
+        <select id="buildingSelect">
+          <option value="" disabled selected>Оберіть будівлю</option>
+        </select>
+        <label for="buildingSelect">Будівля</label>
+      </div>
+      <div class="input-field"><textarea id="goalDescription" class="materialize-textarea"></textarea><label for="goalDescription">Опис</label></div>
+      <div class="input-field"><input id="goalAmount" type="number"><label for="goalAmount">Цільова сума</label></div>
+      <button id="createGoalBtn" class="btn green">Створити збір</button>
+    </div>
+
+    <ul class="collection with-header" id="goalList">
+      <li class="collection-header"><h5>Активні збори</h5></li>
+    </ul>
+  </div>
+
+  <!-- Модальне вікно донату -->
+  <div id="donateModal" class="modal">
+    <div class="modal-content">
+      <h5 id="donateGoalTitle">Збір</h5>
+      <p id="donateGoalDesc">Опис</p>
+      <p><strong>Ціль:</strong> <span id="donateGoalTarget"></span> золота</p>
+      <p><strong>Зібрано:</strong> <span id="donateGoalCollected"></span> золота</p>
+      <div class="input-field" id="donateCharacterWrapper">
+        <input id="donateCharacter" type="text" />
+        <label for="donateCharacter">Ім’я персонажа</label>
+      </div>
+      <div class="input-field"><input id="donateAmount" type="number"><label for="donateAmount">Сума пожертви</label></div>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn grey">Скасувати</a>
+      <a href="#!" id="confirmDonateBtn" class="btn blue">Пожертвувати</a>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js" defer></script>
+  <script type="module" src="firebase.js"></script>
+  <script type="module" src="auth.js"></script>
+  <script type="module" src="donations/donations.js"></script>
+  <script>
+    fetch('navbar.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('navbar').innerHTML = html;
+        document.getElementById("nav-donations")?.classList.add("active");
+      });
+  </script>
+</body>
+</html>

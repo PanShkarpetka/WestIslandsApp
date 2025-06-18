@@ -1,0 +1,127 @@
+<div class="container center-align">
+    <h4>
+        <img src="favicon.ico" class="title-icon" alt="icon">
+        Трекер кораблів
+        <img src="favicon.ico" class="title-icon" alt="icon">
+    </h4>
+</div>
+
+<div class="container" id="app" style="display:block">
+    <!-- Admin Controls -->
+    <div id="admin-controls" style="display: none" class="left-align">
+        <a class="btn modal-trigger brand-color" href="#addShipModal">
+            <i class="material-icons left">add</i>Add Ship
+        </a>
+    </div>
+    <div class="row">
+        <div class="col s12 m6">
+            <ul class="collapsible" id="shipList"></ul>
+        </div>
+        <div class="col s12 m6" id="shipEditorContainer">
+            <div id="shipEditor" class="card-panel">
+                <div class="input-field"><input type="text" id="editName"><label for="editName">Name</label></div>
+                <div class="input-field"><input type="number" id="editHP"><label for="editHP">Current HP</label></div>
+                <div class="input-field"><input type="number" id="editAC"><label for="editAC">AC</label></div>
+                <div class="input-field"><input type="number" id="editHullDiceUsed"><label for="editHullDiceUsed">Hull Dice Used</label></div>
+                <div class="input-field"><input type="number" id="editCrewCurrent"><label for="editCrewCurrent">Crew Current</label></div>
+                <div class="input-field"><input type="number" id="editPassengerCurrent"><label for="editPassengerCurrent">Passenger Current</label></div>
+                <div class="input-field"><input type="number" id="editTonnageCurrent"><label for="editTonnageCurrent">Tonnage Current</label></div>
+                <div class="input-field"><input type="number" id="editWeaponSlotsUsed"><label for="editWeaponSlotsUsed">Weapon Slots Used</label></div>
+
+                <div class="input-field admin-only"><input type="text" id="editType"><label for="editType">Type</label></div>
+                <div class="input-field admin-only"><input type="text" id="editDescription"><label for="editDescription">Description</label></div>
+                <div class="input-field admin-only"><input type="number" id="editMaxHP"><label for="editMaxHP">Max HP</label></div>
+                <div class="input-field admin-only"><input type="number" id="editHullDices"><label for="editHullDices">Hull Dices Amount</label></div>
+                <div class="input-field admin-only"><input type="number" id="editCrewMin"><label for="editCrewMin">Min Crew</label></div>
+                <div class="input-field admin-only"><input type="number" id="editCrewMax"><label for="editCrewMax">Max Crew</label></div>
+                <div class="input-field admin-only"><input type="number" id="editPassengerMax"><label for="editPassengerMax">Max Passengers</label></div>
+                <div class="input-field admin-only"><input type="number" id="editTonnageMax"><label for="editTonnageMax">Max Tonnage</label></div>
+                <div class="input-field admin-only"><input type="number" id="editDamageThreshold"><label for="editDamageThreshold">Damage Threshold</label></div>
+                <div class="input-field admin-only"><input type="number" id="editWeaponSlotsMax"><label for="editWeaponSlotsMax">Max Wespon Slots</label></div>
+                <div class="input-field admin-only"><input type="number" id="editInitiative"><label for="editInitiative">Initiative</label></div>
+                <div class="input-field admin-only"><input type="number" id="editSailStations"><label for="editSailStations">Sail Stations</label></div>
+                <div class="input-field admin-only"><input type="number" id="editSpeedUnit"><label for="editSpeedUnit">Speed Unit</label></div>
+                <div class="input-field admin-only"><input type="number" id="editSpeedMax"><label for="editSpeedMax">Max Speed</label></div>
+                <div class="input-field admin-only"><input type="text" id="editSize"><label for="editSize">Size</label></div>
+
+                <ul id="shipInfoList" class="collection with-header z-depth-1">
+                    <li class="collection-header"><h6>Ship Details</h6></li>
+                </ul>
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <button class="btn green" id="saveShipBtn">Save Changes</button>
+                    <button class="btn yellow" id="toggleShipBtn">Toggle</button>
+                    <button class="btn red" id="deleteShipBtn">Delete Ship</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal">
+    <div class="modal-content">
+        <h5>Login</h5>
+        <div class="input-field"><input type="text" id="loginNickname"><label for="loginNickname">Nickname</label></div>
+        <div class="input-field"><input type="password" id="loginPassword"><label for="loginPassword">Password (only for admin)</label></div>
+    </div>
+    <div class="modal-footer">
+        <a href="#!" class="modal-close btn grey">Cancel</a>
+        <a href="#!" id="confirmLoginBtn" class="btn blue">Login</a>
+    </div>
+</div>
+
+<!-- Add Ship Modal -->
+<div id="addShipModal" class="modal">
+    <div class="modal-content">
+        <h4>Add New Ship</h4>
+        <div class="row">
+            <div class="col s12 m6">
+                <div class="input-field"><input id="newName" type="text"><label for="newName">Name</label></div>
+                <div class="input-field"><input id="newType" type="text"><label for="newType">Type</label></div>
+                <div class="input-field"><input id="newDescription" type="text"><label for="newDescription">Description</label></div>
+                <div class="input-field"><input id="newMaxHP" type="number"><label for="newMaxHP">Max HP</label></div>
+                <div class="input-field"><input id="newAC" type="number"><label for="newAC">AC</label></div>
+                <div class="input-field"><input id="newHullDice" type="number"><label for="newHullDice">Hull Dice</label></div>
+                <div class="input-field"><input id="newHullDiceValue" type="text"><label for="newHullDiceValue">Hull Dice Value</label></div>
+                <div class="input-field"><input id="newCrewMin" type="number"><label for="newCrewMin">Min Crew</label></div>
+                <div class="input-field"><input id="newCrewMax" type="number"><label for="newCrewMax">Max Crew</label></div>
+            </div>
+            <div class="col s12 m6">
+                <div class="input-field"><input id="newPassengerMax" type="number"><label for="newPassengerMax">Max Passengers</label></div>
+                <div class="input-field"><input id="newTonnageMax" type="number"><label for="newTonnageMax">Max Tonnage</label></div>
+                <div class="input-field"><input id="newDamageThreshold" type="number"><label for="newDamageThreshold">Damage Threshold</label></div>
+                <div class="input-field"><input id="newWeaponSlots" type="number"><label for="newWeaponSlots">Max Weapon Slots</label></div>
+                <div class="input-field"><input id="newInitiative" type="number"><label for="newInitiative">Initiative</label></div>
+                <div class="input-field"><input id="newSailStations" type="number"><label for="newSailStations">Sail Stations</label></div>
+                <div class="input-field"><input id="newSpeedUnit" type="text"><label for="newSpeedUnit">Speed Unit</label></div>
+                <div class="input-field"><input id="newSpeedMax" type="number"><label for="newSpeedMax">Max Speed</label></div>
+                <div class="input-field"><input id="newSize" type="text"><label for="newSize">Size</label></div>
+            </div>
+            <div class="col s12 m6">
+                <div class="input-field">
+                    <select id="shipImagePath" class="browser-default">
+                        <option value="" disabled selected>Choose a ship image</option>
+                        <option value="images/ships/rowboat.png">Rowboat</option>
+                        <option value="images/ships/lifeboat.png">Lifeboat</option>
+                        <option value="images/ships/catamaran.png">Catamaran</option>
+                        <option value="images/ships/longship.png">Longship</option>
+                        <option value="images/ships/sloop.png">Sloop</option>
+                        <option value="images/ships/flyut.png">Flyut</option>
+                        <option value="images/ships/gunboat.png">Gunboat</option>
+                        <option value="images/ships/galley.png">Galley</option>
+                        <option value="images/ships/carrack.png">Carrack</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <a href="#!" id="createShipBtn" class="modal-close btn brand-color">Create</a>
+    </div>
+</div>
+
+
+
+
+
+
