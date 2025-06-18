@@ -63,3 +63,9 @@ node_modules/
 
 # dotenv environment variables file
 .env
+/.idea/.gitignore
+/.idea/easycode/codebase-v2.xml
+/.idea/easycode.ignore
+/.idea/jsLibraryMappings.xml
+/.idea/modules.xml
+/.idea/west-islands-dnd.iml
