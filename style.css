@@ -45,6 +45,16 @@ body.dark-theme div.collapsible-header {
     background-color: #2a2c2e;
 }
 
+.brand-logo {
+    white-space: nowrap;
+}
+
+.title {
+    white-space: nowrap;
+}
+
+
+
 .flex-row {
   display: flex;
   flex-direction: row;
@@ -200,3 +210,4 @@ body.dark-theme div.collapsible-header {
   width: auto !important;
   margin-right: 0 !important;
 }
+

@@ -13,7 +13,7 @@
   <div id="navbar"></div>
 
   <div class="container">
-    <h4 class="center-align">💰 Збір коштів</h4>
+    <h4 class="center-align title">💰 Збір коштів 💰</h4>
 
     <div class="card-panel">
       <h5>Створити новий збір</h5>
@@ -66,13 +66,6 @@
   <script type="module" src="firebase.js"></script>
   <script type="module" src="auth.js"></script>
   <script type="module" src="donations/donations.js"></script>
-  <script>
-    fetch('navbar.html')
-      .then(res => res.text())
-      .then(html => {
-        document.getElementById('navbar').innerHTML = html;
-        document.getElementById("nav-donations")?.classList.add("active");
-      });
-  </script>
+  <script src="navbar/navbar.js"></script>
 </body>
 </html>

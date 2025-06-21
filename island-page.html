@@ -6,16 +6,16 @@
     <title>Острів - Перегляд</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"/>
-    <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="island/island-style.css" />
+    <link rel="stylesheet" href="style.css" />
   </head>
 <body>
   <div id="navbar"></div>
 
 
   <div class="container center-align" id="islandPage">
-    <h4>
-      🏝️ <span id="islandNameDisplay">Назва острова</span>
+    <h4 class="title">
+      🏝️ <span id="islandNameDisplay">Назва острова</span> 🏝️
       <a class="btn-small grey right" id="editToggleBtn" style="display: none">Редагувати</a>
     </h4>
 
@@ -117,16 +117,9 @@
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js" defer></script>
+  <script src="navbar/navbar.js"></script>
   <script type="module" src="firebase.js"></script>
   <script type="module" src="auth.js"></script>
   <script type="module" src="island/island.js"></script>
-  <script>
-    fetch('navbar.html')
-            .then(res => res.text())
-            .then(html => {
-              document.getElementById('navbar').innerHTML = html;
-              document.getElementById("nav-island")?.classList.add("active");
-            })
-  </script>
 </body>
 </html>
