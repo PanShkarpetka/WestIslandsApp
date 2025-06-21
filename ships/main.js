@@ -96,38 +96,6 @@ function renderShipList(ships) {
             return b.maxHP - a.maxHP;
         })
 
-
-//         .map((ship, index) => `
-//     <div ${!isAdmin && !ship.visibility ? 'hidden' : '' }>
-//       <div class="collapsible-header collapsible ship-cart" data-index="${index}">
-//         <div style="display: flex; align-items: center; gap: 3rem;">
-//             <img 
-//                 id="shipImage"
-//                 src=${ship.imageUrl}
-//                 alt="Ship Image"
-//                 style="width: 150px; object-fit: cover; border-radius: 8px;"
-//             />
-//             <div>
-//                 <div>
-//                     <strong>${ship.name}</strong>
-//                     ${!ship.visibility ? '<span style="margin-left: 5px;" class="new badge red" data-badge-caption="Hidden"></span>' : ''} 
-//                 </div>
-//                 <div class="grey-text text-darken-1">Ship Type: ${ship.type}</div>
-//                 <div class="grey-text text-darken-1">HP: ${ship.currentHP}/${ship.maxHP}</div>
-//                 <div class="grey-text text-darken-1">AC: ${ship.ac}, Crew: ${ship.crewCurrent}/${ship.crewMax}</div>
-//                 <div class="grey-text text-darken-1">Passengers: ${ship.passengerCurrent}/${ship.passengerMax}</div>
-//             </div>
-//         </div>
-//       </div>
-//       <div class="collapsible-body">
-//         <p>${ship.description || 'Опис відсутній'}</p>
-//       </div>
-//     </div>
-//   `).join("");
-
-
-//   <div class="ship-card collapsible-header collapsible" style="${!isAdmin && !ship.visibility ? 'display: none;' : ''}" data-index="${index}">
-
 .map((ship, index) => `
   <div class="ship-card collapsible-header collapsible" style="${!isAdmin && !ship.visibility ? 'display: none;' : ''}" data-index="${index}">
     <img class="ship-image" src="${ship.imageUrl}" alt="Ship Image" />
