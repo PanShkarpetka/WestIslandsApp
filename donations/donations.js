@@ -1,6 +1,6 @@
 import { db } from '../firebase.js';
 import {
-  collection, addDoc, getDocs, doc, updateDoc, increment, serverTimestamp
+  collection, addDoc, getDocs, doc, updateDoc, increment, serverTimestamp, query, where
 } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 
 import { isAdmin, currentUser, initAuthUI } from '../auth.js';
@@ -108,9 +108,14 @@ async function loadDonationGoals() {
     li.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center">
         <span><strong>${data.title}</strong><br/><small>${data.description}</small></span>
-        ${isComplete
-        ? '<span class="new badge green" data-badge-caption="ЗІБРАНО"></span>'
-        : `<button class="btn-small blue" ${isComplete ? 'disabled' : ''}  data-id="${docSnap.id}" data-title="${data.title}" data-desc="${data.description}" data-target="${data.target}" data-collected="${data.collected}">Донат</button>`}
+        <div>
+          ${isComplete
+          ? '<span class="new badge green" data-badge-caption="ЗІБРАНО"></span>'
+          : `<button class="btn-small blue make-donation" ${isComplete ? 'disabled' : ''}  data-id="${docSnap.id}" data-title="${data.title}" data-desc="${data.description}" data-target="${data.target}" data-collected="${data.collected}">Донат</button>`}
+          <button class="btn-small grey show-donations" data-id="${docSnap.id}" data-title="${data.title}">
+              <i class="material-icons">list</i>
+          </button>
+        </div>
       </div>
       <div class="progress" style="margin-top:0.5em"><div class="determinate" style="width: ${progress}%"></div></div>
       <small>${data.collected} / ${data.target} золота</small>
@@ -118,7 +123,7 @@ async function loadDonationGoals() {
     list.appendChild(li);
   });
 
-  list.querySelectorAll("button").forEach(btn => {
+  list.querySelectorAll("button.make-donation").forEach(btn => {
     btn.addEventListener("click", () => {
       selectedGoalId = btn.dataset.id;
       selectedGoalData = {
@@ -134,6 +139,36 @@ async function loadDonationGoals() {
       document.getElementById("donateGoalCollected").textContent = selectedGoalData.collected;
 
       M.Modal.getInstance(document.getElementById("donateModal")).open();
+    });
+  });
+  list.querySelectorAll("button.show-donations").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      selectedGoalId = btn.dataset.id;
+      selectedGoalData = {
+        title: btn.dataset.title,
+      };
+      const donationList = document.getElementById("donationListContent");
+      donationList.innerHTML = '<li class="collection-item">Завантаження...</li>';
+      document.getElementById("donationListTitle").textContent = `Пожертви: ${selectedGoalData.title}`;
+
+      M.Modal.getInstance(document.getElementById("donationListModal")).open();
+
+      const q = query(collection(db, "donations"), where("goalId", "==", selectedGoalId));
+      const snapshot = await getDocs(q);
+
+      const summary = {};
+
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        const name = d.character || "Анонім";
+        summary[name] = (summary[name] || 0) + d.amount;
+      });
+
+      const sorted = Object.entries(summary).sort((a, b) => b[1] - a[1]);
+
+      donationList.innerHTML = sorted.length
+          ? sorted.map(([name, amount]) => `<li class="collection-item"><strong>${name}</strong>: ${amount} золота</li>`).join("")
+          : '<li class="collection-item">Пожертв ще немає</li>';
     });
   });
 }
@@ -174,4 +209,8 @@ async function donateToGoal() {
   M.toast({ html: "Дякуємо за пожертву!" });
   M.Modal.getInstance(document.getElementById("donateModal")).close();
   loadDonationGoals();
+}
+
+async function loadDonations() {
+
 }
