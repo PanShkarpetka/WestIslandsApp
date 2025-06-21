@@ -44,3 +44,11 @@ body.dark-theme .input-field textarea {
 body.dark-theme div.collapsible-header {
     background-color: #2a2c2e;
 }
+
+.brand-logo {
+    white-space: nowrap;
+}
+
+.title {
+    white-space: nowrap;
+}
