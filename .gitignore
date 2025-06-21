@@ -69,3 +69,5 @@ node_modules/
 /.idea/jsLibraryMappings.xml
 /.idea/modules.xml
 /.idea/west-islands-dnd.iml
+/.idea/vcs.xml
+/.idea/WestIslandsApp.iml
