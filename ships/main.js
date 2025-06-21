@@ -93,36 +93,89 @@ function renderShipList(ships) {
             if (a.visibility !== b.visibility) {
                 return (b.visibility === true ? 1 : 0) - (a.visibility === true ? 1 : 0);
             }
-            return a.name.localeCompare(b.name);
+            return b.maxHP - a.maxHP;
         })
-        .map((ship, index) => `
-    <li ${!isAdmin && !ship.visibility ? 'hidden' : '' }>
-      <div class="collapsible-header" data-index="${index}">
-        <div style="display: flex; align-items: center; gap: 3rem;">
-            <img 
-                id="shipImage"
-                src=${ship.imageUrl}
-                alt="Ship Image"
-                style="width: 150px; object-fit: cover; border-radius: 8px;"
-            />
-            <div>
-                <div>
-                    <strong>${ship.name}</strong>
-                    ${!ship.visibility ? '<span style="margin-left: 5px;" class="new badge red" data-badge-caption="Hidden"></span>' : ''} 
-                </div>
-                <div class="grey-text text-darken-1">Ship Type: ${ship.type}</div>
-                <div class="grey-text text-darken-1">HP: ${ship.currentHP}/${ship.maxHP}</div>
-                <div class="grey-text text-darken-1">AC: ${ship.ac}, Crew: ${ship.crewCurrent}/${ship.crewMax}</div>
-                <div class="grey-text text-darken-1">Passengers: ${ship.passengerCurrent}/${ship.passengerMax}</div>
-            </div>
-        </div>
-      </div>
-      <div class="collapsible-body">
-        <p>${ship.description || 'Опис відсутній'}</p>
-      </div>
-    </li>
-  `).join("");
 
+
+//         .map((ship, index) => `
+//     <div ${!isAdmin && !ship.visibility ? 'hidden' : '' }>
+//       <div class="collapsible-header collapsible ship-cart" data-index="${index}">
+//         <div style="display: flex; align-items: center; gap: 3rem;">
+//             <img 
+//                 id="shipImage"
+//                 src=${ship.imageUrl}
+//                 alt="Ship Image"
+//                 style="width: 150px; object-fit: cover; border-radius: 8px;"
+//             />
+//             <div>
+//                 <div>
+//                     <strong>${ship.name}</strong>
+//                     ${!ship.visibility ? '<span style="margin-left: 5px;" class="new badge red" data-badge-caption="Hidden"></span>' : ''} 
+//                 </div>
+//                 <div class="grey-text text-darken-1">Ship Type: ${ship.type}</div>
+//                 <div class="grey-text text-darken-1">HP: ${ship.currentHP}/${ship.maxHP}</div>
+//                 <div class="grey-text text-darken-1">AC: ${ship.ac}, Crew: ${ship.crewCurrent}/${ship.crewMax}</div>
+//                 <div class="grey-text text-darken-1">Passengers: ${ship.passengerCurrent}/${ship.passengerMax}</div>
+//             </div>
+//         </div>
+//       </div>
+//       <div class="collapsible-body">
+//         <p>${ship.description || 'Опис відсутній'}</p>
+//       </div>
+//     </div>
+//   `).join("");
+
+
+//   <div class="ship-card collapsible-header collapsible" style="${!isAdmin && !ship.visibility ? 'display: none;' : ''}" data-index="${index}">
+
+.map((ship, index) => `
+  <div class="ship-card collapsible-header collapsible" style="${!isAdmin && !ship.visibility ? 'display: none;' : ''}" data-index="${index}">
+    <img class="ship-image" src="${ship.imageUrl}" alt="Ship Image" />
+    <div class="ship-info">
+      <div class="ship-header">
+        <strong>${ship.name}</strong>
+        ${!ship.visibility ? '<span class="new badge red" data-badge-caption="Hidden"></span>' : ''}
+      </div>
+      <div class="ship-stats">
+        <span><i class="material-icons tiny">shield</i> ${ship.ac}</span>
+        <span><i class="material-icons tiny">rowing</i> ${ship.crewMin}/${ship.crewMax}</span>
+        <span><i class="material-icons tiny">man</i> ${ship.passengerMax}</span>
+      </div>
+      <div class="ship-hp">
+        <div class="hp-bar">
+          <div class="hp-fill" style="width: ${Math.floor((ship.currentHP / ship.maxHP) * 100)}%"></div>
+        </div>
+        <small>${ship.currentHP}/${ship.maxHP} HP</small>
+      </div>
+
+      <div class="hull-dice">
+        ${
+            ship.hullDices > 15
+            ? `<span class="hull-text">${ship.hullDices - ship.hullDiceUsed}/${ship.hullDices}</span>`
+            : Array.from({ length: ship.hullDices }).map((_, i) => `<i class="material-icons ${i < ship.hullDiceUsed ? 'grey-text' : ''}">casino</i>`).join('')
+        }
+      </div>
+
+      <div class="ship-meta-row">
+        <span class="ship-meta-label">Тип:</span>
+        <span class="ship-meta-value">${ship.type || '—'}</span>
+        </div>
+      <div class="ship-meta-row">
+        <span class="ship-meta-label">Швидкість:</span>
+        <span class="ship-meta-value">${ship.speedMax / 10 || '—'} M/h</span>
+      </div>
+      <div class="ship-meta-row">
+        <span class="ship-meta-label">Розмір:</span>
+        <span class="ship-meta-value">${ship.size || '—'}</span>
+      </div>
+
+      <p class="ship-description">${ship.description || 'Опис відсутній'}</p>
+    </div>
+  </div>
+`).join("");
+
+
+  
     M.Collapsible.init(document.querySelectorAll('.collapsible'));
 
     shipList.querySelectorAll(".collapsible-header").forEach(header => {
