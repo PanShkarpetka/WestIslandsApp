@@ -1,10 +1,14 @@
 import { db } from '../firebase.js';
 import {
-  collection, addDoc, getDocs, doc, updateDoc, increment, serverTimestamp, query, where
+  collection, addDoc, getDoc, getDocs, doc, updateDoc, increment, serverTimestamp, query, where
 } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 
 import { isAdmin, currentUser, initAuthUI } from '../auth.js';
+// noinspection ES6PreferShortImport
+import { countCostWithDiscount } from "../helpers/index.js";
 
+let islandId = "island_rock";
+let islandData = null;
 let selectedGoalId = null;
 let selectedGoalData = null;
 let buildingsMeta = {};
@@ -17,8 +21,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isAdmin) {
       document.getElementById("donateCharacterWrapper").style.display = "none";
     }
-    await loadBuildingsMeta();
-    loadDonationGoals();
+    try {
+      await Promise.all([loadBuildingsMeta(), loadDonationGoals(), loadIsland()])
+    } catch( err) {
+      console.error(err)
+    }
   });
 
   document.getElementById("goalType").addEventListener("change", (e) => {
@@ -27,13 +34,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById("buildingSelect").addEventListener("change", (e) => {
     const key = e.target.value;
-    document.getElementById("goalAmount").value = buildingsMeta[key].cost;
+
+    document.getElementById("goalAmount").value = countCostWithDiscount(islandData, buildingsMeta[key].cost);
+    M.updateTextFields();
   });
 
 
   document.getElementById("createGoalBtn").addEventListener("click", createDonationGoal);
   document.getElementById("confirmDonateBtn").addEventListener("click", donateToGoal);
 });
+async function loadIsland() {
+  const ref = doc(db, "islands", islandId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    M.toast({html: "Island not found"});
+    return;
+  }
+  islandData = snap.data();
+}
 
 async function loadBuildingsMeta() {
   const snapshot = await getDocs(collection(db, "buildings"));
@@ -209,8 +227,4 @@ async function donateToGoal() {
   M.toast({ html: "Дякуємо за пожертву!" });
   M.Modal.getInstance(document.getElementById("donateModal")).close();
   loadDonationGoals();
-}
-
-async function loadDonations() {
-
 }
