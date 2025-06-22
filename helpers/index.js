@@ -1,0 +1,1 @@
+export const countCostWithDiscount = (islandData, cost) => cost * (100 - islandData?.buildingDiscount || 0) / 100;

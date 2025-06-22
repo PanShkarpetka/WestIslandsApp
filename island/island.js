@@ -4,6 +4,8 @@ import {
   doc, collection, getDoc, getDocs, setDoc, updateDoc
 } from 'https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js';
 import {logAction} from "../logs/logs.js";
+// noinspection ES6PreferShortImport
+import {countCostWithDiscount} from "../helpers/index.js";
 
 let islandId = "island_rock";
 let islandData = null;
@@ -43,7 +45,6 @@ async function loadIsland() {
   await loadBuildings();
   await loadBuildingDonations();
   renderBuildings(islandData.buildings || {});
-
 }
 
 async function loadBuildings() {
@@ -136,12 +137,10 @@ function showBuildingModal(key, built) {
   const data = buildingsMeta[key];
   if (!data) return;
 
-  const countCostWithDiscount = (cost) => cost * (100 - islandData?.buildingDiscount || 0) / 100;
-
   document.getElementById("building-icon-modal").src = `images/buildings/${key}.png`;
   document.getElementById("buildingName").textContent = data.name;
   document.getElementById("buildingDescription").textContent = data.description;
-  document.getElementById("buildingCost").textContent = countCostWithDiscount(data.cost) + " золота";
+  document.getElementById("buildingCost").textContent = countCostWithDiscount(islandData, data.cost) + " золота";
   document.getElementById("buildingGrowth").textContent = "+" + data.growth + " населення";
 
   document.getElementById("adminButtons").style.display = isAdmin ? "flex" : "none";
