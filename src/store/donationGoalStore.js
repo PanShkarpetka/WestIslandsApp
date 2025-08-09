@@ -1,0 +1,165 @@
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import {
+    collection,
+    doc,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    serverTimestamp,
+    writeBatch,
+    increment,
+    getDoc
+} from 'firebase/firestore';
+import { db } from '@/services/firebase';
+
+export const useDonationGoalStore = defineStore('donationGoals', () => {
+    const goals = ref([])
+    let _unsub = null
+
+    // === Realtime goals ===
+    function subscribeToGoals() {
+        if (_unsub) return _unsub
+        const colRef = collection(db, 'donationGoals')
+        _unsub = onSnapshot(colRef, (snapshot) => {
+            goals.value = snapshot.docs.map(d => {
+                const data = d.data()
+                return {
+                    id: d.id,
+                    title: data.title,
+                    description: data.description,
+                    // маппінг до UI
+                    targetAmount: Number(data.target || 0),
+                    currentAmount: Number(data.collected || 0),
+                    // метадані
+                    createdAt: data.createdAt,
+                    createdBy: data.createdBy,
+                    type: data.type,
+                    targetBuildingKey: data.targetBuildingKey,
+                    visible: data.visible !== false,
+                    status: data.status || 'open' // open | locked | closed (якщо використовуєш)
+                }
+            })
+        })
+        return _unsub
+    }
+
+    function stop() {
+        if (_unsub) { _unsub(); _unsub = null }
+    }
+
+    // === CRUD goals ===
+    async function saveGoal(goal) {
+        const data = {
+            title: goal.title || '',
+            description: goal.description || '',
+            target: Number(goal.targetAmount ?? goal.target ?? 0),
+            collected: Number(goal.currentAmount ?? goal.collected ?? 0),
+            createdBy: goal.createdBy || 'Адмін',
+            type: goal.type || 'building',
+            targetBuildingKey: goal.targetBuildingKey || null,
+            visible: typeof goal.visible === 'boolean' ? goal.visible : true,
+            status: goal.status || 'open'
+        }
+
+        if (goal.id) {
+            await updateDoc(doc(db, 'donationGoals', goal.id), data)
+        } else {
+            await addDoc(collection(db, 'donationGoals'), {
+                ...data,
+                createdAt: serverTimestamp()
+            })
+        }
+    }
+
+    async function deleteGoal(id) {
+        await deleteDoc(doc(db, 'donationGoals', id))
+    }
+
+    async function toggleVisibility(goal) {
+        const refDoc = doc(db, 'donationGoals', goal.id)
+        await updateDoc(refDoc, { visible: !goal.visible })
+    }
+
+    // === DONATE ===
+    /**
+     * payload: { goalId, amount, character? (нік/персонаж), userId? }
+     * - Створює документ у top-level "donations"
+     * - Інкрементить "collected" у "donationGoals/{goalId}"
+     * Все разом — одним batch.
+     */
+    async function donate(payload) {
+        const goalId = payload.goalId
+        const amount = Number(payload.amount || 0)
+        console.log(amount)
+        const character = payload.character || null
+        const userId = payload.userId || null
+        const goalTitle = payload.title || 'No goal'
+
+        if (!goalId) throw new Error('goalId is required')
+        if (!amount || amount <= 0) throw new Error('Некоректна сума')
+
+        const goalRef = doc(db, 'donationGoals', goalId)
+        const goalSnap = await getDoc(goalRef)
+        if (!goalSnap.exists()) throw new Error('Ціль не знайдено')
+
+        // опційні перевірки стану
+        const g = goalSnap.data() || {}
+        if (g.status === 'locked') throw new Error('Збір заблоковано')
+
+        // batch: оновити collected + створити донат у /donations
+        const batch = writeBatch(db)
+        batch.update(goalRef, { collected: increment(amount) })
+
+        const donationsCol = collection(db, 'donations')
+        const donationDoc = doc(donationsCol) // авто-ID
+        batch.set(donationDoc, {
+            goalId,
+            amount,
+            character,
+            userId,
+            donatedAt: serverTimestamp()
+        })
+        const logRef = doc(collection(db, 'logs'))
+        const who = character || userId || 'Анонім'
+        batch.set(logRef, {
+            type: 'donation',
+            action: `💰 ${who} задонатив ${amount} ₴ на «${goalTitle}»`,
+            goalId,
+            goalTitle,
+            amount,
+            user: character,
+            timestamp: serverTimestamp()
+        })
+
+        await batch.commit()
+
+        // оптимістичне оновлення локального стейту
+        const i = goals.value.findIndex(g => g.id === goalId)
+        if (i !== -1) {
+            goals.value[i] = {
+                ...goals.value[i],
+                currentAmount: Number(goals.value[i].currentAmount || 0) + amount
+            }
+        }
+    }
+
+    async function toggleLockGoal(id, status) {
+        if (!id) throw new Error('id is required')
+        await updateDoc(doc(db, 'donationGoals', id), { status })
+    }
+
+    return {
+        goals,
+        subscribeToGoals,
+        stop,
+        saveGoal,
+        deleteGoal,
+        toggleVisibility,
+        donate,
+        toggleLockGoal
+    }
+})

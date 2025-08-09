@@ -4,13 +4,13 @@ import LoginView from '../views/LoginView.vue';
 import AdminView from '../views/AdminView.vue';
 import ShipsView from '../views/ShipsView.vue';
 import { useUserStore } from '../store/userStore';
-import DonationsView from "../views/DonationsView.vue";
+import DonationGoalsPage from "../views/DonationGoalsPage.vue";
 
 const routes = [
     { path: '/', component: LoginView },
     { path: '/islands', component: IslandsView, meta: { requiresAuth: false } },
     { path: '/ships', component: ShipsView, meta: { requiresAuth: false } },
-    { path: '/donations', component: DonationsView, meta: { requiresAuth: false } },
+    { path: '/donations', component: DonationGoalsPage, meta: { requiresAuth: false } },
     { path: '/admin', component: AdminView, meta: { adminOnly: true } },
 ];
 
