@@ -20,41 +20,45 @@
             :goal="goal"
             :isAdmin="isAdmin"
             :isLoggedIn="isLoggedIn"
-            @edit="editGoal"
-            @delete="deleteGoal"
+            :nickname="nickname"
+            @click="openDonors(goal)"
         />
       </div>
     </div>
 
-    <DonationGoalDialog
-        v-model:visible="dialogVisible"
-        :goal="selectedGoal"
-        @saved="onSaved"
-    />
   </v-container>
+  <DonationsSummaryDialog
+      v-model:visible="donorsVisible"
+      :donationGoal="selectedGoal"
+  />
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useDonationGoalStore } from '../store/donationGoalStore'
-import { useUserStore } from '../store/userStore'
-import DonationGoalCard from '../components/DonationGoalCard.vue'
-import DonationGoalDialog from '../components/DonationGoalDialog.vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useDonationGoalStore } from '@/store/donationGoalStore'
+import { useUserStore } from '@/store/userStore'
+import DonationGoalCard from '@/components/DonationGoalCard.vue'
+import DonationsSummaryDialog from '@/components/DonationsSummaryDialog.vue'
 
 const userStore = useUserStore()
 const donationGoalStore = useDonationGoalStore()
-
 const isAdmin = userStore.isAdmin;
 const isLoggedIn = userStore.isLoggedIn;
+const nickname = userStore.nickname;
+const donorsVisible = ref(false)
 const dialogVisible = ref(false)
 const selectedGoal = ref(null)
 
 onMounted(() => {
   donationGoalStore.subscribeToGoals()
 })
+onUnmounted(() => {
+  donationGoalStore.stop()
+})
 
 const sortedGoals = computed(() => {
   const goals = Array.isArray(donationGoalStore.goals) ? donationGoalStore.goals.slice() : []
+
   return goals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 })
 
@@ -75,6 +79,11 @@ function deleteGoal(goal) {
 function onSaved() {
   dialogVisible.value = false
   selectedGoal.value = null
+}
+
+const openDonors = (goal) => {
+  selectedGoal.value = goal
+  donorsVisible.value = true
 }
 </script>
 <style scoped>

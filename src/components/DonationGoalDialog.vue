@@ -51,7 +51,7 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   goal: { type: Object, default: null },
   isAdmin: { type: Boolean, default: false },
-  userId: { type: String, default: null }
+  nickname: { type: String, default: 'Unexpected anonim' },
 })
 const emit = defineEmits(['update:visible', 'saved'])
 
@@ -62,7 +62,6 @@ const error = ref('')
 
 const store = useDonationGoalStore()
 
-// Лочимо скрол сторінки під модалкою
 watch(() => props.visible, v => {
   if (v) {
     amount.value = null
@@ -86,8 +85,7 @@ async function saveDonation() {
     await store.donate({
       goalId,
       amount: Number(amount.value),
-      character: props.isAdmin ? (character.value?.trim() || null) : null,
-      userId: props.userId || null
+      character: props.isAdmin ? (character.value?.trim() || null) : props.nickname,
     })
     emit('saved')
     close()

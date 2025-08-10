@@ -52,9 +52,9 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '../services/firebase'
-import { useUserStore } from '../store/userStore'
-import { useLogStore } from '../store/logStore'
+import { db } from '@/services/firebase'
+import { useUserStore } from '@/store/userStore'
+import { useLogStore } from '@/store/logStore'
 
 const props = defineProps({
   dialog: Boolean,

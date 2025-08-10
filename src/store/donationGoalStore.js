@@ -7,8 +7,6 @@ import {
     updateDoc,
     deleteDoc,
     onSnapshot,
-    query,
-    orderBy,
     serverTimestamp,
     writeBatch,
     increment,
@@ -51,7 +49,6 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
         if (_unsub) { _unsub(); _unsub = null }
     }
 
-    // === CRUD goals ===
     async function saveGoal(goal) {
         const data = {
             title: goal.title || '',
@@ -94,10 +91,7 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
     async function donate(payload) {
         const goalId = payload.goalId
         const amount = Number(payload.amount || 0)
-        console.log(amount)
         const character = payload.character || null
-        const userId = payload.userId || null
-        const goalTitle = payload.title || 'No goal'
 
         if (!goalId) throw new Error('goalId is required')
         if (!amount || amount <= 0) throw new Error('Некоректна сума')
@@ -109,6 +103,7 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
         // опційні перевірки стану
         const g = goalSnap.data() || {}
         if (g.status === 'locked') throw new Error('Збір заблоковано')
+        const goalTitle = g.title || 'No goal'
 
         // batch: оновити collected + створити донат у /donations
         const batch = writeBatch(db)
@@ -120,11 +115,10 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
             goalId,
             amount,
             character,
-            userId,
             donatedAt: serverTimestamp()
         })
         const logRef = doc(collection(db, 'logs'))
-        const who = character || userId || 'Анонім'
+        const who = character || 'Анонім'
         batch.set(logRef, {
             type: 'donation',
             action: `💰 ${who} задонатив ${amount} ₴ на «${goalTitle}»`,
@@ -136,15 +130,6 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
         })
 
         await batch.commit()
-
-        // оптимістичне оновлення локального стейту
-        const i = goals.value.findIndex(g => g.id === goalId)
-        if (i !== -1) {
-            goals.value[i] = {
-                ...goals.value[i],
-                currentAmount: Number(goals.value[i].currentAmount || 0) + amount
-            }
-        }
     }
 
     async function toggleLockGoal(id, status) {

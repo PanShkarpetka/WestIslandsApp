@@ -13,7 +13,7 @@
           class="icon-btn"
           title="Заблокувати збір"
           v-if="!isCompleted"
-          @click="onToggleLockClick"
+          @click.stop="onToggleLockClick"
       >🔒</button>
     </div>
 
@@ -48,7 +48,7 @@
             :class="{ 'has-tip': !!donateDisabledReason && isDonateDisabled }"
             :data-tip="donateDisabledReason"
         >
-          <button class="primary" @click="openDonate" :disabled="isDonateDisabled">Задонатити</button>
+          <button class="primary" @click.stop="openDonate" :disabled="isDonateDisabled">Задонатити</button>
         </span>
           <span class="state" v-if="isCompleted">✅ Збір завершено</span>
         <span class="state warn" v-else-if="isLocked">🔒 Заблоковано</span>
@@ -58,8 +58,10 @@
     <!-- Діалог пожертви -->
     <DonationGoalDialog
         v-model:visible="showDonate"
-        :goal="props.goal"
+        :key="goal.id"
+        :goal="goal"
         :isAdmin="props.isAdmin"
+        :nickname="props.nickname"
         @saved="onDonationSaved"
     />
 
@@ -73,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, toRef, computed, onBeforeUnmount } from 'vue'
 import DonationGoalDialog from '@/components/DonationGoalDialog.vue'
 import { useDonationGoalStore } from '@/store/donationGoalStore'
 
@@ -83,30 +85,30 @@ const props = defineProps({
   goal: { type: Object, required: true },
   isAdmin: { type: Boolean, default: false },
   isLoggedIn: { type: Boolean, default: false },
-  completed: { type: Boolean, default: false }
+  nickname: { type: String, default: 'Unexpected anonim' },
 })
-
+const goal = toRef( props, "goal" );
 const progress = computed(() => {
-  const t = props.goal.targetAmount || 0
-  const c = Math.min(props.goal.currentAmount || 0, t)
+  const t = goal.value.targetAmount || 0
+  const c = Math.min(goal.value.currentAmount || 0, t)
   return t ? Math.round((c / t) * 100) : 0
 })
 
-const left = computed(() => Math.max((props.goal.targetAmount || 0) - (props.goal.currentAmount || 0), 0))
+const left = computed(() => Math.max((goal.value.targetAmount || 0) - (goal.value.currentAmount || 0), 0))
 
 const categoryLabel = computed(() => {
   const m = { building: 'Будівництво', other: 'Інше' }
-  return m[props.goal.type] || props.goal.type
+  return m[goal.value.type] || goal.value.type
 })
 
-const isLocked = computed(() => props.goal.status === 'locked')
-const isCompleted = computed(() => Number(props.goal.targetAmount) <= Number(props.goal.currentAmount))
+const isLocked = computed(() => goal.value.status === 'locked')
+const isCompleted = computed(() => Number(goal.value.targetAmount) <= Number(goal.value.currentAmount))
 const isDonateDisabled = computed(() =>
     !props.isLoggedIn || isCompleted.value || isLocked.value
 )
 async function onToggleLockClick() {
   try {
-    await store.toggleLockGoal(props.goal.id, isLocked.value ? 'unlocked' : 'locked');
+    await store.toggleLockGoal(goal.value.id, isLocked.value ? 'unlocked' : 'locked');
   } catch (e) {
     console.error('Не вдалось заблокувати збір:', e)
   }
@@ -127,14 +129,14 @@ function showToast(text, ms = 2500) {
 onBeforeUnmount(() => clearTimeout(toastTimer))
 
 function onDonationSaved() {
-  showDonate.value = false        // закриваємо модалку
-  showToast('Дякуємо! Пожертву збережено.') // показуємо тост
+  showDonate.value = false
+  showToast('Дякуємо! Пожертву збережено.')
 }
 const donateDisabledReason = computed(() => {
   if (!props.isLoggedIn) return 'Залогіньтеся для донату'
   if (isCompleted.value) return 'Збір закрито'
   if (isLocked.value) return 'Збір заблоковано'
-  return '' // для інших причин не показуємо цей текст
+  return ''
 })
 
 </script>
@@ -145,6 +147,7 @@ const donateDisabledReason = computed(() => {
   background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
   border: 1px solid #e6edf2; border-radius: 16px; padding: 16px;
   box-shadow: 0 4px 18px rgba(10,31,68,0.06);
+  cursor: pointer;
 }
 
 /* Легке затемнення всієї картки лише коли вона реально disabled */
@@ -188,9 +191,6 @@ const donateDisabledReason = computed(() => {
 .chip[data-variant="other"] { border-color:#e6d8ff; background:#f4edff; }
 
 .desc { color:#475569; margin:.25rem 0 .5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow:hidden; }
-
-.reqs { display:flex; gap:8px; flex-wrap: wrap; margin-bottom: 8px; }
-.req-chip { font-size:12px; padding:4px 8px; border-radius:8px; background:#f1f5f9; color:#334155; }
 
 .progress .bar { height: 10px; background:#edf2f7; border-radius: 999px; overflow:hidden; }
 .progress .fill { height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); }
