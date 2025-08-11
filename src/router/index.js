@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import IslandsView from '../views/IslandsView.vue';
+import IslandsPage from '../views/IslandsPage.vue';
 import LoginView from '../views/LoginView.vue';
 import AdminView from '../views/AdminView.vue';
 import ShipsView from '../views/ShipsView.vue';
@@ -8,7 +8,7 @@ import DonationGoalsPage from "../views/DonationGoalsPage.vue";
 
 const routes = [
     { path: '/', component: LoginView },
-    { path: '/islands', component: IslandsView, meta: { requiresAuth: false } },
+    { path: '/islands', component: IslandsPage, meta: { requiresAuth: false } },
     { path: '/ships', component: ShipsView, meta: { requiresAuth: false } },
     { path: '/donations', component: DonationGoalsPage, meta: { requiresAuth: false } },
     { path: '/admin', component: AdminView, meta: { adminOnly: true } },
