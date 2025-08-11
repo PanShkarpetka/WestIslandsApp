@@ -55,20 +55,18 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
             description: goal.description || '',
             target: Number(goal.targetAmount ?? goal.target ?? 0),
             collected: Number(goal.currentAmount ?? goal.collected ?? 0),
-            createdBy: goal.createdBy || 'Адмін',
+            createdBy: goal.createdBy || 'Анонім',
             type: goal.type || 'building',
             targetBuildingKey: goal.targetBuildingKey || null,
             visible: typeof goal.visible === 'boolean' ? goal.visible : true,
-            status: goal.status || 'open'
+            status: goal.status || 'open',
+            createdAt: goal.createdAt || serverTimestamp()
         }
 
         if (goal.id) {
             await updateDoc(doc(db, 'donationGoals', goal.id), data)
         } else {
-            await addDoc(collection(db, 'donationGoals'), {
-                ...data,
-                createdAt: serverTimestamp()
-            })
+            await addDoc(collection(db, 'donationGoals'), data)
         }
     }
 

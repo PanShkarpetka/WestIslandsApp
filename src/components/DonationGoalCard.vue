@@ -39,7 +39,7 @@
 
       <div class="meta">
         <span>Автор: {{ goal.createdBy }}</span>
-        <span>Створено: {{ goal.createdAt.toDate().toLocaleString() }}</span>
+        <span>Створено: {{ createdAtText }}</span>
       </div>
 
       <div class="cta">
@@ -93,6 +93,7 @@ const progress = computed(() => {
   const c = Math.min(goal.value.currentAmount || 0, t)
   return t ? Math.round((c / t) * 100) : 0
 })
+const createdAtText = computed(() => goal.value.createdAt?.toDate().toLocaleString())
 
 const left = computed(() => Math.max((goal.value.targetAmount || 0) - (goal.value.currentAmount || 0), 0))
 

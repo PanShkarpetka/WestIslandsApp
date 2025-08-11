@@ -4,8 +4,8 @@
       <v-col cols="12" sm="6">
         <h1 class="text-h5">Цілі зборів</h1>
       </v-col>
-      <v-col cols="12" sm="6" class="text-sm-end" v-if="isAdmin">
-        <v-btn color="primary" @click="createNewGoal">
+      <v-col cols="12" sm="6" class="text-sm-end">
+        <v-btn color="primary" @click="createNewGoal" :disabled="!isLoggedIn">
           <v-icon start>mdi-plus</v-icon>
           Додати збір
         </v-btn>
@@ -31,6 +31,10 @@
       v-model:visible="donorsVisible"
       :donationGoal="selectedGoal"
   />
+  <DonationGoalCreateDialog
+      v-model="showCreate"
+      :preset="{ createdBy: nickname }"
+  />
 </template>
 
 <script setup>
@@ -39,6 +43,8 @@ import { useDonationGoalStore } from '@/store/donationGoalStore'
 import { useUserStore } from '@/store/userStore'
 import DonationGoalCard from '@/components/DonationGoalCard.vue'
 import DonationsSummaryDialog from '@/components/DonationsSummaryDialog.vue'
+import DonationGoalCreateDialog from '@/components/DonationGoalCreateDialog.vue'
+import {storeToRefs} from "pinia";
 
 const userStore = useUserStore()
 const donationGoalStore = useDonationGoalStore()
@@ -46,8 +52,9 @@ const isAdmin = userStore.isAdmin;
 const isLoggedIn = userStore.isLoggedIn;
 const nickname = userStore.nickname;
 const donorsVisible = ref(false)
-const dialogVisible = ref(false)
 const selectedGoal = ref(null)
+const showCreate = ref(false)
+const { goals } = storeToRefs(donationGoalStore)
 
 onMounted(() => {
   donationGoalStore.subscribeToGoals()
@@ -56,29 +63,10 @@ onUnmounted(() => {
   donationGoalStore.stop()
 })
 
-const sortedGoals = computed(() => {
-  const goals = Array.isArray(donationGoalStore.goals) ? donationGoalStore.goals.slice() : []
-
-  return goals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-})
+const sortedGoals = computed(() => [...goals.value].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)))
 
 function createNewGoal() {
-  selectedGoal.value = null
-  dialogVisible.value = true
-}
-
-function editGoal(goal) {
-  selectedGoal.value = { ...goal }
-  dialogVisible.value = true
-}
-
-function deleteGoal(goal) {
-  donationGoalStore.deleteGoal(goal.id)
-}
-
-function onSaved() {
-  dialogVisible.value = false
-  selectedGoal.value = null
+  showCreate.value = true
 }
 
 const openDonors = (goal) => {
