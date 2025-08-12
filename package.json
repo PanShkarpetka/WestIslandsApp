@@ -1,11 +1,13 @@
 {
   "name": "west-islands-app",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy-stage": "firebase hosting:channel:deploy staging",
+    "deploy": "firebase deploy --only hosting"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
@@ -17,6 +19,7 @@
     "vuetify": "^3.9.4"
   },
   "devDependencies": {
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vite-plugin-static-copy": "^3.1.1"
   }
 }

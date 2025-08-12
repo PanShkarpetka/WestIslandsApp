@@ -157,7 +157,7 @@ const donateDisabledReason = computed(() => {
 /* ===== BG ART LAYER ===== */
 .bg-art {
   position: absolute; inset: 0;
-  background: url('@/assets/donations/gold-bg.png') no-repeat right center / 520px auto;
+  background: url('@/images/donations/gold-bg.png') no-repeat right center / 520px auto;
   pointer-events: none; z-index: 0;
 }
 .bg-art.ongoing { opacity: .98; filter: saturate(1.1) contrast(1.05); }
