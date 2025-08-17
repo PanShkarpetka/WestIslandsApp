@@ -11,7 +11,7 @@
       <v-btn icon to="/ships">
         <v-icon>mdi-ferry</v-icon>
       </v-btn>
-      <v-btn icon to="/islands">
+      <v-btn icon to="/islands/Камінь">
         <v-icon>mdi-island</v-icon>
       </v-btn>
       <v-btn icon to="/donations">
@@ -52,7 +52,7 @@
           <v-list-item-title>Головна</v-list-item-title>
         </v-list-item>
 
-        <v-list-item tag="router-link" :to="'/islands'" @click="drawer = false">
+        <v-list-item tag="router-link" :to="'/islands/island_rock'" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-island</v-icon></v-list-item-icon>
           <v-list-item-title>Острови</v-list-item-title>
         </v-list-item>
