@@ -45,7 +45,7 @@
               <strong>Тип:</strong> {{ ship.type }}
             </div>
             <div class="text-white text-caption mb-1">
-              <strong>Швидкість:</strong> {{ ship.speedUnit / 10 }} М/год
+              <strong>Швидкість:</strong> {{ ship.speedMax / 10 }} М/год
             </div>
             <div class="text-white text-caption mb-1">
               <strong>Розмір:</strong> {{ ship.size || '/' }}
