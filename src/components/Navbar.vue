@@ -17,6 +17,9 @@
       <v-btn icon to="/donations">
         <v-icon>mdi-cash-multiple</v-icon>
       </v-btn>
+      <v-btn icon to="/politics">
+        <v-icon>mdi-town-hall</v-icon>
+      </v-btn>
       <v-btn v-if="userStore.isAdmin" icon to="/admin">
         <v-icon>mdi-shield-account</v-icon>
       </v-btn>
