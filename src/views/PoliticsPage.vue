@@ -9,48 +9,50 @@
       Наразі немає актуальних пропозицій.
     </div>
     <v-row v-if="!isAdmin" justify="space-between" align="center" class="my-4">
-      <div class="space-y-4">
-        <v-card
-            v-for="p in proposals"
-            :key="p.id"
-            class="proposal-card overflow-hidden with-bg"
-            elevation="1"
-            rounded="xl"
-        >
-          <!-- header -->
-          <div class="px-5 pt-4 pb-2 flex items-center justify-between gap-3">
-            <div class="text-h6 font-semibold leading-tight">{{ p.title }}</div>
+      <v-col cols="12">
+        <div class="space-y-4">
+          <v-card
+              v-for="p in proposals"
+              :key="p.id"
+              class="proposal-card overflow-hidden with-bg"
+              elevation="1"
+              rounded="xl"
+          >
+            <!-- header -->
+            <div class="px-5 pt-4 pb-2 flex items-center justify-between gap-3">
+              <div class="text-h6 font-semibold leading-tight">{{ p.title }}</div>
 
-            <v-chip
-                density="comfortable"
-                size="small"
-                class="votes-chip"
-                variant="elevated"
-            >
-              {{ VOTE_FMT(proposalVotes[p.id] ?? 0) }} / {{ VOTE_FMT(TOTAL_VOTES) }} голосів
-            </v-chip>
-          </div>
-
-          <!-- body -->
-          <div class="px-5 pb-2 text-[15px] text-gray-700 clamp-3 proposal-summary">
-            {{ p.summary || '—' }}
-          </div>
-
-          <!-- progress -->
-          <div class="px-5 pb-4">
-            <v-progress-linear
-                :model-value="Math.round(((proposalVotes[p.id] ?? 0) / TOTAL_VOTES) * 1000) / 10"
-                height="8"
-                color="success"
-                rounded
-                class="progress"
-            />
-            <div class="progress-meta">
-              Підтримка: <b>{{ Math.round(((proposalVotes[p.id] ?? 0) / TOTAL_VOTES) * 1000) / 10 }}%</b>
+              <v-chip
+                  density="comfortable"
+                  size="small"
+                  class="votes-chip"
+                  variant="elevated"
+              >
+                {{ VOTE_FMT(proposalVotes[p.id] ?? 0) }} / {{ VOTE_FMT(TOTAL_VOTES) }} голосів
+              </v-chip>
             </div>
-          </div>
-        </v-card>
-      </div>
+
+            <!-- body -->
+            <div class="px-5 pb-2 text-[15px] text-gray-700 clamp-3 proposal-summary">
+              {{ p.summary || '—' }}
+            </div>
+
+            <!-- progress -->
+            <div class="px-5 pb-4">
+              <v-progress-linear
+                  :model-value="Math.round(((proposalVotes[p.id] ?? 0) / TOTAL_VOTES) * 1000) / 10"
+                  height="8"
+                  color="success"
+                  rounded
+                  class="progress"
+              />
+              <div class="progress-meta">
+                Підтримка: <b>{{ Math.round(((proposalVotes[p.id] ?? 0) / TOTAL_VOTES) * 1000) / 10 }}%</b>
+              </div>
+            </div>
+          </v-card>
+        </div>
+      </v-col>
     </v-row>
 
     <!-- ==== ADMIN VIEW ==== -->
@@ -420,6 +422,7 @@ async function updatePeople(groupId, proposalId, value) {
 .proposal-card {
   border-radius: 16px;
   background: #fff;
+  min-height: 250px;
 }
 
 /* темна пігулка голосів, як бейджі на «зборах» */
@@ -434,7 +437,6 @@ async function updatePeople(groupId, proposalId, value) {
 .progress-meta {
   margin-top: 6px;
   font-size: 12px;
-  color: #6b7280; /* gray-500 */
 }
 
 /* обрізання опису на 3 рядки */
@@ -496,11 +498,43 @@ async function updatePeople(groupId, proposalId, value) {
 }
 
 .with-bg {
-  background: linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), url('@/images/politics/proposal-bg.png') no-repeat right center / 50% auto;
-  pointer-events: none; z-index: 0;
+  --bgW: 42%;
+  background:
+      linear-gradient(rgba(255,255,255,.55),
+      rgba(255,255,255,.55)),
+      url('@/images/politics/proposal-bg.png') no-repeat right center / var(--bgW) auto;
+  position: relative;
+}
+.with-bg > *{
+  padding-right: calc(var(--bgW) + 12px);
+}
+@media (max-width: 960px){
+  .with-bg{ --bgW: 50%; }
+}
+@media (max-width: 600px){
+  .with-bg{ --bgW: 100%; }
+}
+.proposal-summary {
+  width: auto;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.proposal-summary.clamp-3{
+  display: block;
+  -webkit-line-clamp: initial;
+  -webkit-box-orient: initial;
+  overflow: visible;
+}
+@media (min-width: 900px){
+  .proposal-summary.clamp-3{
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
-.proposal-summary {
-  width: 50%
-}
+/* Optional: shrink/hide the image on very small screens */
+@media (max-width: 600px){ .with-bg{ --bgW: 100%; } }
+
 </style>
