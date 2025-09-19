@@ -1,54 +1,62 @@
 <template>
-  <section class="space-y-8">
+  <v-container>
+    <v-row justify="space-between" align="center" class="my-4">
+      <v-col cols="12" sm="6">
+        <h1 class="text-h5">Актуальні пропозиції</h1>
+      </v-col>
+    </v-row>
+    <div v-if="!proposals.length">
+      Наразі немає актуальних пропозицій.
+    </div>
+    <v-row v-if="!isAdmin" justify="space-between" align="center" class="my-4">
+      <div class="space-y-4">
+        <v-card
+            v-for="p in proposals"
+            :key="p.id"
+            class="proposal-card overflow-hidden with-bg"
+            elevation="1"
+            rounded="xl"
+        >
+          <!-- header -->
+          <div class="px-5 pt-4 pb-2 flex items-center justify-between gap-3">
+            <div class="text-h6 font-semibold leading-tight">{{ p.title }}</div>
 
-    <!-- ==== USER VIEW ==== -->
-    <div v-if="!isAdmin" class="space-y-4">
-      <h2 class="text-xl font-semibold">Актуальні пропозиції</h2>
-
-      <div v-if="proposals.length === 0" class="text-gray-500">
-        Наразі немає актуальних пропозицій.
-      </div>
-
-      <div class="grid gap-4 md:grid-cols-2">
-        <v-card v-for="p in proposals" :key="p.id" class="rounded-xl">
-          <v-card-title class="flex items-center justify-between">
-            <span>{{ p.title }}</span>
-            <v-chip variant="flat" size="small">
+            <v-chip
+                density="comfortable"
+                size="small"
+                class="votes-chip"
+                variant="elevated"
+            >
               {{ VOTE_FMT(proposalVotes[p.id] ?? 0) }} / {{ VOTE_FMT(TOTAL_VOTES) }} голосів
             </v-chip>
-          </v-card-title>
-          <v-card-text class="text-sm text-gray-700 whitespace-pre-line">
+          </div>
+
+          <!-- body -->
+          <div class="px-5 pb-2 text-[15px] text-gray-700 clamp-3 proposal-summary">
             {{ p.summary || '—' }}
-          </v-card-text>
+          </div>
+
+          <!-- progress -->
+          <div class="px-5 pb-4">
+            <v-progress-linear
+                :model-value="Math.round(((proposalVotes[p.id] ?? 0) / TOTAL_VOTES) * 1000) / 10"
+                height="8"
+                color="success"
+                rounded
+                class="progress"
+            />
+            <div class="progress-meta">
+              Підтримка: <b>{{ Math.round(((proposalVotes[p.id] ?? 0) / TOTAL_VOTES) * 1000) / 10 }}%</b>
+            </div>
+          </div>
         </v-card>
       </div>
-    </div>
+    </v-row>
 
     <!-- ==== ADMIN VIEW ==== -->
     <div v-else class="space-y-8">
-      <!-- Add proposal -->
-      <div class="rounded-xl border p-4 space-y-3">
-        <h2 class="text-lg font-semibold">Додати пропозицію</h2>
-        <div class="grid gap-3 md:grid-cols-2">
-          <v-text-field
-              v-model="newProposal.title"
-              label="Назва"
-              density="comfortable"
-          />
-          <v-text-field
-              v-model="newProposal.summary"
-              label="Короткий опис"
-              density="comfortable"
-          />
-        </div>
-        <v-btn :loading="adding" color="primary" @click="addProposal">
-          Додати
-        </v-btn>
-      </div>
-
       <!-- Proposals table -->
       <div class="space-y-4">
-        <h2 class="text-xl font-semibold">Усі пропозиції (адмін)</h2>
         <div v-if="proposals.length === 0" class="text-gray-500">
           Немає пропозицій.
         </div>
@@ -56,21 +64,22 @@
         <v-table class="rounded-xl border">
           <thead>
           <tr>
-            <th>Назва</th>
-            <th>Опис</th>
-            <th class="text-center">Актуальна</th>
-            <th class="text-right">Голосів (всього)</th>
-            <th class="text-right">Дії</th>
+            <th><b>Назва</b></th>
+            <th><b>Опис</b></th>
+            <th class="text-center"><b>Актуальна</b></th>
+            <th class="text-center"><b>Голосів (всього)</b></th>
+            <th class="text-center"><b>Дії</b></th>
           </tr>
           </thead>
           <tbody>
           <tr v-for="p in proposals" :key="p.id">
             <td class="font-medium">{{ p.title }}</td>
-            <td class="text-sm">{{ p.summary || '—' }}</td>
+            <td class="admin-table-summary text-sm">{{ p.summary || '—' }}</td>
             <td class="text-center">
               <v-switch
                   :model-value="p.actual"
                   inset
+                  color="blue"
                   hide-details
                   @click.stop="toggleActual(p)"
               />
@@ -89,72 +98,92 @@
           </tbody>
         </v-table>
       </div>
-
-      <!-- Interests matrix -->
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <h2 class="text-xl font-semibold">Інтереси груп → пропозиції</h2>
-          <div class="text-sm text-gray-600">
-            Всього голосів: <b>{{ VOTE_FMT(TOTAL_VOTES) }}</b>;
-            Розподіл між групами:
-            <span v-for="g in groups" :key="g.id" class="ml-2">
-              {{ g.name || g.id }} — <b>{{ VOTE_FMT(groupVotes[g.id] || 0) }}</b>
-            </span>
-          </div>
+      <!-- Add proposal -->
+      <div class="rounded-xl border p-4 space-y-3">
+        <h4 class="text-center">Додати пропозицію</h4>
+        <div class="admin-proposal-input grid gap-3 md:grid-cols-2">
+          <v-text-field
+              v-model="newProposal.title"
+              label="Назва"
+              density="comfortable"
+          />
+          <v-text-field
+              v-model="newProposal.summary"
+              label="Короткий опис"
+              density="comfortable"
+          />
         </div>
-
-        <div class="overflow-x-auto rounded-xl border">
-          <table class="min-w-[720px] w-full">
-            <thead>
-            <tr>
-              <th class="p-3 text-left">Група</th>
-              <th class="p-3 text-right">Населення</th>
-              <th class="p-3 text-right">Голоси групи</th>
-              <th
-                  v-for="p in proposals"
-                  :key="p.id"
-                  class="p-3 text-center"
-              >
-                {{ p.title }}
-                <div class="text-xs text-gray-500">
-                  (всього голосів: {{ VOTE_FMT(proposalVotes[p.id] ?? 0) }})
-                </div>
-              </th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="g in groups" :key="g.id" class="border-t">
-              <td class="p-3 font-medium">{{ g.name || g.id }}</td>
-              <td class="p-3 text-right">{{ g.count }}</td>
-              <td class="p-3 text-right">{{ VOTE_FMT(groupVotes[g.id] || 0) }}</td>
-
-              <td v-for="p in proposals" :key="p.id" class="p-2">
-                <v-text-field
-                    type="number"
-                    min="0"
-                    :model-value="interests[keyGI(g.id,p.id)]?.people ?? 0"
-                    hide-details
-                    density="compact"
-                    @update:model-value="val => updatePeople(g.id, p.id, val)"
-                />
-                <div class="mt-1 text-[11px] text-gray-500 text-center">
-                  Голоси від групи: {{ VOTE_FMT(cellVotes(g.id, p.id)) }}
-                </div>
-              </td>
-            </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p class="text-sm text-gray-600">
-          Адмін заповнює <b>кількість осіб</b> (people), яких цікавить кожна
-          пропозиція. Система автоматично розподіляє групові голоси
-          (із {{ VOTE_FMT(TOTAL_VOTES) }} загальних) між пропозиціями пропорційно
-          значенням people з точністю до десятих.
-        </p>
+        <v-btn class="admin-proposal-input" :loading="adding" color="primary" @click="addProposal">
+          Додати
+        </v-btn>
       </div>
     </div>
-  </section>
+    <!-- Interests matrix -->
+    <v-row justify="space-between" align="center" class="my-4">
+      <v-col cols="12" sm="6">
+        <h1 class="text-h5">Інтереси груп</h1>
+      </v-col>
+    </v-row>
+    <v-row justify="space-between" align="center" class="my-4">
+      <v-col cols="12" sm="12">
+        Всього голосів: <b>{{ VOTE_FMT(TOTAL_VOTES) }}</b>;
+        Розподіл між групами:
+        <span v-for="g in groups" :key="g.id" class="ml-2">
+            {{ g.name || g.id }} — <b>{{ VOTE_FMT(groupVotes[g.id] || 0) }}</b>
+          </span>
+      </v-col>
+    </v-row>
+    <v-row justify="space-between" align="center" class="my-4">
+      <v-col cols="12" sm="12" class="matrix-wrap rounded-xl border">
+        <table class="matrix">
+          <thead>
+          <tr>
+            <th class="sticky-col p-3 text-left">Населення групи</th>
+            <th class="p-3 text-center col-votes">Голоси групи</th>
+            <th
+                v-for="p in proposals"
+                :key="p.id"
+                class="p-3 text-center"
+            >
+              {{ p.title }}
+              <div class="text-xs text-gray-500">
+                (всього голосів: {{ VOTE_FMT(proposalVotes[p.id] ?? 0) }})
+              </div>
+            </th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="g in groups" :key="g.id" class="border-t">
+            <td class="sticky-col p-3 font-medium">{{ g.name || g.id }} - {{ g.count }}. Вагаються: {{ groupUndecided[g.id] }}</td>
+            <td class="p-3 text-center col-votes">{{ VOTE_FMT(groupVotes[g.id] || 0) }}</td>
+
+            <td v-for="p in proposals" :key="p.id" class="p-2">
+              <v-text-field
+                  type="number"
+                  min="0"
+                  :model-value="interests[keyGI(g.id,p.id)]?.people ?? 0"
+                  hide-details
+                  density="compact"
+                  @update:model-value="val => updatePeople(g.id, p.id, val)"
+                  :disabled="!isAdmin"
+              />
+              <div class="mt-1 text-[11px] text-gray-500 text-center">
+                Голоси від групи: {{ VOTE_FMT(cellVotes(g.id, p.id)) }}
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </v-col>
+
+      <p :hidden="!isAdmin" class="text-sm text-gray-600">
+        Адмін заповнює <b>кількість осіб</b> (people), яких цікавить кожна
+        пропозиція. Система автоматично розподіляє групові голоси
+        (із {{ VOTE_FMT(TOTAL_VOTES) }} загальних) між пропозиціями пропорційно
+        значенням people з точністю до десятих.
+      </p>
+    </v-row>
+  </v-container>
 </template>
 
 <script setup>
@@ -243,44 +272,48 @@ const proposalVotes = computed(() => {
   proposals.value.forEach(p => { byProposal[p.id] = 0; });
 
   groups.value.forEach(g => {
+    const pop = groupPop(g);
     const gVotes = Number(groupVotes.value[g.id] || 0);
-    if (gVotes <= 0) return;
+    if (pop <= 0 || gVotes <= 0) return;
 
-    // people по пропозиціях для цієї групи
     const peopleByP = proposals.value.map(p => {
       const it = interests.value[keyGI(g.id, p.id)];
-      return Number(it?.people) || 0;
+      return Math.max(0, Math.floor(Number(it?.people) || 0));
     });
     const sumPeople = peopleByP.reduce((a, b) => a + b, 0);
     if (sumPeople <= 0) return;
 
-    // Розподіл голосів групи між її пропозиціями (0.1 точність)
-    const dist = apportionFixed(gVotes, peopleByP, DECIMALS);
+    // РОЗПОДІЛЯЄМО ЛИШЕ ЧАСТКУ квоти, що вже має вподобання
+    const ratio = Math.min(1, sumPeople / pop);
+    const totalAlloc = gVotes * ratio;                 // ← не вся квота, а її частка
+    const dist = apportionFixed(totalAlloc, peopleByP, DECIMALS);
 
-    // Сумуємо у загальний підсумок по пропозиції
     proposals.value.forEach((p, idx) => {
-      byProposal[p.id] = +( (byProposal[p.id] || 0) + dist[idx] ).toFixed(DECIMALS);
+      byProposal[p.id] = +(((byProposal[p.id] || 0) + dist[idx]).toFixed(DECIMALS));
     });
   });
 
-  return byProposal; // { [proposalId]: число з 1 десятковим }
+  return byProposal; // сума може бути < TOTAL_VOTES (нерозподілена частка = «вагаються»)
 });
 const groupCellVotes = computed(() => {
   const out = {};
   groups.value.forEach(g => {
+    const pop = groupPop(g);
     const gVotes = Number(groupVotes.value[g.id] || 0);
     const perProposal = {};
-    if (gVotes > 0) {
+    if (pop > 0 && gVotes > 0) {
       const peopleByP = proposals.value.map(p => {
         const it = interests.value[keyGI(g.id, p.id)];
-        return Number(it?.people) || 0;
+        return Math.max(0, Math.floor(Number(it?.people) || 0));
       });
       const sumPeople = peopleByP.reduce((a, b) => a + b, 0);
 
       if (sumPeople > 0) {
-        const dist = apportionFixed(gVotes, peopleByP, DECIMALS);
+        const ratio = Math.min(1, sumPeople / pop);
+        const totalAlloc = gVotes * ratio;
+        const dist = apportionFixed(totalAlloc, peopleByP, DECIMALS);
         proposals.value.forEach((p, idx) => {
-          perProposal[p.id] = +(dist[idx]).toFixed(DECIMALS);
+          perProposal[p.id] = +dist[idx].toFixed(DECIMALS);
         });
       } else {
         proposals.value.forEach(p => { perProposal[p.id] = 0; });
@@ -294,6 +327,34 @@ const groupCellVotes = computed(() => {
 });
 const cellVotes = (groupId, proposalId) =>
     groupCellVotes.value?.[groupId]?.[proposalId] ?? 0;
+
+const groupPop = (g) => Number(g?.population ?? g?.count ?? 0) || 0;
+
+// скільки осіб уже мають вподобання (усі інпути по пропозиціях) у межах групи
+const groupPeopleTotals = computed(() => {
+  const res = {};
+  groups.value.forEach(g => {
+    let sum = 0;
+    proposals.value.forEach(p => {
+      const it = interests.value[keyGI(g.id, p.id)];
+      sum += Math.max(0, Math.floor(Number(it?.people) || 0)); // цілі особи
+    });
+    res[g.id] = sum;
+  });
+  return res; // { groupId: usedPeople }
+});
+
+// скільки вагаються = населення - заповнені вподобання
+const groupUndecided = computed(() => {
+  const res = {};
+  groups.value.forEach(g => {
+    const pop = groupPop(g);
+    const used = groupPeopleTotals.value[g.id] || 0;
+    res[g.id] = Math.max(0, pop - used);
+  });
+  return res; // { groupId: undecidedPeople }
+});
+
 // =================== MUTATIONS (ADMIN) ========
 const newProposal = ref({ title: '', summary: '' });
 const adding = ref(false);
@@ -349,4 +410,97 @@ async function updatePeople(groupId, proposalId, value) {
 <style scoped>
 .space-y-8 > * + * { margin-top: 2rem; }
 .space-y-4 > * + * { margin-top: 1rem; }
+/* ширина як на сторінці зборів */
+
+
+/* заголовок розділу */
+.page-title { font-size: 28px; font-weight: 800; }
+
+/* картка у стилі «цілей зборів» */
+.proposal-card {
+  border-radius: 16px;
+  background: #fff;
+}
+
+/* темна пігулка голосів, як бейджі на «зборах» */
+.votes-chip {
+  background: #2f2f2f !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+/* прогрес і підпис під ним */
+.progress { --v-theme-success: #1a9c52; }
+.progress-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280; /* gray-500 */
+}
+
+/* обрізання опису на 3 рядки */
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.matrix-wrap {
+  max-height: 70vh;        /* можна підкрутити під сторінку */
+  overflow: auto;          /* і вертикальний, і горизонтальний скрол */
+  background: #fff;
+}
+
+/* Базова таблиця */
+.matrix {
+  width: 100%;
+  min-width: 960px;        /* щоб з’являвся горизонтальний скрол при багатьох колонках */
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.matrix th, .matrix td { padding: 12px; }
+.matrix thead th {
+  white-space: normal;              /* ← дозволити перенос */
+  overflow-wrap: anywhere;
+}
+
+/* Липкий заголовок */
+.matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  box-shadow: inset 0 -1px 0 #e5e7eb; /* лінія під хедером */
+}
+
+/* Липка перша колонка ("Група") */
+.matrix .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 15;
+  background: #fff;              /* перекриває сусідні клітинки при скролі */
+  box-shadow: 1px 0 0 #e5e7eb;   /* вертикальна лінія справа */
+}
+
+/* акуратні межі між рядками */
+.matrix tbody tr { border-top: 1px solid #e5e7eb; }
+
+.col-votes {
+  width: 80px;
+}
+
+.admin-proposal-input {
+  margin: 10px;
+}
+
+.with-bg {
+  background: linear-gradient(rgba(255,255,255,.35), rgba(255,255,255,.35)), url('@/images/politics/proposal-bg.png') no-repeat right center / 50% auto;
+  pointer-events: none; z-index: 0;
+}
+
+.proposal-summary {
+  width: 50%
+}
 </style>
