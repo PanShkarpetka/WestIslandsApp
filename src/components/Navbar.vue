@@ -66,7 +66,7 @@
         </v-list-item>
 
         <v-list-item tag="router-link" :to="'/politics'" @click="drawer = false">
-          <v-list-item-icon><v-icon>mdi-town-hal</v-icon></v-list-item-icon>
+          <v-list-item-icon><v-icon>mdi-town-hall</v-icon></v-list-item-icon>
           <v-list-item-title>Політика</v-list-item-title>
         </v-list-item>
 
