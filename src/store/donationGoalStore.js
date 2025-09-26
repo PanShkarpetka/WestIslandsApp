@@ -26,13 +26,12 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
             goals.value = snapshot.docs.map(d => {
                 const data = d.data()
                 return {
+                    treasure: data.treasure || false,
                     id: d.id,
                     title: data.title,
                     description: data.description,
-                    // маппінг до UI
                     targetAmount: Number(data.target || 0),
                     currentAmount: Number(data.collected || 0),
-                    // метадані
                     createdAt: data.createdAt,
                     createdBy: data.createdBy,
                     type: data.type,

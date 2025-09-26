@@ -63,7 +63,22 @@ onUnmounted(() => {
   donationGoalStore.stop()
 })
 
-const sortedGoals = computed(() => [...goals.value].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)))
+const sortedGoals = computed(() => {
+  const isComplete = g =>
+      g != null && g.targetAmount != null && g.currentAmount === g.targetAmount;
+
+  return [...goals.value].sort((a, b) => {
+    const aDone = isComplete(a);
+    const bDone = isComplete(b);
+
+    if (aDone !== bDone) return aDone ? 1 : -1;
+
+    if (a.treasure === true && b.treasure !== true) return -1;
+    if (a.treasure !== true && b.treasure === true) return 1;
+
+    return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  });
+});
 
 function createNewGoal() {
   showCreate.value = true
