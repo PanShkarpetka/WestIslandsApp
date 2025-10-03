@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import IslandsPage from '@/views/IslandsPage.vue';
 import IslandInfoPage from '@/views/IslandInfoPage.vue';
 import PopulationPage from '@/views/PopulationPage.vue'
+import TreasuryPage from '@/views/TreasuryPage.vue'
 import BuildingsPage from '@/views/BuildingsPage.vue'
 import LoginView from '@/views/LoginView.vue';
 import AdminView from '@/views/AdminView.vue';
@@ -21,6 +22,7 @@ const routes = [
             { path: '', name: 'island', component: IslandInfoPage },
             { path: 'buildings', name: 'buildings', component: BuildingsPage },
             { path: 'population', name: 'population', component: PopulationPage },
+            { path: 'treasury', name: 'treasury', component: TreasuryPage },
         ]
     },
     { path: '/ships', component: ShipsView, meta: { requiresAuth: false } },
