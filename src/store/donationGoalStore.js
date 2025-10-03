@@ -26,7 +26,7 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
             goals.value = snapshot.docs.map(d => {
                 const data = d.data()
                 return {
-                    treasure: data.treasure || false,
+                    treasury: data.treasury || false,
                     id: d.id,
                     title: data.title,
                     description: data.description,

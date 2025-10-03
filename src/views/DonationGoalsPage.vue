@@ -73,8 +73,8 @@ const sortedGoals = computed(() => {
 
     if (aDone !== bDone) return aDone ? 1 : -1;
 
-    if (a.treasure === true && b.treasure !== true) return -1;
-    if (a.treasure !== true && b.treasure === true) return 1;
+    if (a.treasury === true && b.treasury !== true) return -1;
+    if (a.treasury !== true && b.treasury === true) return 1;
 
     return (b.createdAt ?? 0) - (a.createdAt ?? 0);
   });
