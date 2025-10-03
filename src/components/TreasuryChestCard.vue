@@ -105,6 +105,7 @@
 
           <div class="text-caption mt-3 opacity-70">
             Баланс після операції порахується автоматично. Транзакція з’явиться в списку нижче.
+            <b>{{ isLoggedIn ? '' : 'Для операції необхідна авторизація.'}}</b>
           </div>
 
           <div v-if="error" class="text-error text-body-2 mt-2">{{ error }}</div>
@@ -118,6 +119,7 @@
               size="large"
               :prepend-icon="mode === 'deposit' ? 'mdi-cash-plus' : 'mdi-cash-minus'"
               @click="submit"
+              :disabled="!isLoggedIn"
           >
             Підтвердити
           </v-btn>
@@ -147,6 +149,7 @@ const loading = ref(false);
 const error = ref('');
 
 const isAdmin = computed(() => !!user.isAdmin);
+const isLoggedIn = computed(() => user.nickname !== '');
 const balance = computed(() => treasury.balance);
 
 function open() {

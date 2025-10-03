@@ -22,5 +22,4 @@ import TreasuryChestCard from "@/components/TreasuryChestCard.vue";
 </script>
 
 <style scoped>
-/* дрібний тюнінг під Tailwind+Vuetify мікс */
 </style>
