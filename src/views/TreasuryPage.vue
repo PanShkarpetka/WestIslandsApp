@@ -3,7 +3,6 @@
     <div class="flex items-center justify-between mb-4">
       <div>
         <h1 class="text-h5 font-semibold">Скарбниця острова</h1>
-        <div class="opacity-70 text-sm">Прозорий облік внесків і витрат</div>
       </div>
     </div>
 
