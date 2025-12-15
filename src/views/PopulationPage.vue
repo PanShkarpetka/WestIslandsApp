@@ -12,7 +12,7 @@
             <v-col v-for="g in viewRows" :key="g.id" cols="12" sm="6" md="4" lg="3">
               <v-card class="population-card">
                 <v-img
-                    :src="g.imageUrl || '/images/ships/ship-default.png'"
+                    :src="g.imageUrl"
                     cover
                     class="group-image"
                 >
@@ -46,21 +46,27 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { usePopulationStore } from '@/store/populationStore'
+import { useIslandStore } from '@/store/islandStore'
 import { Pie } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from 'chart.js'
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
 
-const islandId = 'island_rock'
-
 const store = usePopulationStore()
+window.store = store;
+const islandStore = useIslandStore()
 
-onMounted(async () => {
-  store.startListener(islandId)
+onMounted(() => {
+  store.startListener(islandStore.currentId)
+  console.log(islandStore.currentId)
 });
 onBeforeUnmount(() => store.stopListener())
+
+watch(() => islandStore.currentId, (id) => {
+  store.startListener(id)
+})
 
 const totalPopulation = computed(() => store.totalPopulation)
 

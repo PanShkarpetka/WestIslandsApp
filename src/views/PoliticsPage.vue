@@ -202,7 +202,8 @@ import {
   onSnapshot, query, where, orderBy, serverTimestamp
 } from 'firebase/firestore';
 import { apportionFixed } from '@/utils/votes';
-import {useUserStore} from "@/store/userStore.js";
+import { useUserStore } from "@/store/userStore.js";
+import { useInterestGroupStore } from '@/store/interestGroupStore';
 
 const auth = useUserStore()
 
@@ -216,19 +217,16 @@ const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 // =================== STATE ====================
 const proposals = ref([]);      // [{id, title, summary, actual, createdAt}, ...]
-const groups = ref([]);         // [{id, name, count}, ...]
+const interestGroupStore = useInterestGroupStore();
+const groups = computed(() => interestGroupStore.items || []);   // [{id, name, count}, ...]
 const interests = ref({});      // { `${groupId}_${proposalId}`: {id, groupId, proposalId, people} }
 
-let unsubProposals, unsubGroups, unsubInterests;
+let unsubProposals, unsubInterests;
 
 // =================== SUBSCRIPTIONS ============
 onMounted(() => {
   // Groups (наприклад: sailors/peasants/workers)
-  unsubGroups = onSnapshot(collection(db, 'interestGroup'), (snap) => {
-    const arr = [];
-    snap.forEach(d => arr.push({ id: d.id, ...d.data() }));
-    groups.value = arr;
-  });
+  interestGroupStore.startListener();
 
   // Proposals
   const base = collection(db, 'proposals');
@@ -252,8 +250,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unsubProposals && unsubProposals();
-  unsubGroups && unsubGroups();
   unsubInterests && unsubInterests();
+  interestGroupStore.stopListener();
 });
 
 // =================== HELPERS ==================
