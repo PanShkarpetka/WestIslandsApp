@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
 import {
-    getFirestore, collection, query, orderBy, onSnapshot, doc
+    getFirestore, collection, query, orderBy, onSnapshot, doc, updateDoc
 } from 'firebase/firestore'
 
 export const usePopulationStore = defineStore('population', () => {
@@ -71,6 +71,13 @@ export const usePopulationStore = defineStore('population', () => {
         }
     }
 
+    async function setGroupCount(id, count) {
+        if (!id) throw new Error('id is required')
+        const value = Math.max(0, Number(count) || 0)
+        const ref = doc(getFirestore(), 'population', id)
+        await updateDoc(ref, { count: value, amount: value })
+    }
+
     const totalCountFromGroups = computed(() =>
         state.items.reduce((s, g) => s + (g.count || 0), 0)
     )
@@ -103,5 +110,6 @@ export const usePopulationStore = defineStore('population', () => {
         totalPopulation,
         totalCountFromGroups,
         groupsAugmented,
+        setGroupCount,
     }
 })
