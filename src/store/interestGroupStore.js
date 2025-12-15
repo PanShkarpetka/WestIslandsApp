@@ -1,13 +1,13 @@
-// stores/population.js
+// stores/interestGroup.js
 import { defineStore } from 'pinia'
 import { reactive, computed, toRefs } from 'vue'
 import {
-    getFirestore, collection, query, orderBy, onSnapshot, doc, updateDoc
+    getFirestore, collection, query, where, orderBy, onSnapshot, doc,
 } from 'firebase/firestore'
 
-export const usePopulationStore = defineStore('population', () => {
+export const useInterestGroupStore = defineStore('interestGroup', () => {
     const state = reactive({
-        items: [],              // документи population для острова
+        items: [],              // документи interestGroup для острова
         totalPopulation: 0,     // населення з islands/<islandId>
         loading: false,
         error: null,
@@ -29,33 +29,20 @@ export const usePopulationStore = defineStore('population', () => {
 
         const db = getFirestore()
 
-        // 1) population по islandId (якщо є поле); інакше — вся колекція
-        const refGroups = collection(db, 'population')
-        const qGroups = query(refGroups, orderBy('name'))
+        // 1) interestGroup по islandId (якщо задано) або вся колекція
+        const refGroups = collection(db, 'interestGroup')
+        const qGroups = islandId
+            ? query(refGroups, where('islandId', '==', islandId), orderBy('name'))
+            : query(refGroups, orderBy('name'))
         state._unsubGroups = onSnapshot(qGroups, (snap) => {
-            state.items = snap.docs
-                .map(d => {
-                    const data = d.data()
-                    return {
-                        id: d.id,
-                        ...data,
-                        // Перекладаємо поле amount => count для графіка
-                        count: data.count ?? data.amount ?? 0,
-                    }
-                })
-                // Підтримка острівних даних, але не ховаємо глобальні записи без islandId
-                .filter(g => {
-                    if (!islandId) return true
-                    const fromIsland = g.islandId ?? g.island
-                    return fromIsland ? fromIsland === islandId : true
-                })
+            state.items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
             state.loading = false
         }, (err) => {
             state.error = err.message
             state.loading = false
         })
 
-        // 2) island doc з населенням
+        // 2) island doc з населенням (лише якщо islandId передано)
         if (islandId) {
             const islandRef = doc(db, 'islands', islandId)
             state._unsubIsland = onSnapshot(islandRef, (snap) => {
@@ -63,19 +50,12 @@ export const usePopulationStore = defineStore('population', () => {
                 const pop = data.population ?? data.populationCount ?? data.people ?? 0
                 state.totalPopulation = Number(pop) || 0
             }, (err) => {
-                console.error('[population] island error:', err)
+                console.error('[interestGroup] island error:', err)
                 state.error = err.message
             })
         } else {
             state.totalPopulation = 0
         }
-    }
-
-    async function setGroupCount(id, count) {
-        if (!id) throw new Error('id is required')
-        const value = Math.max(0, Number(count) || 0)
-        const ref = doc(getFirestore(), 'population', id)
-        await updateDoc(ref, { count: value, amount: value })
     }
 
     const totalCountFromGroups = computed(() =>
@@ -110,6 +90,5 @@ export const usePopulationStore = defineStore('population', () => {
         totalPopulation,
         totalCountFromGroups,
         groupsAugmented,
-        setGroupCount,
     }
 })
