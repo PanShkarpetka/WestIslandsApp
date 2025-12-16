@@ -9,6 +9,7 @@ import AdminView from '@/views/AdminView.vue';
 import ShipsView from '@/views/ShipsView.vue';
 import DonationGoalsPage from "@/views/DonationGoalsPage.vue";
 import PoliticsPage from "@/views/PoliticsPage.vue";
+import ReligionPage from "@/views/ReligionPage.vue";
 import CourierPage from "@/views/CourierView.vue";
 import { useUserStore } from '@/store/userStore';
 
@@ -29,6 +30,7 @@ const routes = [
     { path: '/ships', component: ShipsView, meta: { requiresAuth: false } },
     { path: '/donations', component: DonationGoalsPage, meta: { requiresAuth: false } },
     { path: '/politics', component: PoliticsPage, meta: { requiresAuth: false } },
+    { path: '/religion', component: ReligionPage, meta: { requiresAuth: false } },
     { path: '/courier', component: CourierPage, meta: { requiresAuth: false } },
     { path: '/admin', component: AdminView, meta: { adminOnly: true } },
 ];
