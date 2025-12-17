@@ -11,13 +11,16 @@
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12">
         <v-card class="pa-6 religion-card" elevation="4" width="100%">
-          <div class="card-overlay" aria-hidden="true"></div>
+          <div
+            class="card-overlay"
+            aria-hidden="true"
+          ></div>
           <v-card-text class="px-0 position-relative">
             <div v-if="loading" class="text-gray-500">Завантаження…</div>
             <div v-else-if="error" class="error">{{ error }}</div>
             <div v-else-if="records.length === 0" class="text-gray-500">Немає даних.</div>
 
-            <section v-else class="distribution-section">
+            <section v-else class="distribution-section section-overlay" :style="sectionBackgroundStyle">
               <header class="distribution-header">
                 <div>
                   <p class="text-sm text-medium-emphasis mb-1">Розподіл населення</p>
@@ -37,22 +40,6 @@
                     :options="chartOptions"
                     class="doughnut-chart"
                   />
-                  <transition name="center-icon" mode="out-in">
-                    <div
-                      v-if="hoveredReligion"
-                      key="center-icon"
-                      class="center-icon"
-                      :aria-label="`Фокус на духовенстві ${hoveredReligion.name}`"
-                    >
-                      <div class="center-icon__circle">
-                        <img
-                          :src="`/images/religions/${getCenterImage(hoveredReligion.name)}.png`"
-                          :alt="hoveredReligion.name"
-                          loading="lazy"
-                        />
-                      </div>
-                    </div>
-                  </transition>
                 </template>
                 <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
               </div>
@@ -229,6 +216,7 @@ const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
 const religionChartRef = ref(null)
 const hoveredReligion = ref(null)
+const defaultCardBackground = ''
 
 function hasIcon(name) {
   switch (name) {
@@ -461,7 +449,11 @@ const chartOptions = computed(() => ({
     },
   },
   onHover: (_evt, elements) => {
-    hoveredReligion.value = elements.length ? distribution.value[elements[0].index] : null
+    hoveredReligion.value = elements.length ? distribution.value[elements[0].index] : null;
+    const container = document.querySelector('.doughnut-chart');
+    if (!container) return;
+
+    container.style.opacity = elements.length ? '0.6' : '1';
   },
   onClick: (_evt, elements) => {
     if (!elements.length) return
@@ -469,6 +461,17 @@ const chartOptions = computed(() => ({
     handleSliceClick(distribution.value[index])
   },
 }))
+
+const sectionBackgroundStyle = computed(() => {
+  const name = hoveredReligion.value?.name
+  const imageUrl = name
+    ? `/images/religions/${getCenterImage(name)}.png`
+    : defaultCardBackground
+
+  return {
+    backgroundImage: `url('${imageUrl}')`,
+  }
+})
 
 watch(
   () => islandStore.currentId,
@@ -606,6 +609,13 @@ async function applyFaithChange(mode) {
   opacity: 1;
   z-index: 0;
 }
+.section-overlay {
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+}
 
 .religion-card .v-card-text {
   position: relative;
@@ -630,51 +640,6 @@ async function applyFaithChange(mode) {
   min-height: 520px;
   position: relative;
   padding: 12px 8px 0;
-}
-
-.center-icon {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  transform: translateZ(0);
-}
-
-.center-icon__circle {
-  width: 30%;
-  aspect-ratio: 1;
-  border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.92), rgba(255,255,255,0.78));
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(0, 0, 0, 0.04);
-  display: grid;
-  place-items: center;
-  transform-origin: center;
-}
-
-.center-icon__circle img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.15));
-}
-
-.center-icon-enter-active,
-.center-icon-leave-active {
-  transition: opacity 180ms ease, transform 200ms ease;
-}
-
-.center-icon-enter-from,
-.center-icon-leave-to {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-.center-icon-enter-to,
-.center-icon-leave-from {
-  opacity: 1;
-  transform: scale(1);
 }
 
 .doughnut-chart {
