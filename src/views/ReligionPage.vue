@@ -47,65 +47,67 @@
               <v-divider class="my-6" />
             </section>
 
-            <v-table v-if="records.length" density="comfortable" class="religion-table">
-              <thead>
-                <tr>
-                  <th class="text-left">
-                    <button type="button" class="sort-btn" @click="toggleSort('heroName')">
-                      <b>Герой</b>
-                      <span class="sort-indicator">
-                        {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                      </span>
-                    </button>
-                  </th>
-                  <th class="text-left">
-                    <button type="button" class="sort-btn" @click="toggleSort('religionName')">
-                      <b>Духовенство</b>
-                      <span class="sort-indicator">
-                        {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                      </span>
-                    </button>
-                  </th>
-                  <th class="text-left">
-                    <button type="button" class="sort-btn" @click="toggleSort('faith')">
-                      <b>Очки віри</b>
-                      <span class="sort-indicator">
-                        {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                      </span>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="record in sortedRecords"
-                  :key="record.id"
-                  class="clickable-row"
-                  role="button"
-                  tabindex="0"
-                  @click="openClergy(record)"
-                  @keydown.enter.prevent="openClergy(record)"
-                >
-                  <td>{{ record.heroName }}</td>
-                  <td>{{ record.religionName }}</td>
-                  <td class="faith-cell">
+            <div v-if="records.length" class="table-scroll">
+              <v-table density="comfortable" class="religion-table">
+                <thead>
+                  <tr>
+                    <th class="text-left">
+                      <button type="button" class="sort-btn" @click="toggleSort('heroName')">
+                        <b>Герой</b>
+                        <span class="sort-indicator">
+                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
+                        </span>
+                      </button>
+                    </th>
+                    <th class="text-left">
+                      <button type="button" class="sort-btn" @click="toggleSort('religionName')">
+                        <b>Духовенство</b>
+                        <span class="sort-indicator">
+                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
+                        </span>
+                      </button>
+                    </th>
+                    <th class="text-left">
+                      <button type="button" class="sort-btn" @click="toggleSort('faith')">
+                        <b>Очки віри</b>
+                        <span class="sort-indicator">
+                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
+                        </span>
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="record in sortedRecords"
+                    :key="record.id"
+                    class="clickable-row"
+                    role="button"
+                    tabindex="0"
+                    @click="openClergy(record)"
+                    @keydown.enter.prevent="openClergy(record)"
+                  >
+                    <td>{{ record.heroName }}</td>
+                    <td>{{ record.religionName }}</td>
+                    <td class="faith-cell">
 
-                    <v-icon v-if="hasIcon(record.religionName)">
-                      <img
-                          :src="`/images/religions/${record.religionName}.png`"
-                          alt="Faith Icon"
-                          width="32"
-                          height="32"
-                      />
-                    </v-icon>
-                    <v-icon v-else>
-                      mdi-dharmachakra
-                    </v-icon>
-                    <span>{{ record.faith }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </v-table>
+                      <v-icon v-if="hasIcon(record.religionName)">
+                        <img
+                            :src="`/images/religions/${record.religionName}.png`"
+                            alt="Faith Icon"
+                            width="32"
+                            height="32"
+                        />
+                      </v-icon>
+                      <v-icon v-else>
+                        mdi-dharmachakra
+                      </v-icon>
+                      <span>{{ record.faith }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -267,7 +269,7 @@ const religionIconPlugin = {
 
     const items = pluginOptions?.distribution || []
     const minPercent = pluginOptions?.minPercent ?? 6
-    const baseSize = pluginOptions?.baseSize ?? 32
+    const baseSize = pluginOptions?.baseSize ?? 20
     const sizeScale = pluginOptions?.sizeScale ?? 1.2
     const radialPosition = pluginOptions?.radialPosition ?? 0.62
     const elements = chart.getDatasetMeta(args.index).data
@@ -751,5 +753,103 @@ async function applyFaithChange(mode) {
   align-content: center;
   flex-direction: row;
   width: 100px;
+}
+
+@media (max-width: 960px) {
+  .distribution-section {
+    padding: 12px 12px 0;
+  }
+
+  .distribution-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .section-overlay {
+    background-size: 65% !important;
+  }
+
+  .chart-container {
+    min-height: 380px;
+    padding: 8px 0 0;
+  }
+
+  .doughnut-chart {
+    max-width: 100%;
+    height: 260px;
+  }
+}
+
+@media (max-width: 600px) {
+  .section-overlay {
+    background-size: 80% !important;
+  }
+
+  .chart-container {
+    min-height: 320px;
+  }
+
+  .doughnut-chart {
+    height: 220px;
+  }
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.religion-table {
+  min-width: 540px;
+}
+
+@media (max-width: 960px) {
+  .distribution-section {
+    padding: 12px 12px 0;
+  }
+
+  .distribution-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .section-overlay {
+    background-size: 65% !important;
+  }
+
+  .chart-container {
+    min-height: 380px;
+    padding: 8px 0 0;
+  }
+
+  .doughnut-chart {
+    max-width: 100%;
+    height: 260px;
+  }
+}
+
+@media (max-width: 600px) {
+  .section-overlay {
+    background-size: 80% !important;
+  }
+
+  .chart-container {
+    min-height: 320px;
+  }
+
+  .doughnut-chart {
+    height: 220px;
+  }
+
+  .religion-table {
+    font-size: 14px;
+    min-width: 100%;
+  }
+
+  .faith-cell {
+    gap: 8px;
+    width: auto;
+  }
 }
 </style>
