@@ -27,22 +27,73 @@
                   <p class="text-h6 font-semibold">{{ totalFollowersLabel }}</p>
                   <p class="text-caption text-medium-emphasis">Населення острова: {{ totalPopulationLabel }}</p>
                 </div>
+                <v-btn-toggle
+                  v-model="viewMode"
+                  mandatory
+                  density="comfortable"
+                  color="primary"
+                  variant="tonal"
+                  class="view-toggle"
+                >
+                  <v-btn value="diagram" prepend-icon="mdi-chart-donut">Діаграма</v-btn>
+                  <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
+                </v-btn-toggle>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
                   {{ distribution.length }} духовенств
                 </v-chip>
               </header>
 
-              <div class="chart-container">
-                <template v-if="distribution.length">
+              <template v-if="distribution.length">
+                <div v-if="viewMode === 'diagram'" class="chart-container">
                   <Doughnut
                     ref="religionChartRef"
                     :data="chartData"
                     :options="chartOptions"
                     class="doughnut-chart"
                   />
-                </template>
-                <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
-              </div>
+                </div>
+                <div v-else class="distribution-table-wrapper">
+                  <v-table density="comfortable" class="distribution-table">
+                    <thead>
+                      <tr>
+                        <th class="text-left">Духовенство</th>
+                        <th class="text-left">Віряни</th>
+                        <th class="text-left">Герої</th>
+                        <th class="text-left">Частка</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="item in distribution"
+                        :key="item.name"
+                        class="distribution-row"
+                        role="button"
+                        tabindex="0"
+                        :style="rowStyle(item)"
+                        @mouseenter="hoveredReligion = item"
+                        @mouseleave="hoveredReligion = null"
+                        @focus="hoveredReligion = item"
+                        @blur="hoveredReligion = null"
+                        @click="handleSliceClick(item)"
+                        @keydown.enter.prevent="handleSliceClick(item)"
+                      >
+                        <td class="distribution-name">
+                          <span
+                            class="color-bullet"
+                            :style="{ backgroundColor: item.color }"
+                            aria-hidden="true"
+                          ></span>
+                          {{ item.name }}
+                        </td>
+                        <td>{{ item.followers.toLocaleString('uk-UA') }}</td>
+                        <td>{{ item.heroes }}</td>
+                        <td>{{ item.percentRounded }}%</td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </div>
+              </template>
+              <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
 
               <v-divider class="my-6" />
             </section>
@@ -218,6 +269,7 @@ const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
 const religionChartRef = ref(null)
 const hoveredReligion = ref(null)
+const viewMode = ref('diagram')
 const defaultCardBackground = ''
 
 function hasIcon(name) {
@@ -249,6 +301,7 @@ function getIconImage(name) {
 const religionImages = {
   Панцуріель: 'Panzuriel',
   Амберлі: 'Umberlee',
+  Ашкарот: 'Ashkarot',
   Девіл: 'Devil',
   'Не визначено': 'Unknown',
   Атеїзм: 'Atheism',
@@ -476,6 +529,33 @@ function handleSliceClick(item) {
   console.info('[religion] slice clicked:', item.name)
 }
 
+function withAlpha(hex, alpha) {
+  const value = hex?.startsWith('#') ? hex.slice(1) : hex
+  if (!value) return hex
+
+  const expanded = value.length === 3
+    ? value.split('').map((char) => char + char).join('')
+    : value
+
+  if (expanded.length !== 6) return hex
+
+  const r = parseInt(expanded.slice(0, 2), 16)
+  const g = parseInt(expanded.slice(2, 4), 16)
+  const b = parseInt(expanded.slice(4, 6), 16)
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function rowStyle(item) {
+  const isActive = hoveredReligion.value?.name === item.name
+
+  return {
+    '--row-color': item.color,
+    backgroundColor: isActive ? withAlpha(item.color, 0.1) : undefined,
+    cursor: 'pointer',
+  }
+}
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -619,9 +699,54 @@ async function applyFaithChange(mode) {
 <style scoped>
 .error{ color:#dc2626; font-size: 15px; margin-top: 8px; }
 
+.view-toggle {
+  margin-left: auto;
+}
+
+.distribution-table-wrapper {
+  margin-top: 12px;
+  background-color: rgba(255, 255, 255, 0.62);
+  border-radius: 12px;
+  overflow: hidden;
+  opacity: 0.5;
+}
+.distribution-table th {
+  background-color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+}
+
+.distribution-table td {
+  background-color: transparent;
+}
+
+.distribution-row {
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.distribution-row:hover,
+.distribution-row:focus-visible {
+  background-color: color-mix(in srgb, var(rgba(0, 0, 0, 0.08)) 20%, transparent);
+}
+
+.distribution-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.color-bullet {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
 .religion-table {
   background-color: rgba(255, 255, 255, 0.62);
   color: #0f172a;
+  min-width: 540px;
 }
 .religion-table td {
   background-color: transparent;
@@ -798,10 +923,6 @@ async function applyFaithChange(mode) {
   width: 100%;
   overflow-x: auto;
   padding-bottom: 8px;
-}
-
-.religion-table {
-  min-width: 540px;
 }
 
 @media (max-width: 960px) {
