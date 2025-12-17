@@ -52,8 +52,12 @@
                     class="doughnut-chart"
                   />
                 </div>
-                <div v-else class="distribution-table-wrapper">
-                  <v-table density="comfortable" class="distribution-table">
+                <div v-else class="distribution-table-wrapper" :class="{ 'distribution-table-wrapper-hovered': hoveredReligion !== null }">
+                  <v-table
+                      density="comfortable"
+                      class="distribution-table"
+
+                  >
                     <thead>
                       <tr>
                         <th class="text-left">Духовенство</th>
@@ -705,13 +709,17 @@ async function applyFaithChange(mode) {
 
 .distribution-table-wrapper {
   margin-top: 12px;
-  background-color: rgba(255, 255, 255, 0.62);
+  background-color: #fff;
   border-radius: 12px;
   overflow: hidden;
+}
+
+.distribution-table-wrapper-hovered {
   opacity: 0.5;
 }
+
 .distribution-table th {
-  background-color: rgba(255, 255, 255, 0.85);
+  background-color: #fff;
   font-weight: 700;
 }
 
