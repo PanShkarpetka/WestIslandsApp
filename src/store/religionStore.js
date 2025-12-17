@@ -83,6 +83,7 @@ export const useReligionStore = defineStore('religion', () => {
         return {
           id: docSnap.id,
           heroName,
+          religion: data.religion,
           religionName,
           faith: Number(data.faith ?? 0),
         }

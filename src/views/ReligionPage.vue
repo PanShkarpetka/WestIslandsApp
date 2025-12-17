@@ -58,7 +58,21 @@
                 >
                   <td>{{ record.heroName }}</td>
                   <td>{{ record.religionName }}</td>
-                  <td>{{ record.faith }} <v-icon>mdi-dharmachakra</v-icon></td>
+                  <td class="faith-cell">
+
+                    <v-icon v-if="hasIcon(record.religionName)">
+                      <img
+                          :src="`/images/religions/${record.religionName}.png`"
+                          alt="Faith Icon"
+                          width="32"
+                          height="32"
+                      />
+                    </v-icon>
+                    <v-icon v-else>
+                      mdi-dharmachakra
+                    </v-icon>
+                    <span>{{ record.faith }}</span>
+                  </td>
                 </tr>
               </tbody>
             </v-table>
@@ -75,7 +89,18 @@
             <div class="text-body-2 text-medium-emphasis">{{ activeClergy.religionName }}</div>
           </div>
           <v-chip color="primary" variant="elevated" class="ml-auto">
-            {{ activeClergy.faith }} <v-icon class="ml-1" size="18">mdi-dharmachakra</v-icon>
+            {{ activeClergy.faith }}
+            <v-icon v-if="hasIcon(activeClergy.religionName)">
+              <img
+                  :src="`/images/religions/${activeClergy.religionName}.png`"
+                  alt="Faith Icon"
+                  width="16"
+                  height="16"
+              />
+            </v-icon>
+            <v-icon v-else class="ml-1" size="18">
+              mdi-dharmachakra
+            </v-icon>
           </v-chip>
         </v-card-title>
 
@@ -247,12 +272,43 @@ async function applyFaithChange(mode) {
     actionLoading.value = false
   }
 }
+
+function hasIcon(name) {
+  switch (name) {
+    case 'Амберлі':
+      return true;
+    case 'Блібдулпулп':
+      return true;
+    case 'Панцуріель':
+      return true;
+    case 'Істишія':
+      return true;
+    case 'Девіл':
+      return true;
+    case 'Ашкарот':
+      return true;
+    default:
+      return false;
+  }
+}
 </script>
 <style scoped>
 .error{ color:#dc2626; font-size: 15px; margin-top: 8px; }
 
-.religion-table th { font-weight: 600; }
-.religion-table tbody tr:nth-child(even) { background-color: rgba(0,0,0,0.02); }
+.religion-table {
+  background-color: rgba(255, 255, 255, 0.62);
+  color: #0f172a;
+}
+.religion-table td {
+  background-color: transparent;
+}
+.religion-table th {
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.72);
+}
+.religion-table tbody tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.4);
+}
 .sort-btn { background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .sort-btn:hover { text-decoration: underline; }
 .sort-indicator { font-size: 12px; }
@@ -266,7 +322,7 @@ async function applyFaithChange(mode) {
 .card-overlay {
   position: absolute;
   inset: 0;
-  background-image: url('@/images/religions/clergyBackground.jpg');
+  background-image: url('@/images/religions/clergyBackground.png');
   background-size: cover;
   background-position: center;
   opacity: 1;
@@ -276,8 +332,6 @@ async function applyFaithChange(mode) {
 .religion-card .v-card-text {
   position: relative;
   z-index: 1;
-  backdrop-filter: blur(1px);
-  opacity: 0.7;
 }
 
 .clickable-row {
@@ -308,5 +362,13 @@ async function applyFaithChange(mode) {
 }
 .btns {
   justify-content: space-evenly;
+}
+.faith-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  align-content: center;
+  flex-direction: row;
+  width: 100px;
 }
 </style>
