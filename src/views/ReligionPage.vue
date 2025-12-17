@@ -287,6 +287,10 @@ function hasIcon(name) {
       return true;
     case 'Ашкарот':
       return true;
+    case 'Трійка':
+      return true;
+    case 'Четвірка':
+      return true;
     default:
       return false;
   }
