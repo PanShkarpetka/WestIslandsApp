@@ -16,6 +16,7 @@ import { db } from '@/services/firebase'
 
 export const useReligionStore = defineStore('religion', () => {
   const records = ref([])
+  const religions = ref([])
   const loading = ref(false)
   const error = ref('')
   const logsByClergy = ref({})
@@ -23,6 +24,7 @@ export const useReligionStore = defineStore('religion', () => {
   const logsError = ref('')
   let unsubscribe = null
   const logUnsubscribes = new Map()
+  let religionUnsubscribe = null
 
   function stopLogs(clergyId) {
     const stop = logUnsubscribes.get(clergyId)
@@ -42,6 +44,10 @@ export const useReligionStore = defineStore('religion', () => {
     if (unsubscribe) {
       unsubscribe()
       unsubscribe = null
+    }
+    if (religionUnsubscribe) {
+      religionUnsubscribe()
+      religionUnsubscribe = null
     }
     stopAllLogs()
   }
@@ -69,6 +75,7 @@ export const useReligionStore = defineStore('religion', () => {
     error.value = ''
 
     const colRef = collection(db, 'clergy')
+    const religionsRef = collection(db, 'religions')
     const heroCache = new Map()
     const religionCache = new Map()
 
@@ -79,7 +86,7 @@ export const useReligionStore = defineStore('religion', () => {
           resolveName(data.hero, heroCache, 'Невідомий герой'),
           resolveName(data.religion, religionCache, 'Невідома релігія'),
         ])
-
+            // [{"id":"Ashkarot","name":"Ашкарот","followers":0},{"id":"Asmodei","name":"Девіл","followers":66},{"id":"Blibdoolpoolp","name":"Блібдулпулп","followers":1},{"id":"Godless","name":"Атеїзм","followers":10},{"id":"Istishia","name":"Істишія","followers":1},{"id":"Panzuriel","name":"Панцуріель","followers":5},{"id":"Umberlee","name":"Амберлі","followers":27},{"id":"Unknown","name":"Не визначено","followers":86},{"id":"quadro","name":"Четвірка","followers":37},{"id":"test","name":"test religion","followers":12},{"id":"trio","name":"Трійка","followers":130}]
         return {
           id: docSnap.id,
           heroName,
@@ -103,6 +110,19 @@ export const useReligionStore = defineStore('religion', () => {
       console.error('[religion] Snapshot error', err)
       error.value = 'Не вдалося завантажити дані релігії.'
       loading.value = false
+    })
+
+    religionUnsubscribe = onSnapshot(religionsRef, (snapshot) => {
+      religions.value = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() || {}
+        return {
+          id: docSnap.id,
+          name: data.name || 'Невідома релігія',
+          followers: Number(data.followers ?? 0),
+        }
+      })
+    }, (err) => {
+      console.error('[religion] Failed to fetch religions', err)
     })
   }
 
@@ -160,6 +180,7 @@ export const useReligionStore = defineStore('religion', () => {
     records,
     loading,
     error,
+    religions,
     logsByClergy,
     logsLoading,
     logsError,
