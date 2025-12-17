@@ -30,13 +30,30 @@
               </header>
 
               <div class="chart-container">
-                <Doughnut
-                  v-if="distribution.length"
-                  ref="religionChartRef"
-                  :data="chartData"
-                  :options="chartOptions"
-                  class="doughnut-chart"
-                />
+                <template v-if="distribution.length">
+                  <Doughnut
+                    ref="religionChartRef"
+                    :data="chartData"
+                    :options="chartOptions"
+                    class="doughnut-chart"
+                  />
+                  <transition name="center-icon" mode="out-in">
+                    <div
+                      v-if="hoveredReligion"
+                      key="center-icon"
+                      class="center-icon"
+                      :aria-label="`Фокус на духовенстві ${hoveredReligion.name}`"
+                    >
+                      <div class="center-icon__circle">
+                        <img
+                          :src="`/images/religions/${getCenterImage(hoveredReligion.name)}.png`"
+                          :alt="hoveredReligion.name"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                  </transition>
+                </template>
                 <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
               </div>
 
@@ -211,6 +228,7 @@ const userStore = useUserStore()
 const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
 const religionChartRef = ref(null)
+const hoveredReligion = ref(null)
 
 function hasIcon(name) {
   switch (name) {
@@ -236,6 +254,22 @@ function getIconImage(name) {
     iconCache.set(name, img)
   }
   return iconCache.get(name)
+}
+
+const religionImages = {
+  Панцуріель: 'Panzuriel',
+  Амберлі: 'Umberlee',
+  Девіл: 'Devil',
+  'Не визначено': 'Unknown',
+  Атеїзм: 'Atheism',
+  Трійка: 'trio',
+  Четвірка: 'quadro',
+  Блібдулпулп: 'Blibdoolpoolp',
+  Істишія: 'Istishia'
+}
+
+function getCenterImage(name) {
+  return name ? religionImages[name] : 'Unknown';
 }
 
 const religionIconPlugin = {
@@ -424,8 +458,10 @@ const chartOptions = computed(() => ({
     religionIcons: {
       distribution: distribution.value,
       minPercent: 6,
-      radialPosition: 0.62,
     },
+  },
+  onHover: (_evt, elements) => {
+    hoveredReligion.value = elements.length ? distribution.value[elements[0].index] : null
   },
   onClick: (_evt, elements) => {
     if (!elements.length) return
@@ -440,6 +476,10 @@ watch(
     populationStore.startListener(id)
   },
 )
+
+watch(distribution, () => {
+  hoveredReligion.value = null
+})
 
 const sortBy = ref('heroName')
 const sortDirection = ref('asc')
@@ -590,6 +630,51 @@ async function applyFaithChange(mode) {
   min-height: 520px;
   position: relative;
   padding: 12px 8px 0;
+}
+
+.center-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+.center-icon__circle {
+  width: 30%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.92), rgba(255,255,255,0.78));
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  display: grid;
+  place-items: center;
+  transform-origin: center;
+}
+
+.center-icon__circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.15));
+}
+
+.center-icon-enter-active,
+.center-icon-leave-active {
+  transition: opacity 180ms ease, transform 200ms ease;
+}
+
+.center-icon-enter-from,
+.center-icon-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.center-icon-enter-to,
+.center-icon-leave-from {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .doughnut-chart {
