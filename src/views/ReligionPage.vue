@@ -30,12 +30,12 @@
               </header>
 
               <div class="chart-container">
-                <Pie
+                <Doughnut
                   v-if="distribution.length"
                   ref="religionChartRef"
                   :data="chartData"
                   :options="chartOptions"
-                  class="pie-chart"
+                  class="doughnut-chart"
                 />
                 <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
               </div>
@@ -201,7 +201,7 @@ import { useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
-import { Pie } from 'vue-chartjs'
+import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
@@ -321,7 +321,7 @@ const chartData = computed(() => ({
       data: distribution.value.map((item) => item.followers || 0),
       backgroundColor: distribution.value.map((item) => item.color),
       borderColor: '#ffffff',
-      borderWidth: 2,
+      borderWidth: 1,
       hoverOffset: 8,
     },
   ],
@@ -530,12 +530,12 @@ function hasIcon(name) {
 }
 
 .chart-container {
-  min-height: 320px;
+  min-height: 520px;
   position: relative;
   padding: 12px 8px 0;
 }
 
-.pie-chart {
+.doughnut-chart {
   width: 100%;
   max-width: 640px;
   height: 320px;
