@@ -267,7 +267,7 @@ const religionIconPlugin = {
 
     const items = pluginOptions?.distribution || []
     const minPercent = pluginOptions?.minPercent ?? 6
-    const baseSize = pluginOptions?.baseSize ?? 18
+    const baseSize = pluginOptions?.baseSize ?? 32
     const sizeScale = pluginOptions?.sizeScale ?? 1.2
     const radialPosition = pluginOptions?.radialPosition ?? 0.62
     const elements = chart.getDatasetMeta(args.index).data
@@ -423,6 +423,52 @@ const chartData = computed(() => ({
   ],
 }))
 
+function getTooltipLabel(item) {
+  if (!item) return ''
+  return `${item.name}: ${item.percentRounded}% • ${item.followers} вірян • ${item.heroes} героїв`
+}
+
+function getOrCreateTooltip(chart) {
+  const parent = chart.canvas.parentNode
+  if (!parent) return null
+
+  let tooltipEl = parent.querySelector('.chart-tooltip')
+
+  if (!tooltipEl) {
+    tooltipEl = document.createElement('div')
+    tooltipEl.className = 'chart-tooltip'
+    tooltipEl.innerHTML = '<div class="chart-tooltip__content"></div>'
+    parent.appendChild(tooltipEl)
+  }
+
+  return tooltipEl
+}
+
+const externalTooltipHandler = (context) => {
+  const { chart, tooltip } = context
+  const tooltipEl = getOrCreateTooltip(chart)
+  if (!tooltipEl) return
+
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = '0'
+    return
+  }
+
+  const tooltipContent = tooltipEl.querySelector('.chart-tooltip__content')
+  const item = distribution.value[tooltip.dataPoints?.[0]?.dataIndex]
+
+  if (tooltipContent) {
+    tooltipContent.textContent = getTooltipLabel(item)
+  }
+
+  const { offsetLeft: positionX, offsetTop: positionY } = chart.canvas
+
+  tooltipEl.style.opacity = '1'
+  tooltipEl.style.left = `${positionX + tooltip.caretX}px`
+  tooltipEl.style.top = `${positionY + tooltip.caretY}px`
+  tooltipEl.style.transform = 'translate(-50%, -100%) translateY(-8px)'
+}
+
 function handleSliceClick(item) {
   if (!item) return
   console.info('[religion] slice clicked:', item.name)
@@ -435,25 +481,20 @@ const chartOptions = computed(() => ({
     legend: { display: false },
     title: { display: true, text: 'Духовенства' },
     tooltip: {
-      callbacks: {
-        label: (ctx) => {
-          const item = distribution.value[ctx.dataIndex]
-          if (!item) return ''
-          return `${item.name}: ${item.percentRounded}% • ${item.followers} вірян • ${item.heroes} героїв`
-        },
-      },
+      enabled: false,
+      external: externalTooltipHandler,
     },
     religionIcons: {
       distribution: distribution.value,
       minPercent: 6,
     },
   },
-  onHover: (_evt, elements) => {
+  onHover: (_evt, elements, chart) => {
     hoveredReligion.value = elements.length ? distribution.value[elements[0].index] : null;
-    const container = document.querySelector('.doughnut-chart');
-    if (!container) return;
+    const canvas = chart?.canvas;
+    if (!canvas) return;
 
-    container.style.opacity = elements.length ? '0.6' : '1';
+    canvas.style.opacity = elements.length ? '0.5' : '1';
   },
   onClick: (_evt, elements) => {
     if (!elements.length) return
@@ -606,15 +647,16 @@ async function applyFaithChange(mode) {
   background-image: url('@/images/religions/clergyBackground.png');
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   opacity: 1;
   z-index: 0;
 }
 .section-overlay {
   inset: 0;
   z-index: 0;
-  background-position: center;
-  background-size: cover !important;
   background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 55% !important;
 }
 
 .religion-card .v-card-text {
@@ -640,6 +682,26 @@ async function applyFaithChange(mode) {
   min-height: 520px;
   position: relative;
   padding: 12px 8px 0;
+}
+
+:deep(.chart-tooltip) {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background-color: #0f172a;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  white-space: nowrap;
+}
+
+:deep(.chart-tooltip__content) {
+  display: block;
 }
 
 .doughnut-chart {
