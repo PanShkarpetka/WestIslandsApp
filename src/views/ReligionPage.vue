@@ -204,13 +204,87 @@ import { useIslandStore } from '@/store/islandStore'
 import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
 
-ChartJS.register(ArcElement, Tooltip, Legend, Title)
+const iconCache = new Map()
 
 const religionStore = useReligionStore()
 const userStore = useUserStore()
 const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
 const religionChartRef = ref(null)
+
+function hasIcon(name) {
+  switch (name) {
+    case 'Амберлі':
+    case 'Блібдулпулп':
+    case 'Панцуріель':
+    case 'Істишія':
+    case 'Девіл':
+    case 'Ашкарот':
+    case 'Трійка':
+    case 'Четвірка':
+      return true
+    default:
+      return false
+  }
+}
+
+function getIconImage(name) {
+  console.log(name)
+  if (!iconCache.has(name)) {
+    const img = new Image()
+    img.src = `/images/religions/${name}.png`
+    iconCache.set(name, img)
+  }
+  return iconCache.get(name)
+}
+
+const religionIconPlugin = {
+  id: 'religionIcons',
+  afterDatasetDraw(chart, args, pluginOptions) {
+    if (args.index !== 0) return
+
+    const items = pluginOptions?.distribution || []
+    const minPercent = pluginOptions?.minPercent ?? 6
+    const baseSize = pluginOptions?.baseSize ?? 18
+    const sizeScale = pluginOptions?.sizeScale ?? 1.2
+    const radialPosition = pluginOptions?.radialPosition ?? 0.62
+    const elements = chart.getDatasetMeta(args.index).data
+
+    const ctx = chart.ctx
+
+    elements.forEach((element, index) => {
+      const item = items[index]
+      if (!item || item.percentRounded < minPercent) return
+
+      const icon = getIconImage(item.name)
+      if (!icon) return
+      if (!icon.complete) {
+        icon.onload = () => chart.draw()
+        return
+      }
+
+      const angle = (element.startAngle + element.endAngle) / 2
+      const radius = element.innerRadius + (element.outerRadius - element.innerRadius) * radialPosition
+      const size = Math.min(
+        element.outerRadius - element.innerRadius,
+        baseSize + item.percent * sizeScale,
+      )
+
+      const x = element.x + Math.cos(angle) * radius
+      const y = element.y + Math.sin(angle) * radius
+
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(x, y, size / 2 + 4, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'
+      ctx.fill()
+      ctx.drawImage(icon, x - size / 2, y - size / 2, size, size)
+      ctx.restore()
+    })
+  },
+}
+
+ChartJS.register(ArcElement, Tooltip, Legend, Title, religionIconPlugin)
 
 onMounted(() => religionStore.startListening())
 onBeforeUnmount(() => religionStore.stopListening())
@@ -347,6 +421,11 @@ const chartOptions = computed(() => ({
         },
       },
     },
+    religionIcons: {
+      distribution: distribution.value,
+      minPercent: 6,
+      radialPosition: 0.62,
+    },
   },
   onClick: (_evt, elements) => {
     if (!elements.length) return
@@ -450,28 +529,6 @@ async function applyFaithChange(mode) {
   }
 }
 
-function hasIcon(name) {
-  switch (name) {
-    case 'Амберлі':
-      return true;
-    case 'Блібдулпулп':
-      return true;
-    case 'Панцуріель':
-      return true;
-    case 'Істишія':
-      return true;
-    case 'Девіл':
-      return true;
-    case 'Ашкарот':
-      return true;
-    case 'Трійка':
-      return true;
-    case 'Четвірка':
-      return true;
-    default:
-      return false;
-  }
-}
 </script>
 <style scoped>
 .error{ color:#dc2626; font-size: 15px; margin-top: 8px; }
