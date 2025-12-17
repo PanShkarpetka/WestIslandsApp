@@ -3,7 +3,7 @@
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12" sm="6">
         <h1 class="text-h5">
-          Релігії острова
+          Релігії острова (В розробці)
         </h1>
       </v-col>
     </v-row>
