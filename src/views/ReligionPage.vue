@@ -39,7 +39,7 @@
                   <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
                 </v-btn-toggle>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
-                  {{ distribution.length }} духовенств
+                  {{ distribution.length }} конфесій
                 </v-chip>
               </header>
 
@@ -60,7 +60,7 @@
                   >
                     <thead>
                       <tr>
-                        <th class="text-left">Духовенство</th>
+                        <th class="text-left">Конфесія</th>
                         <th class="text-left">Віряни</th>
                         <th class="text-left">Герої</th>
                         <th class="text-left">Частка</th>
@@ -97,7 +97,7 @@
                   </v-table>
                 </div>
               </template>
-              <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
+              <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
 
               <v-divider class="my-6" />
             </section>
@@ -116,7 +116,7 @@
                     </th>
                     <th class="text-left">
                       <button type="button" class="sort-btn" @click="toggleSort('religionName')">
-                        <b>Духовенство</b>
+                        <b>Конфесія</b>
                         <span class="sort-indicator">
                           {{ sortDirection === 'desc' ? '▲' : '▼' }}
                         </span>
@@ -565,7 +565,7 @@ const chartOptions = computed(() => ({
   maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
-    title: { display: true, text: 'Духовенства' },
+    title: { display: true, text: 'Конфесії' },
     tooltip: {
       enabled: false,
       external: externalTooltipHandler,
