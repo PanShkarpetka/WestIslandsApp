@@ -761,10 +761,10 @@ async function applyFaithChange(mode) {
 }
 .religion-table th {
   font-weight: 600;
-  background-color: rgba(255, 255, 255, 0.72);
+  background-color: rgba(255, 255, 255, 0.82);
 }
 .religion-table tbody tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.6);
 }
 .sort-btn { background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
 .sort-btn:hover { text-decoration: underline; }

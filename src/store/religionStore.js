@@ -69,6 +69,28 @@ export const useReligionStore = defineStore('religion', () => {
     }
   }
 
+  async function resolveHero(refValue, cache, fallbackLabel) {
+    const cacheKey = refValue?.path
+
+    if (!refValue || !cacheKey) return { name: fallbackLabel, inactive: false }
+    if (cache.has(cacheKey)) return cache.get(cacheKey)
+
+    try {
+      const snapshot = await getDoc(refValue)
+      const data = snapshot.data() || {}
+      const result = {
+        name: snapshot.exists() ? (data.name || fallbackLabel) : fallbackLabel,
+        inactive: Boolean(data.inactive),
+      }
+
+      cache.set(cacheKey, result)
+      return result
+    } catch (err) {
+      console.error('[religion] Failed to resolve hero for', cacheKey, err)
+      return { name: fallbackLabel, inactive: false }
+    }
+  }
+
   function startListening() {
     stopListening()
     loading.value = true
@@ -82,14 +104,17 @@ export const useReligionStore = defineStore('religion', () => {
     unsubscribe = onSnapshot(colRef, (snapshot) => {
       const tasks = snapshot.docs.map(async (docSnap) => {
         const data = docSnap.data() || {}
-        const [heroName, religionName] = await Promise.all([
-          resolveName(data.hero, heroCache, 'Невідомий герой'),
+        const [hero, religionName] = await Promise.all([
+          resolveHero(data.hero, heroCache, 'Невідомий герой'),
           resolveName(data.religion, religionCache, 'Невідома релігія'),
         ])
             // [{"id":"Ashkarot","name":"Ашкарот","followers":0},{"id":"Asmodei","name":"Девіл","followers":66},{"id":"Blibdoolpoolp","name":"Блібдулпулп","followers":1},{"id":"Godless","name":"Атеїзм","followers":10},{"id":"Istishia","name":"Істишія","followers":1},{"id":"Panzuriel","name":"Панцуріель","followers":5},{"id":"Umberlee","name":"Амберлі","followers":27},{"id":"Unknown","name":"Не визначено","followers":86},{"id":"quadro","name":"Четвірка","followers":37},{"id":"test","name":"test religion","followers":12},{"id":"trio","name":"Трійка","followers":130}]
+
+        if (hero.inactive) return null
+
         return {
           id: docSnap.id,
-          heroName,
+          heroName: hero.name,
           religion: data.religion,
           religionName,
           faith: Number(data.faith ?? 0),
@@ -98,7 +123,7 @@ export const useReligionStore = defineStore('religion', () => {
 
       Promise.all(tasks)
         .then((result) => {
-          records.value = result
+          records.value = result.filter(Boolean)
           loading.value = false
         })
         .catch((err) => {
