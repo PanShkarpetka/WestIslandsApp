@@ -308,7 +308,7 @@ const religionImages = {
   Ашкарот: 'Ashkarot',
   Девіл: 'Devil',
   'Не визначено': 'Unknown',
-  Атеїзм: 'Atheism',
+  Відсутність: 'Godless',
   Трійка: 'trio',
   Четвірка: 'quadro',
   Блібдулпулп: 'Blibdoolpoolp',
