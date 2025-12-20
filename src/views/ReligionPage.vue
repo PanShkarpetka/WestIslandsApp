@@ -8,6 +8,38 @@
       </v-col>
     </v-row>
 
+    <v-row class="my-4">
+      <v-col cols="12">
+        <v-alert
+          v-if="latestCycleError"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+        >
+          {{ latestCycleError }}
+        </v-alert>
+
+        <v-skeleton-loader
+          v-else-if="latestCycleLoading"
+          type="heading, subtitle"
+          class="pa-4"
+        />
+
+        <v-card v-else class="pa-4" variant="tonal">
+          <div class="current-cycle-header">
+            <v-avatar color="primary" variant="elevated">
+              <v-icon>mdi-timeline-clock</v-icon>
+            </v-avatar>
+            <div class="current-cycle-text">
+              <div class="text-overline text-medium-emphasis mb-1">Поточний цикл</div>
+              <div class="text-subtitle-1 font-semibold">{{ currentCycleHeadline }}</div>
+              <div class="text-body-2 text-medium-emphasis">{{ currentCycleDetails }}</div>
+            </div>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12">
         <v-card class="pa-6 religion-card" elevation="4" width="100%">
@@ -184,33 +216,27 @@
             {{ cycleError }}
           </v-alert>
           <v-form ref="newCycleForm">
-            <v-text-field
-              v-model="cycleForm.startedAt"
+            <FaerunDatePicker
+              v-model="cycleForm.startedDate"
               label="Початок"
-              placeholder="Наприклад, 3 Alturiak 815 рік після Потопу"
-              density="comfortable"
-              hide-details="auto"
-              class="mb-4"
-              required
+              placeholder="Оберіть дату початку"
+              :year="currentFaerunYear"
+            />
+            <FaerunDatePicker
+              v-model="cycleForm.finishedDate"
+              label="Завершення (необов'язково)"
+              placeholder="Оберіть дату завершення"
+              :year="currentFaerunYear"
+              clearable
+              hint="Залиште поле порожнім, якщо цикл ще триває"
             />
             <v-text-field
-              v-model="cycleForm.finishedAt"
-              label="Завершення"
-              placeholder="Наприклад, 10 Alturiak 815 рік після Потопу"
+              :model-value="cycleDurationLabel"
+              label="Тривалість"
               density="comfortable"
               hide-details="auto"
               class="mb-4"
-              required
-            />
-            <v-text-field
-              v-model.number="cycleForm.duration"
-              type="number"
-              min="1"
-              label="Тривалість (днів)"
-              density="comfortable"
-              hide-details="auto"
-              class="mb-4"
-              required
+              readonly
             />
             <v-textarea
               v-model="cycleForm.notes"
@@ -235,7 +261,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { addDoc, collection, doc, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore'
 import { useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
@@ -244,7 +270,9 @@ import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
 import ReligionDistributionDiagram from '@/components/ReligionDistributionDiagram.vue'
 import ReligionDistributionTable from '@/components/ReligionDistributionTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
+import FaerunDatePicker from '@/components/FaerunDatePicker.vue'
 import { db } from '@/services/firebase'
+import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
 
 const iconCache = new Map()
 
@@ -255,6 +283,9 @@ const islandStore = useIslandStore()
 const hoveredReligion = ref(null)
 const viewMode = ref('diagram')
 const defaultCardBackground = ''
+const latestCycle = ref(null)
+const latestCycleLoading = ref(false)
+const latestCycleError = ref('')
 
 function hasIcon(name) {
   switch (name) {
@@ -355,20 +386,65 @@ onMounted(() => {
 
 onBeforeUnmount(() => populationStore.stopListener())
 
+onMounted(loadLatestCycle)
+
 const loading = computed(() => religionStore.loading)
 const error = computed(() => religionStore.error)
 const records = computed(() => religionStore.records)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
 const totalPopulation = computed(() => populationStore.totalPopulation || 0)
+
+function getCycleDurationDays(cycle) {
+  if (!cycle) return null
+  if (cycle.duration) return Number(cycle.duration)
+
+  const start = parseFaerunDate(cycle.startedAt)
+  const end = parseFaerunDate(cycle.finishedAt)
+  const diff = start && end ? diffInDays(start, end) : null
+  return diff > 0 ? diff : null
+}
+
+const currentCycleHeadline = computed(() => {
+  if (!latestCycle.value) return 'Цикл ще не розпочато'
+
+  const start = latestCycle.value.startedAt || '—'
+  const end = latestCycle.value.finishedAt
+
+  return end ? `${start} — ${end}` : `${start} (триває)`
+})
+
+const currentCycleDetails = computed(() => {
+  if (!latestCycle.value) return 'Додайте перший цикл, щоб відстежувати дії релігії.'
+
+  const durationDays = getCycleDurationDays(latestCycle.value)
+  const durationLabel = durationDays ? `${durationDays} днів` : 'Тривалість не вказана'
+  const status = latestCycle.value.finishedAt ? 'Цикл завершено' : 'Цикл триває'
+  const notes = latestCycle.value.notes?.trim()
+
+  return [durationLabel, status, notes ? `Нотатки: ${notes}` : null].filter(Boolean).join(' • ')
+})
 const newCycleDialog = ref(false)
 const cycleSaving = ref(false)
 const cycleError = ref('')
 const newCycleForm = ref(null)
+const currentFaerunYear = DEFAULT_YEAR
 const cycleForm = reactive({
-  startedAt: '',
-  finishedAt: '',
-  duration: null,
+  startedDate: null,
+  finishedDate: null,
   notes: '',
+})
+
+const cycleDurationLabel = computed(() => {
+  const start = normalizeFaerunDate(cycleForm.startedDate)
+  const end = normalizeFaerunDate(cycleForm.finishedDate)
+
+  if (!start || !end) return 'Тривалість буде розрахована автоматично'
+
+  const diff = diffInDays(start, end)
+  if (diff === null) return 'Тривалість буде розрахована автоматично'
+  if (diff <= 0) return 'Дата завершення має бути пізнішою за початок'
+
+  return `${diff} днів`
 })
 
 const heroCountsByReligion = computed(() => {
@@ -628,10 +704,32 @@ const clergyLogs = computed(() => (activeClergy.value ? religionStore.logsByCler
 const logsLoading = computed(() => religionStore.logsLoading)
 const logsError = computed(() => religionStore.logsError)
 
+async function loadLatestCycle() {
+  latestCycleLoading.value = true
+  latestCycleError.value = ''
+
+  try {
+    const cyclesRef = collection(db, 'cycles')
+    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1))
+    const snapshot = await getDocs(latestCycleQuery)
+
+    if (snapshot.docs.length) {
+      const docSnap = snapshot.docs[0]
+      latestCycle.value = { id: docSnap.id, ...docSnap.data() }
+    } else {
+      latestCycle.value = null
+    }
+  } catch (e) {
+    console.error('[religion] Failed to load latest cycle', e)
+    latestCycleError.value = 'Не вдалося завантажити дані про цикл.'
+  } finally {
+    latestCycleLoading.value = false
+  }
+}
+
 function openNewCycleDialog() {
-  cycleForm.startedAt = ''
-  cycleForm.finishedAt = ''
-  cycleForm.duration = null
+  cycleForm.startedDate = null
+  cycleForm.finishedDate = null
   cycleForm.notes = ''
   cycleError.value = ''
   newCycleDialog.value = true
@@ -679,28 +777,60 @@ async function createCycleStartAction(cycleId, notes) {
 async function createCycle() {
   cycleError.value = ''
 
-  if (!cycleForm.startedAt?.trim() || !cycleForm.finishedAt?.trim()) {
-    cycleError.value = 'Заповніть поля початку та завершення.'
+  const startedDate = normalizeFaerunDate(cycleForm.startedDate)
+  const finishedDate = normalizeFaerunDate(cycleForm.finishedDate)
+
+  if (!startedDate) {
+    cycleError.value = 'Вкажіть початок циклу.'
     return
   }
 
-  if (!cycleForm.duration || Number(cycleForm.duration) <= 0) {
-    cycleError.value = 'Вкажіть тривалість циклу.'
-    return
+  if (finishedDate) {
+    const diff = diffInDays(startedDate, finishedDate)
+    if (!diff || diff <= 0) {
+      cycleError.value = 'Дата завершення має бути пізнішою за початок.'
+      return
+    }
   }
 
   cycleSaving.value = true
   try {
     const cyclesRef = collection(db, 'cycles')
-    const cycleDoc = await addDoc(cyclesRef, {
-      startedAt: cycleForm.startedAt.trim(),
-      finishedAt: cycleForm.finishedAt.trim(),
-      duration: Number(cycleForm.duration),
+    const lastCycleSnapshot = await getDocs(query(cyclesRef, orderBy('createdAt', 'desc'), limit(1)))
+    const lastCycleDoc = lastCycleSnapshot.docs[0]
+
+    const startedAt = formatFaerunDate(startedDate)
+    const finishedAt = finishedDate ? formatFaerunDate(finishedDate) : null
+    const calculatedDuration = finishedDate ? diffInDays(startedDate, finishedDate) : null
+
+    const newCycleData = {
+      startedAt,
+      duration: calculatedDuration,
       createdAt: serverTimestamp(),
-    })
+    }
+
+    if (finishedAt) {
+      newCycleData.finishedAt = finishedAt
+    }
+
+    const cycleDoc = await addDoc(cyclesRef, newCycleData)
+
+    if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
+      const previousCycle = lastCycleDoc.data()
+      const parsedPreviousStart = parseFaerunDate(previousCycle.startedAt)
+      const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, startedDate) : null
+
+      const previousUpdate = { finishedAt: startedAt }
+      if (previousDuration && previousDuration > 0) {
+        previousUpdate.duration = previousDuration
+      }
+
+      await updateDoc(lastCycleDoc.ref, previousUpdate)
+    }
 
     await resetReligionsSvTemp()
     await createCycleStartAction(cycleDoc.id, cycleForm.notes)
+    await loadLatestCycle()
     closeNewCycleDialog()
   } catch (e) {
     console.error('[religion] Failed to create cycle', e)
@@ -756,6 +886,16 @@ async function applyFaithChange(mode) {
   color: #dc2626;
   font-size: 15px;
   margin-top: 8px;
+}
+
+.current-cycle-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.current-cycle-text {
+  padding-left: 6px;
 }
 
 .view-toggle {
