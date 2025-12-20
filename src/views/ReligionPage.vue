@@ -203,7 +203,6 @@ function hasIcon(name) {
 }
 
 function getIconImage(name) {
-  console.log(name)
   if (!iconCache.has(name)) {
     const img = new Image()
     img.src = `/images/religions/${name}.png`
@@ -314,6 +313,15 @@ const followersByReligion = computed(() => {
       name,
       followers: Number(religion.followers ?? 0),
       heroes: heroCountsByReligion.value.get(name)?.heroes || 0,
+      buildingLevel: religion.buildingLevel || '—',
+      buildingFaithIncome: religion.buildingFaithIncome,
+      farmBase: Number(religion.farmBase),
+      farmDCBase: Number(religion.farmDCBase),
+      shieldActive: Boolean(religion.shieldActive),
+      shieldBonus: Number(religion.shieldBonus),
+      svTemp: Number(religion.svTemp),
+      svBase: Number(religion.svBase),
+      minSpreadFollowersResult: Number(religion.minSpreadFollowersResult),
     })
   }
 
@@ -323,6 +331,13 @@ const followersByReligion = computed(() => {
         name,
         followers: 0,
         heroes: stats.heroes,
+        buildingLevel: '—',
+        farmName: '—',
+        farmDCBase: 0,
+        farmDCBonus: 0,
+        shieldActive: false,
+        shieldBonus: 0,
+        svTemp: 0,
       })
     }
   }

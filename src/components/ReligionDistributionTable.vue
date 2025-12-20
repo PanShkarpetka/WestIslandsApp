@@ -4,9 +4,17 @@
       <thead>
         <tr>
           <th class="text-left">Конфесія</th>
-          <th class="text-left">Віряни</th>
+          <th class="text-left">Послідовники</th>
           <th class="text-left">Герої</th>
           <th class="text-left">Частка</th>
+          <th class="text-left">Споруда</th>
+          <th class="text-left">Пасивні Очки Віри</th>
+          <th class="text-left">Базова Стійкість віри</th>
+          <th class="text-left">Бонус до Стійкості</th>
+          <th class="text-left">Бонус від Захисту</th>
+          <th class="text-left">Мінімальний розмір накопичення Очок Віри</th>
+          <th class="text-left">Базова Складність накопичення</th>
+          <th class="text-left">Мінімальна кількість послідовників від Поширення</th>
         </tr>
       </thead>
       <tbody>
@@ -35,6 +43,14 @@
           <td>{{ item.followers.toLocaleString('uk-UA') }}</td>
           <td>{{ item.heroes }}</td>
           <td>{{ item.percentRounded }}%</td>
+          <td>{{ item.buildingLevel ? buildingMap[item.buildingLevel] : '—' }}</td>
+          <td>{{ item.buildingFaithIncome }}</td>
+          <td>{{ item.svBase }}</td>
+          <td>{{ item.svTemp }}</td>
+          <td>{{ formatShield(item) }}</td>
+          <td>{{ item.farmBase }}</td>
+          <td>{{ item.farmDCBase }}</td>
+          <td>{{ item.minSpreadFollowersResult }}</td>
         </tr>
       </tbody>
     </v-table>
@@ -52,6 +68,13 @@ const props = defineProps({
     default: null,
   },
 })
+
+const buildingMap = {
+  'none': '–',
+  'chapel': 'Капличка',
+  'temple': 'Храм',
+  'cathedral': 'Собор'
+};
 
 const emit = defineEmits(['hover', 'leave', 'select'])
 
@@ -89,6 +112,11 @@ function handleHover(item) {
 function handleLeave() {
   emit('leave')
 }
+
+function formatShield(item) {
+  if (!item.shieldActive) return 'Не активний'
+  return `Активний (+${item.shieldBonus})`
+}
 </script>
 
 <style scoped>
@@ -97,6 +125,10 @@ function handleLeave() {
   background-color: #fff;
   border-radius: 12px;
   overflow: hidden;
+}
+
+.distribution-table {
+  min-width: 960px;
 }
 
 .distribution-table-wrapper-hovered {

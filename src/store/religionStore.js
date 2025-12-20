@@ -14,6 +14,41 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 
+const DEFAULT_VALUES = {
+  farmBase: 10,
+  farmDCBase: 10,
+  minSpreadFollowersResult: 5,
+  shieldBonus: 0,
+  svBase: 10,
+  svTemp: 0,
+};
+
+const BUILDING_LEVEL_BONUSES = {
+  none: {
+    svBonus: 0,
+    passiveFaith: 0,
+  },
+  chapel: {
+    svBonus: 1,
+    passiveFaith: 10,
+  },
+  temple:  {
+    svBonus: 2,
+    passiveFaith: 20,
+  },
+  cathedral: {
+    svBonus: 3,
+    passiveFaith: 30,
+  },
+}
+
+function getTempSV(data) {
+  const svTemp = Number(data.svTemp ?? DEFAULT_VALUES.svTemp)
+  const buildingBonus = Number(data.buildingLevel ? BUILDING_LEVEL_BONUSES[data.buildingLevel].svBonus : 0);
+
+  return svTemp + buildingBonus;
+}
+
 export const useReligionStore = defineStore('religion', () => {
   const records = ref([])
   const religions = ref([])
@@ -144,6 +179,16 @@ export const useReligionStore = defineStore('religion', () => {
           id: docSnap.id,
           name: data.name || 'Невідома релігія',
           followers: Number(data.followers ?? 0),
+          buildingLevel: data.buildingLevel || '—',
+          buildingFaithIncome: data.buildingLevel ? BUILDING_LEVEL_BONUSES[data.buildingLevel].passiveFaith : 0,
+          buildingUpdatedAt: data.buildingUpdatedAt || null,
+          farmBase: Number(data.farmBase ?? DEFAULT_VALUES.farmBase),
+          farmDCBase: Number(data.farmDCBase ?? DEFAULT_VALUES.farmDCBase),
+          minSpreadFollowersResult: Number(data.minSpreadFollowers ?? DEFAULT_VALUES.minSpreadFollowersResult),
+          shieldActive: Boolean(data.shieldActive),
+          shieldBonus: Number(data.shieldBonus ?? DEFAULT_VALUES.shieldBonus),
+          svBase: Number(data.svBase ?? DEFAULT_VALUES.svBase),
+          svTemp: getTempSV(data),
         }
       })
     }, (err) => {
