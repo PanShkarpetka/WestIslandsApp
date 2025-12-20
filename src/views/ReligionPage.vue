@@ -327,6 +327,86 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="followersDialogOpen" max-width="720">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center justify-space-between">
+          <div>
+            <div class="text-subtitle-1 font-semibold">Розподіл послідовників</div>
+            <div class="text-body-2 text-medium-emphasis">Оберіть кількість послідовників для кожної конфесії.</div>
+          </div>
+          <v-chip v-if="distributionSelected" color="primary" variant="tonal">
+            {{ distributionSelected.name }}
+          </v-chip>
+        </v-card-title>
+
+        <v-card-text>
+          <v-alert
+            v-if="followersError"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+          >
+            {{ followersError }}
+          </v-alert>
+
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            Загалом населення: {{ totalPopulationLabel }}. Розподіліть послідовників між конфесіями. Залишок: {{ followersRemaining }}.
+          </p>
+
+          <div
+            v-for="item in editedFollowers"
+            :key="item.name"
+            class="followers-row"
+            :class="{ 'followers-row--selected': item.name === distributionSelected?.name }"
+          >
+            <div class="followers-row__header">
+              <div class="d-flex align-center gap-2">
+                <span class="color-bullet" :style="{ backgroundColor: item.color }"></span>
+                <div>
+                  <div class="text-subtitle-2 font-semibold">{{ item.name }}</div>
+                  <div class="text-caption text-medium-emphasis">Було: {{ item.followers.toLocaleString('uk-UA') }} вірян</div>
+                </div>
+              </div>
+              <div class="text-caption text-medium-emphasis">≈ {{ followersPercentFor(item.newFollowers) }}%</div>
+            </div>
+
+            <div class="followers-row__controls">
+              <v-slider
+                v-model.number="item.newFollowers"
+                :min="0"
+                :max="followersSliderCeiling"
+                step="1"
+                color="primary"
+                thumb-label="always"
+                hide-details
+              />
+              <v-text-field
+                v-model.number="item.newFollowers"
+                type="number"
+                label="Послідовники"
+                density="comfortable"
+                hide-details
+                class="count-input"
+                variant="outlined"
+                :min="0"
+              />
+            </div>
+
+            <div class="text-caption text-medium-emphasis">
+              Буде: <b>{{ Number(item.newFollowers || 0).toLocaleString('uk-UA') }}</b> вірян (Δ {{ followersDelta(item) }})
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeFollowersDialog" :disabled="followersSaving">Скасувати</v-btn>
+          <v-btn color="primary" :loading="followersSaving" :disabled="followersOverLimit" @click="saveFollowersDistribution">
+            Зберегти розподіл
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="newCycleDialog" max-width="640">
       <v-card rounded="xl">
         <v-card-title class="d-flex align-center">
@@ -515,6 +595,11 @@ const error = computed(() => religionStore.error)
 const records = computed(() => religionStore.records)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
 const totalPopulation = computed(() => populationStore.totalPopulation || 0)
+const followersDialogOpen = ref(false)
+const distributionSelected = ref(null)
+const editedFollowers = ref([])
+const followersError = ref('')
+const followersSaving = ref(false)
 
 function getCycleDurationDays(cycle) {
   if (!cycle) return null
@@ -588,6 +673,7 @@ const followersByReligion = computed(() => {
   for (const religion of religionStore.religions) {
     const name = religion.name || 'Невідома релігія'
     result.set(name, {
+      id: religion.id,
       name,
       followers: Number(religion.followers ?? 0),
       heroes: heroCountsByReligion.value.get(name)?.heroes || 0,
@@ -606,6 +692,7 @@ const followersByReligion = computed(() => {
   for (const [name, stats] of heroCountsByReligion.value.entries()) {
     if (!result.has(name)) {
       result.set(name, {
+        id: null,
         name,
         followers: 0,
         heroes: stats.heroes,
@@ -639,6 +726,23 @@ const distribution = computed(() => {
     })
     .sort((a, b) => b.followers - a.followers)
 })
+
+const followersSliderCeiling = computed(() => {
+  const base = totalPopulation.value || 0
+  const maxValue = editedFollowers.value.reduce(
+    (max, item) => Math.max(max, Number(item.newFollowers) || 0),
+    0,
+  )
+
+  return Math.max(base, maxValue, 100)
+})
+
+const editedFollowersTotal = computed(() =>
+  editedFollowers.value.reduce((sum, item) => sum + (Number(item.newFollowers) || 0), 0),
+)
+
+const followersRemaining = computed(() => (totalPopulation.value || 0) - editedFollowersTotal.value)
+const followersOverLimit = computed(() => followersRemaining.value < 0)
 
 const totalFollowersLabel = computed(() => {
   const total = followersByReligion.value.reduce((sum, item) => sum + item.followers, 0)
@@ -731,9 +835,98 @@ const externalTooltipHandler = (context) => {
   tooltipEl.style.transform = 'translate(-50%, -100%) translateY(-8px)'
 }
 
+function openFollowersDialog(item) {
+  if (!isAdmin.value) return
+
+  distributionSelected.value = item || null
+  editedFollowers.value = distribution.value.map((entry) => ({
+    ...entry,
+    newFollowers: entry.followers,
+  }))
+  followersError.value = ''
+  followersDialogOpen.value = true
+}
+
+function closeFollowersDialog() {
+  followersDialogOpen.value = false
+  distributionSelected.value = null
+}
+
+function followersPercentFor(value) {
+  const base = totalPopulation.value || editedFollowersTotal.value || 1
+  return Math.round(((Number(value) || 0) / base) * 1000) / 10
+}
+
+function followersDelta(item) {
+  const previous = Number(item.followers || 0)
+  const current = Number(item.newFollowers || 0)
+  const diff = current - previous
+  const sign = diff > 0 ? '+' : ''
+
+  return `${sign}${diff.toLocaleString('uk-UA')}`
+}
+
+async function saveFollowersDistribution() {
+  if (!isAdmin.value) return
+
+  followersError.value = ''
+
+  if (followersOverLimit.value) {
+    followersError.value = 'Сума послідовників перевищує населення острова.'
+    return
+  }
+
+  followersSaving.value = true
+  try {
+    const batch = writeBatch(db)
+    const changes = []
+
+    for (const item of editedFollowers.value) {
+      if (!item.id) continue
+
+      const previous = Number(item.followers || 0)
+      const updatedFollowers = Number(item.newFollowers || 0)
+
+      if (updatedFollowers === previous) continue
+
+      batch.update(doc(db, 'religions', item.id), { followers: updatedFollowers })
+      changes.push({
+        religionId: item.id,
+        religionName: item.name,
+        previousFollowers: previous,
+        updatedFollowers,
+        delta: updatedFollowers - previous,
+      })
+    }
+
+    if (!changes.length) {
+      followersError.value = 'Немає змін для збереження.'
+      return
+    }
+
+    await batch.commit()
+
+    await addDoc(collection(db, 'religionActions'), {
+      actionType: doc(db, 'religionActionTypes', 'religionsDistributionChange'),
+      changes,
+      totalPopulation: totalPopulation.value,
+      remaining: followersRemaining.value,
+      user: userStore.nickname || 'Адміністратор',
+      createdAt: serverTimestamp(),
+    })
+
+    closeFollowersDialog()
+  } catch (e) {
+    console.error('[religion] Failed to save distribution', e)
+    followersError.value = e?.message || 'Не вдалося зберегти розподіл.'
+  } finally {
+    followersSaving.value = false
+  }
+}
+
 function handleSliceClick(item) {
-  if (!item) return
-  console.info('[religion] slice clicked:', item.name)
+  if (!item || !isAdmin.value) return
+  openFollowersDialog(item)
 }
 
 const chartOptions = computed(() => ({
@@ -1416,6 +1609,43 @@ async function saveDowntimeAvailability() {
   margin-top: 10px;
 }
 
+.color-bullet {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.followers-row {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background-color: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.followers-row--selected {
+  border-color: #3f51b5;
+  box-shadow: 0 4px 18px rgba(63, 81, 181, 0.15);
+}
+
+.followers-row__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.followers-row__controls {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
 @media (max-width: 960px) {
   .distribution-section {
     padding: 12px 12px 0;
@@ -1436,6 +1666,10 @@ async function saveDowntimeAvailability() {
 }
 
 @media (max-width: 600px) {
+  .followers-row__controls {
+    grid-template-columns: 1fr;
+  }
+
   .section-overlay {
     background-size: 80% !important;
   }
