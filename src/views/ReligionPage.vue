@@ -1080,6 +1080,29 @@ async function confirmReligionChange() {
   }
 }
 
+async function createFaithAwardAction(delta) {
+  const heroRef = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef || null
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+
+  const religionRef = activeClergy.value.religion?.path
+    ? doc(db, activeClergy.value.religion.path)
+    : activeClergy.value.religion || null
+
+  await addDoc(collection(db, 'religionActions'), {
+    actionType: doc(db, 'religionActionTypes', 'awardAdventure'),
+    hero: heroRef,
+    clergy: clergyRef,
+    religion: religionRef,
+    faithDelta: delta,
+    message: logMessage.value?.trim() || '',
+    user: userStore.nickname || 'Адміністратор',
+    createdAt: serverTimestamp(),
+  })
+}
+
 async function applyFaithChange(mode) {
   if (!isAdmin.value || !activeClergy.value) return
   actionError.value = ''
@@ -1093,12 +1116,18 @@ async function applyFaithChange(mode) {
 
   actionLoading.value = true
   try {
-    await religionStore.changeFaith({
+    const tasks = [religionStore.changeFaith({
       clergyId: activeClergy.value.id,
       delta,
       message: logMessage.value,
       user: userStore.nickname || 'Адміністратор',
-    })
+    })]
+
+    if (delta > 0) {
+      tasks.push(createFaithAwardAction(delta))
+    }
+
+    await Promise.all(tasks)
     faithChange.value = null
     logMessage.value = ''
   } catch (e) {
