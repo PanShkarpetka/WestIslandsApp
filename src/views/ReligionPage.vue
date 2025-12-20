@@ -44,125 +44,34 @@
               </header>
 
               <template v-if="distribution.length">
-                <div v-if="viewMode === 'diagram'" class="chart-container">
-                  <Doughnut
-                    ref="religionChartRef"
-                    :data="chartData"
-                    :options="chartOptions"
-                    class="doughnut-chart"
-                  />
-                </div>
-                <div v-else class="distribution-table-wrapper" :class="{ 'distribution-table-wrapper-hovered': hoveredReligion !== null }">
-                  <v-table
-                      density="comfortable"
-                      class="distribution-table"
-
-                  >
-                    <thead>
-                      <tr>
-                        <th class="text-left">Конфесія</th>
-                        <th class="text-left">Віряни</th>
-                        <th class="text-left">Герої</th>
-                        <th class="text-left">Частка</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        v-for="item in distribution"
-                        :key="item.name"
-                        class="distribution-row"
-                        role="button"
-                        tabindex="0"
-                        :style="rowStyle(item)"
-                        @mouseenter="hoveredReligion = item"
-                        @mouseleave="hoveredReligion = null"
-                        @focus="hoveredReligion = item"
-                        @blur="hoveredReligion = null"
-                        @click="handleSliceClick(item)"
-                        @keydown.enter.prevent="handleSliceClick(item)"
-                      >
-                        <td class="distribution-name">
-                          <span
-                            class="color-bullet"
-                            :style="{ backgroundColor: item.color }"
-                            aria-hidden="true"
-                          ></span>
-                          {{ item.name }}
-                        </td>
-                        <td>{{ item.followers.toLocaleString('uk-UA') }}</td>
-                        <td>{{ item.heroes }}</td>
-                        <td>{{ item.percentRounded }}%</td>
-                      </tr>
-                    </tbody>
-                  </v-table>
-                </div>
+                <ReligionDistributionDiagram
+                  v-if="viewMode === 'diagram'"
+                  :chart-data="chartData"
+                  :chart-options="chartOptions"
+                />
+                <ReligionDistributionTable
+                  v-else
+                  :distribution="distribution"
+                  :hovered-religion="hoveredReligion"
+                  @hover="hoveredReligion = $event"
+                  @leave="hoveredReligion = null"
+                  @select="handleSliceClick"
+                />
               </template>
               <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
 
               <v-divider class="my-6" />
             </section>
 
-            <div v-if="records.length" class="table-scroll">
-              <v-table density="comfortable" class="religion-table">
-                <thead>
-                  <tr>
-                    <th class="text-left">
-                      <button type="button" class="sort-btn" @click="toggleSort('heroName')">
-                        <b>Герой</b>
-                        <span class="sort-indicator">
-                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                        </span>
-                      </button>
-                    </th>
-                    <th class="text-left">
-                      <button type="button" class="sort-btn" @click="toggleSort('religionName')">
-                        <b>Конфесія</b>
-                        <span class="sort-indicator">
-                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                        </span>
-                      </button>
-                    </th>
-                    <th class="text-left">
-                      <button type="button" class="sort-btn" @click="toggleSort('faith')">
-                        <b>Очки віри</b>
-                        <span class="sort-indicator">
-                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                        </span>
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="record in sortedRecords"
-                    :key="record.id"
-                    class="clickable-row"
-                    role="button"
-                    tabindex="0"
-                    @click="openClergy(record)"
-                    @keydown.enter.prevent="openClergy(record)"
-                  >
-                    <td>{{ record.heroName }}</td>
-                    <td>{{ record.religionName }}</td>
-                    <td class="faith-cell">
-
-                      <v-icon v-if="hasIcon(record.religionName)">
-                        <img
-                            :src="`/images/religions/${record.religionName}.png`"
-                            alt="Faith Icon"
-                            width="32"
-                            height="32"
-                        />
-                      </v-icon>
-                      <v-icon v-else>
-                        mdi-dharmachakra
-                      </v-icon>
-                      <span>{{ record.faith }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </v-table>
-            </div>
+            <ReligionTable
+              v-if="records.length"
+              :records="sortedRecords"
+              :sort-by="sortBy"
+              :sort-direction="sortDirection"
+              :has-icon="hasIcon"
+              @toggle-sort="toggleSort"
+              @select="openClergy"
+            />
           </v-card-text>
         </v-card>
       </v-col>
@@ -262,8 +171,10 @@ import { useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
-import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
+import ReligionDistributionDiagram from '@/components/ReligionDistributionDiagram.vue'
+import ReligionDistributionTable from '@/components/ReligionDistributionTable.vue'
+import ReligionTable from '@/components/ReligionTable.vue'
 
 const iconCache = new Map()
 
@@ -271,7 +182,6 @@ const religionStore = useReligionStore()
 const userStore = useUserStore()
 const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
-const religionChartRef = ref(null)
 const hoveredReligion = ref(null)
 const viewMode = ref('diagram')
 const defaultCardBackground = ''
@@ -533,33 +443,6 @@ function handleSliceClick(item) {
   console.info('[religion] slice clicked:', item.name)
 }
 
-function withAlpha(hex, alpha) {
-  const value = hex?.startsWith('#') ? hex.slice(1) : hex
-  if (!value) return hex
-
-  const expanded = value.length === 3
-    ? value.split('').map((char) => char + char).join('')
-    : value
-
-  if (expanded.length !== 6) return hex
-
-  const r = parseInt(expanded.slice(0, 2), 16)
-  const g = parseInt(expanded.slice(2, 4), 16)
-  const b = parseInt(expanded.slice(4, 6), 16)
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
-function rowStyle(item) {
-  const isActive = hoveredReligion.value?.name === item.name
-
-  return {
-    '--row-color': item.color,
-    backgroundColor: isActive ? withAlpha(item.color, 0.1) : undefined,
-    cursor: 'pointer',
-  }
-}
-
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -701,74 +584,15 @@ async function applyFaithChange(mode) {
 
 </script>
 <style scoped>
-.error{ color:#dc2626; font-size: 15px; margin-top: 8px; }
+.error {
+  color: #dc2626;
+  font-size: 15px;
+  margin-top: 8px;
+}
 
 .view-toggle {
   margin-left: auto;
 }
-
-.distribution-table-wrapper {
-  margin-top: 12px;
-  background-color: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.distribution-table-wrapper-hovered {
-  opacity: 0.5;
-}
-
-.distribution-table th {
-  background-color: #fff;
-  font-weight: 700;
-}
-
-.distribution-table td {
-  background-color: transparent;
-}
-
-.distribution-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.distribution-row:hover,
-.distribution-row:focus-visible {
-  background-color: color-mix(in srgb, var(rgba(0, 0, 0, 0.08)) 20%, transparent);
-}
-
-.distribution-name {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 600;
-}
-
-.color-bullet {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-
-.religion-table {
-  background-color: rgba(255, 255, 255, 0.62);
-  color: #0f172a;
-  min-width: 540px;
-}
-.religion-table td {
-  background-color: transparent;
-}
-.religion-table th {
-  font-weight: 600;
-  background-color: rgba(255, 255, 255, 0.82);
-}
-.religion-table tbody tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.6);
-}
-.sort-btn { background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-.sort-btn:hover { text-decoration: underline; }
-.sort-indicator { font-size: 12px; }
 
 .religion-card {
   position: relative;
@@ -786,6 +610,7 @@ async function applyFaithChange(mode) {
   opacity: 1;
   z-index: 0;
 }
+
 .section-overlay {
   inset: 0;
   z-index: 0;
@@ -813,61 +638,14 @@ async function applyFaithChange(mode) {
   flex-wrap: wrap;
 }
 
-.chart-container {
-  min-height: 520px;
-  position: relative;
-  padding: 12px 8px 0;
-}
-
-:deep(.chart-tooltip) {
-  position: absolute;
-  z-index: 5;
-  pointer-events: none;
-  background-color: #0f172a;
-  color: #fff;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-  opacity: 0;
-  transition: opacity 0.12s ease, transform 0.12s ease;
-  white-space: nowrap;
-}
-
-:deep(.chart-tooltip__content) {
-  display: block;
-}
-
-.doughnut-chart {
-  width: 100%;
-  max-width: 640px;
-  height: 320px;
-  margin: 0 auto;
-}
-
 .chart-chip {
   font-weight: 600;
-}
-
-.clickable-row {
-  cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
-}
-
-.clickable-row:hover {
-  background-color: rgba(255, 255, 255, 0.32);
-  transform: translateY(-1px);
-}
-
-.clickable-row:focus-visible {
-  outline: 2px solid #3f51b5;
-  outline-offset: -2px;
 }
 
 .clergy-dialog .log-card {
   background-color: rgba(63, 81, 181, 0.01);
 }
+
 .log-card div {
   margin: 5px;
 }
@@ -876,17 +654,10 @@ async function applyFaithChange(mode) {
 .admin-actions .v-textarea {
   margin-bottom: 10px;
 }
+
 .btns {
   justify-content: space-evenly;
 }
-.faith-cell {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  align-content: center;
-  flex-direction: row;
-  width: 100px;
-}
 
 @media (max-width: 960px) {
   .distribution-section {
@@ -901,84 +672,11 @@ async function applyFaithChange(mode) {
   .section-overlay {
     background-size: 65% !important;
   }
-
-  .chart-container {
-    min-height: 380px;
-    padding: 8px 0 0;
-  }
-
-  .doughnut-chart {
-    max-width: 100%;
-    height: 260px;
-  }
 }
 
 @media (max-width: 600px) {
   .section-overlay {
     background-size: 80% !important;
-  }
-
-  .chart-container {
-    min-height: 320px;
-  }
-
-  .doughnut-chart {
-    height: 220px;
-  }
-}
-
-.table-scroll {
-  width: 100%;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-@media (max-width: 960px) {
-  .distribution-section {
-    padding: 12px 12px 0;
-  }
-
-  .distribution-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .section-overlay {
-    background-size: 65% !important;
-  }
-
-  .chart-container {
-    min-height: 380px;
-    padding: 8px 0 0;
-  }
-
-  .doughnut-chart {
-    max-width: 100%;
-    height: 260px;
-  }
-}
-
-@media (max-width: 600px) {
-  .section-overlay {
-    background-size: 80% !important;
-  }
-
-  .chart-container {
-    min-height: 320px;
-  }
-
-  .doughnut-chart {
-    height: 220px;
-  }
-
-  .religion-table {
-    font-size: 14px;
-    min-width: 100%;
-  }
-
-  .faith-cell {
-    gap: 8px;
-    width: auto;
   }
 }
 </style>
