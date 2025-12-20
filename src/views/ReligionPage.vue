@@ -27,17 +27,27 @@
                   <p class="text-h6 font-semibold">{{ totalFollowersLabel }}</p>
                   <p class="text-caption text-medium-emphasis">Населення острова: {{ totalPopulationLabel }}</p>
                 </div>
-                <v-btn-toggle
-                  v-model="viewMode"
-                  mandatory
-                  density="comfortable"
-                  color="primary"
-                  variant="tonal"
-                  class="view-toggle"
-                >
-                  <v-btn value="diagram" prepend-icon="mdi-chart-donut">Діаграма</v-btn>
-                  <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
-                </v-btn-toggle>
+                <div class="distribution-actions">
+                  <v-btn
+                    v-if="isAdmin"
+                    color="primary"
+                    prepend-icon="mdi-play-circle-outline"
+                    @click="openNewCycleDialog"
+                  >
+                    Почати новий цикл
+                  </v-btn>
+                  <v-btn-toggle
+                    v-model="viewMode"
+                    mandatory
+                    density="comfortable"
+                    color="primary"
+                    variant="tonal"
+                    class="view-toggle"
+                  >
+                    <v-btn value="diagram" prepend-icon="mdi-chart-donut">Діаграма</v-btn>
+                    <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
+                  </v-btn-toggle>
+                </div>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
                   {{ distribution.length }} конфесій
                 </v-chip>
@@ -162,11 +172,70 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="newCycleDialog" max-width="640">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center">
+          <v-icon color="primary" class="mr-3">mdi-playlist-plus</v-icon>
+          <span class="text-h6">Почати новий цикл</span>
+        </v-card-title>
+        <v-card-text>
+          <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">
+            {{ cycleError }}
+          </v-alert>
+          <v-form ref="newCycleForm">
+            <v-text-field
+              v-model="cycleForm.startedAt"
+              label="Початок"
+              placeholder="Наприклад, 3 Alturiak 815 рік після Потопу"
+              density="comfortable"
+              hide-details="auto"
+              class="mb-4"
+              required
+            />
+            <v-text-field
+              v-model="cycleForm.finishedAt"
+              label="Завершення"
+              placeholder="Наприклад, 10 Alturiak 815 рік після Потопу"
+              density="comfortable"
+              hide-details="auto"
+              class="mb-4"
+              required
+            />
+            <v-text-field
+              v-model.number="cycleForm.duration"
+              type="number"
+              min="1"
+              label="Тривалість (днів)"
+              density="comfortable"
+              hide-details="auto"
+              class="mb-4"
+              required
+            />
+            <v-textarea
+              v-model="cycleForm.notes"
+              label="Нотатки до дії"
+              auto-grow
+              rows="2"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeNewCycleDialog">Скасувати</v-btn>
+          <v-btn color="primary" :loading="cycleSaving" @click="createCycle">
+            Створити цикл
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { addDoc, collection, doc, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
@@ -175,6 +244,7 @@ import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
 import ReligionDistributionDiagram from '@/components/ReligionDistributionDiagram.vue'
 import ReligionDistributionTable from '@/components/ReligionDistributionTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
+import { db } from '@/services/firebase'
 
 const iconCache = new Map()
 
@@ -290,6 +360,16 @@ const error = computed(() => religionStore.error)
 const records = computed(() => religionStore.records)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
 const totalPopulation = computed(() => populationStore.totalPopulation || 0)
+const newCycleDialog = ref(false)
+const cycleSaving = ref(false)
+const cycleError = ref('')
+const newCycleForm = ref(null)
+const cycleForm = reactive({
+  startedAt: '',
+  finishedAt: '',
+  duration: null,
+  notes: '',
+})
 
 const heroCountsByReligion = computed(() => {
   const result = new Map()
@@ -548,6 +628,19 @@ const clergyLogs = computed(() => (activeClergy.value ? religionStore.logsByCler
 const logsLoading = computed(() => religionStore.logsLoading)
 const logsError = computed(() => religionStore.logsError)
 
+function openNewCycleDialog() {
+  cycleForm.startedAt = ''
+  cycleForm.finishedAt = ''
+  cycleForm.duration = null
+  cycleForm.notes = ''
+  cycleError.value = ''
+  newCycleDialog.value = true
+}
+
+function closeNewCycleDialog() {
+  newCycleDialog.value = false
+}
+
 function openClergy(record) {
   selectedClergyId.value = record.id
   faithChange.value = null
@@ -555,6 +648,66 @@ function openClergy(record) {
   actionError.value = ''
   dialogOpen.value = true
   religionStore.listenLogs(record.id)
+}
+
+async function resetReligionsSvTemp() {
+  const religionsSnapshot = await getDocs(collection(db, 'religions'))
+  const batch = writeBatch(db)
+
+  religionsSnapshot.forEach((docSnap) => {
+    batch.update(docSnap.ref, { svTemp: 0 })
+  })
+
+  await batch.commit()
+}
+
+async function createCycleStartAction(cycleId, notes) {
+  const actionsRef = collection(db, 'religionActions')
+  const actionTypeRef = doc(db, 'religionActionTypes', 'cycleStart')
+
+  await addDoc(actionsRef, {
+    actionType: actionTypeRef,
+    cycleId,
+    notes: notes?.trim() || '',
+    createdAt: serverTimestamp(),
+    md: 0,
+    convertedFollowers: 0,
+    result: 0,
+  })
+}
+
+async function createCycle() {
+  cycleError.value = ''
+
+  if (!cycleForm.startedAt?.trim() || !cycleForm.finishedAt?.trim()) {
+    cycleError.value = 'Заповніть поля початку та завершення.'
+    return
+  }
+
+  if (!cycleForm.duration || Number(cycleForm.duration) <= 0) {
+    cycleError.value = 'Вкажіть тривалість циклу.'
+    return
+  }
+
+  cycleSaving.value = true
+  try {
+    const cyclesRef = collection(db, 'cycles')
+    const cycleDoc = await addDoc(cyclesRef, {
+      startedAt: cycleForm.startedAt.trim(),
+      finishedAt: cycleForm.finishedAt.trim(),
+      duration: Number(cycleForm.duration),
+      createdAt: serverTimestamp(),
+    })
+
+    await resetReligionsSvTemp()
+    await createCycleStartAction(cycleDoc.id, cycleForm.notes)
+    closeNewCycleDialog()
+  } catch (e) {
+    console.error('[religion] Failed to create cycle', e)
+    cycleError.value = 'Не вдалося створити новий цикл.'
+  } finally {
+    cycleSaving.value = false
+  }
 }
 
 function closeDialog() {
@@ -606,7 +759,7 @@ async function applyFaithChange(mode) {
 }
 
 .view-toggle {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .religion-card {
@@ -651,6 +804,13 @@ async function applyFaithChange(mode) {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.distribution-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .chart-chip {
