@@ -208,6 +208,93 @@
             <v-sheet class="action-card" rounded="lg" elevation="0">
               <div class="action-card__header">
                 <div>
+                  <div class="text-subtitle-2 font-semibold">Активний фарм віри</div>
+                  <div class="text-body-2 text-medium-emphasis">Дія потребує доступного давнтайму та витрачає його</div>
+                </div>
+              </div>
+
+              <v-alert v-if="activeFaithFarmError" type="error" variant="tonal" class="mb-3">
+                {{ activeFaithFarmError }}
+              </v-alert>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="activeClergy?.heroRef?.id || ''"
+                  label="ID героя"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                  hint="Герой вибраного духовенства"
+                />
+                <v-text-field
+                  v-model.number="activeFaithFarmForm.roll"
+                  type="number"
+                  label="Кидок"
+                  density="comfortable"
+                  hide-details="auto"
+                  hint="Результат d20 скіл чека"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="activeFaithFarmForm.dmMod"
+                  type="number"
+                  label="DM Mod"
+                  density="comfortable"
+                  hide-details="auto"
+                  prefix="±"
+                />
+                <v-text-field
+                  :model-value="activeFaithFarmDC"
+                  label="Базове DC"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="currentFaithPoints"
+                  label="Поточні ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="activeFaithFarmFollowers ?? '—'"
+                  label="Отриманті в результаті ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <v-text-field
+                v-model="activeFaithFarmForm.notes"
+                label="Нотатки / посилання"
+                density="comfortable"
+                hide-details="auto"
+                hint="Наприклад, посилання на пост у Telegram"
+              />
+
+              <div class="d-flex gap-2 mt-3 justify-space-between">
+                <v-btn
+                  color="primary"
+                  :loading="activeFaithFarmLoading"
+                  :disabled="!downtimeAvailable"
+                  @click="applyActiveFaithFarm"
+                >
+                  <v-icon start>mdi-shield-sun</v-icon>
+                  Застосувати
+                </v-btn>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
                   <div class="text-subtitle-2 font-semibold">Зміна конфесії</div>
                   <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
                 </div>
@@ -463,8 +550,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
-import { BUILDING_LEVEL_BONUSES, useReligionStore } from '@/store/religionStore'
+import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where, writeBatch, runTransaction } from 'firebase/firestore'
+import { BUILDING_LEVEL_BONUSES, DEFAULT_VALUES, useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
@@ -600,6 +687,13 @@ const distributionSelected = ref(null)
 const editedFollowers = ref([])
 const followersError = ref('')
 const followersSaving = ref(false)
+const activeFaithFarmForm = reactive({
+  roll: null,
+  dmMod: 0,
+  notes: '',
+})
+const activeFaithFarmError = ref('')
+const activeFaithFarmLoading = ref(false)
 
 function getCycleDurationDays(cycle) {
   if (!cycle) return null
@@ -997,6 +1091,26 @@ const downtimeAvailable = ref(true)
 const downtimeUpdateLoading = ref(false)
 const downtimeUpdateError = ref('')
 const downtimeUpdateSuccess = ref(false)
+const activeClergyReligion = computed(() => {
+  const religionId = activeClergy.value?.religion?.id
+  if (!religionId) return null
+
+  return religionStore.religions.find((item) => item.id === religionId) || null
+})
+const activeFaithFarmBase = computed(() => activeClergyReligion.value?.farmBase ?? DEFAULT_VALUES.farmBase)
+const activeFaithFarmDCBase = computed(() => activeClergyReligion.value?.farmDCBase ?? DEFAULT_VALUES.farmDCBase)
+const currentFaithPoints = computed(() => Number(activeClergy.value?.faith ?? 0))
+const activeFaithFarmDC = computed(() => {
+  const dmMod = Number(activeFaithFarmForm.dmMod ?? 0)
+  return activeFaithFarmDCBase.value + Math.floor(currentFaithPoints.value / 100) + dmMod
+})
+const activeFaithFarmFollowers = computed(() => {
+  const roll = Number(activeFaithFarmForm.roll)
+  if (Number.isNaN(roll)) return null
+
+  const extra = Math.max(0, roll - activeFaithFarmDC.value)
+  return activeFaithFarmBase.value + extra
+})
 
 const sortedRecords = computed(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
@@ -1095,6 +1209,10 @@ function openClergy(record) {
   faithChange.value = null
   logMessage.value = ''
   actionError.value = ''
+  activeFaithFarmForm.roll = null
+  activeFaithFarmForm.dmMod = 0
+  activeFaithFarmForm.notes = ''
+  activeFaithFarmError.value = ''
   resetDowntimeState()
   cancelReligionChange()
   dialogOpen.value = true
@@ -1452,6 +1570,117 @@ async function saveDowntimeAvailability() {
     downtimeUpdateError.value = e?.message || 'Не вдалося оновити статус даутайму.'
   } finally {
     downtimeUpdateLoading.value = false
+  }
+}
+
+async function applyActiveFaithFarm() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const roll = Number(activeFaithFarmForm.roll)
+  const dmMod = Number(activeFaithFarmForm.dmMod ?? 0)
+  const heroRefSource = activeClergy.value.heroRef
+  const cycleId = latestCycle.value?.id
+  const gained = activeFaithFarmFollowers.value
+  const dc = activeFaithFarmDC.value
+
+  if (!downtimeAvailable.value) {
+    activeFaithFarmError.value = 'Даутайм недоступний для цього героя.'
+    return
+  }
+
+  if (!cycleId) {
+    activeFaithFarmError.value = 'Спочатку додайте поточний цикл.'
+    return
+  }
+
+  const heroRef = heroRefSource?.path ? doc(db, heroRefSource.path) : heroRefSource
+
+  if (!heroRef) {
+    activeFaithFarmError.value = 'Не вдалося визначити героя духовенства.'
+    return
+  }
+
+  if (Number.isNaN(roll)) {
+    activeFaithFarmError.value = 'Вкажіть результат кидка.'
+    return
+  }
+
+  if (gained === null) {
+    activeFaithFarmError.value = 'Не вдалося розрахувати здобуті ОВ.'
+    return
+  }
+
+  activeFaithFarmError.value = ''
+  activeFaithFarmLoading.value = true
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const religionRef = activeClergy.value.religion?.path
+    ? doc(db, activeClergy.value.religion.path)
+    : activeClergy.value.religion || null
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      if (!clergySnapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const clergyData = clergySnapshot.data() || {}
+      const currentFaith = Number(clergyData.faith ?? 0)
+      const currentFaithMax = Number(clergyData.faithMax ?? 0)
+      const updatedFaith = currentFaith + gained
+      const updates = { faith: updatedFaith }
+
+      if (updatedFaith > currentFaithMax) {
+        updates.faithMax = updatedFaith
+      }
+
+      transaction.update(clergyRef, updates)
+      transaction.update(heroRef, {
+        lastDowntimeCycleId: cycleId,
+        downtimeAvailable: false,
+      })
+    })
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta: gained,
+        message: `Активна ферма: кидок ${roll}, модифікатор ${dmMod}, DC ${dc}. ${
+          activeFaithFarmForm.notes?.trim() || 'Без нотаток'
+        }`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'generate'),
+        hero: heroRef,
+        clergy: clergyRef,
+        religion: religionRef,
+        heroId: heroRef.id,
+        roll,
+        dmMod,
+        notes: activeFaithFarmForm.notes?.trim() || '',
+        dc,
+        faithGained: gained,
+        farmBase: activeFaithFarmBase.value,
+        farmDCBase: activeFaithFarmDCBase.value,
+        currentFaith: currentFaithPoints.value,
+        cycleId,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    religionStore.setDowntimeAvailability(activeClergy.value.id, false)
+
+    activeFaithFarmForm.roll = null
+    activeFaithFarmForm.notes = ''
+    activeFaithFarmForm.dmMod = 0
+  } catch (e) {
+    console.error('[religion] Failed to apply active faith farm', e)
+    activeFaithFarmError.value = e?.message || 'Не вдалося застосувати ферму віри.'
+  } finally {
+    activeFaithFarmLoading.value = false
   }
 }
 
