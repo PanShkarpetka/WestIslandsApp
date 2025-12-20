@@ -107,7 +107,9 @@ export const useReligionStore = defineStore('religion', () => {
   async function resolveHero(refValue, cache, fallbackLabel) {
     const cacheKey = refValue?.path
 
-    if (!refValue || !cacheKey) return { name: fallbackLabel, inactive: false }
+    if (!refValue || !cacheKey) {
+      return { name: fallbackLabel, inactive: false, downtimeAvailable: true, ref: null }
+    }
     if (cache.has(cacheKey)) return cache.get(cacheKey)
 
     try {
@@ -116,13 +118,15 @@ export const useReligionStore = defineStore('religion', () => {
       const result = {
         name: snapshot.exists() ? (data.name || fallbackLabel) : fallbackLabel,
         inactive: Boolean(data.inactive),
+        downtimeAvailable: data.downtimeAvailable,
+        ref: doc(db, snapshot.ref.path),
       }
 
       cache.set(cacheKey, result)
       return result
     } catch (err) {
       console.error('[religion] Failed to resolve hero for', cacheKey, err)
-      return { name: fallbackLabel, inactive: false }
+      return { name: fallbackLabel, inactive: false, downtimeAvailable: true, ref: null }
     }
   }
 
@@ -139,9 +143,11 @@ export const useReligionStore = defineStore('religion', () => {
     unsubscribe = onSnapshot(colRef, (snapshot) => {
       const tasks = snapshot.docs.map(async (docSnap) => {
         const data = docSnap.data() || {}
+        const heroRef = data.hero?.path ? doc(db, data.hero.path) : data.hero
+        const religionRef = data.religion?.path ? doc(db, data.religion.path) : data.religion
         const [hero, religionName] = await Promise.all([
-          resolveHero(data.hero, heroCache, 'Невідомий герой'),
-          resolveName(data.religion, religionCache, 'Невідома релігія'),
+          resolveHero(heroRef, heroCache, 'Невідомий герой'),
+          resolveName(religionRef, religionCache, 'Невідома релігія'),
         ])
             // [{"id":"Ashkarot","name":"Ашкарот","followers":0},{"id":"Asmodei","name":"Девіл","followers":66},{"id":"Blibdoolpoolp","name":"Блібдулпулп","followers":1},{"id":"Godless","name":"Атеїзм","followers":10},{"id":"Istishia","name":"Істишія","followers":1},{"id":"Panzuriel","name":"Панцуріель","followers":5},{"id":"Umberlee","name":"Амберлі","followers":27},{"id":"Unknown","name":"Не визначено","followers":86},{"id":"quadro","name":"Четвірка","followers":37},{"id":"test","name":"test religion","followers":12},{"id":"trio","name":"Трійка","followers":130}]
 
@@ -150,9 +156,12 @@ export const useReligionStore = defineStore('religion', () => {
         return {
           id: docSnap.id,
           heroName: hero.name,
-          religion: data.religion,
+          religion: religionRef,
           religionName,
           faith: Number(data.faith ?? 0),
+          faithMax: Number(data.faithMax ?? 0),
+          downtimeAvailable: hero.downtimeAvailable,
+          heroRef: hero.ref,
         }
       })
 

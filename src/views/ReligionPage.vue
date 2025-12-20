@@ -175,6 +175,43 @@
             </div>
           </div>
 
+          <div v-if="isAdmin" class="mb-4 change-religion">
+            <div class="d-flex justify-space-between align-center mb-2">
+              <div>
+                <div class="text-subtitle-2 font-medium"><b>Зміна конфесії</b></div>
+                <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
+              </div>
+              <v-btn v-if="!changeReligionMode" color="primary" variant="tonal" @click="startReligionChange">
+                Змінити конфесію
+              </v-btn>
+            </div>
+
+            <div v-if="changeReligionMode" class="change-religion__form">
+              <v-alert v-if="changeReligionError" type="error" variant="tonal" class="mb-3">{{ changeReligionError }}</v-alert>
+
+              <v-select
+                v-model="selectedReligionId"
+                :items="religionOptions"
+                item-title="title"
+                item-value="value"
+                label="Нова конфесія"
+                density="comfortable"
+                hide-details="auto"
+              />
+
+              <v-alert type="warning" variant="tonal" class="mt-3">
+                Буде знято {{ religionChangeFine }} ОВ ({{ religionChangeFinePercent }}%) з духовенства за зміну конфесії.
+              </v-alert>
+
+              <div class="d-flex gap-2 mt-3">
+                <v-btn color="primary" :loading="changeReligionLoading" @click="confirmReligionChange">
+                  Підтвердити зміну
+                </v-btn>
+                <v-btn variant="text" @click="cancelReligionChange">Скасувати</v-btn>
+              </div>
+            </div>
+          </div>
+
           <v-card class="log-card">
             <div class="d-flex align-center gap-2 mb-2">
               <v-icon size="18">mdi-history</v-icon>
@@ -674,6 +711,10 @@ const faithChange = ref(null)
 const logMessage = ref('')
 const actionError = ref('')
 const actionLoading = ref(false)
+const changeReligionMode = ref(false)
+const selectedReligionId = ref('')
+const changeReligionLoading = ref(false)
+const changeReligionError = ref('')
 
 const sortedRecords = computed(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
@@ -686,7 +727,7 @@ const sortedRecords = computed(() => {
       return (aVal - bVal) * dir
     }
 
-    return aVal.localeCompare(bVal, 'uk', { sensitivity: 'base' }) * dir
+    return String(aVal ?? '').localeCompare(String(bVal ?? ''), 'uk', { sensitivity: 'base' }) * dir
   })
 })
 
@@ -703,6 +744,34 @@ const activeClergy = computed(() => records.value.find((item) => item.id === sel
 const clergyLogs = computed(() => (activeClergy.value ? religionStore.logsByClergy[activeClergy.value.id] || [] : []))
 const logsLoading = computed(() => religionStore.logsLoading)
 const logsError = computed(() => religionStore.logsError)
+const religionOptions = computed(() => {
+  const currentReligionId = activeClergy.value?.religion?.id
+  return religionStore.religions
+    .filter((item) => item.id !== currentReligionId)
+    .map((item) => ({
+      ...item,
+      value: item.id,
+      title: item.name,
+    }))
+})
+const selectedReligion = computed(() => religionStore.religions.find((item) => item.id === selectedReligionId.value))
+
+function getReligionChangeRate(faithMax) {
+  if (faithMax < 200) return 0.5
+  if (faithMax < 400) return 0.6
+  return 0.7
+}
+
+function calculateReligionChangeFine(clergy) {
+  const faith = Number(clergy?.faith ?? 0)
+  const faithMax = Number(clergy?.faithMax ?? 0)
+  const rate = getReligionChangeRate(faithMax)
+
+  return { fine: Math.floor(faith * rate), rate }
+}
+
+const religionChangeFine = computed(() => calculateReligionChangeFine(activeClergy.value).fine)
+const religionChangeFinePercent = computed(() => Math.round(calculateReligionChangeFine(activeClergy.value).rate * 100))
 
 async function loadLatestCycle() {
   latestCycleLoading.value = true
@@ -744,6 +813,7 @@ function openClergy(record) {
   faithChange.value = null
   logMessage.value = ''
   actionError.value = ''
+  cancelReligionChange()
   dialogOpen.value = true
   religionStore.listenLogs(record.id)
 }
@@ -909,11 +979,105 @@ function closeDialog() {
   if (selectedClergyId.value) {
     religionStore.stopLogs(selectedClergyId.value)
   }
+  cancelReligionChange()
 }
 
 function formatLogMeta(log) {
   const time = log.createdAt ? log.createdAt.toLocaleString('uk-UA') : 'Очікує на час'
   return `${log.user || 'Невідомо'} • ${time}`
+}
+
+function startReligionChange() {
+  changeReligionMode.value = true
+  selectedReligionId.value = ''
+  changeReligionError.value = ''
+}
+
+function cancelReligionChange() {
+  changeReligionMode.value = false
+  selectedReligionId.value = ''
+  changeReligionError.value = ''
+  changeReligionLoading.value = false
+}
+
+async function confirmReligionChange() {
+  if (!isAdmin.value || !activeClergy.value) return
+  changeReligionError.value = ''
+
+  if (!selectedReligionId.value) {
+    changeReligionError.value = 'Оберіть конфесію для зміни.'
+    return
+  }
+
+  if (selectedReligionId.value === activeClergy.value.religion?.id) {
+    changeReligionError.value = 'Оберіть іншу конфесію.'
+    return
+  }
+
+  const newReligion = selectedReligion.value
+  if (!newReligion) {
+    changeReligionError.value = 'Обрана конфесія недоступна.'
+    return
+  }
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const newReligionRef = doc(db, 'religions', selectedReligionId.value)
+  const heroRef = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef
+
+  const currentReligionRef = activeClergy.value.religion?.path
+    ? doc(db, activeClergy.value.religion.path)
+    : activeClergy.value.religion?.id
+      ? doc(db, 'religions', activeClergy.value.religion.id)
+      : null
+
+  const fine = religionChangeFine.value
+  const delta = -fine
+  const updatedFaith = Math.max(0, Number(activeClergy.value.faith ?? 0) + delta)
+
+  changeReligionLoading.value = true
+  try {
+    const batch = writeBatch(db)
+    batch.update(clergyRef, {
+      religion: newReligionRef,
+      faith: updatedFaith,
+    })
+
+    if (heroRef) {
+      batch.update(heroRef, { religion: newReligionRef })
+    }
+
+    await batch.commit()
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta,
+        message: `Зміна конфесії на ${newReligion.name}. Штраф ${fine} ОВ.`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+        previousReligion: activeClergy.value.religionName,
+        newReligion: newReligion.name,
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'changeReligion'),
+        hero: heroRef || null,
+        clergy: clergyRef,
+        fromReligion: currentReligionRef,
+        toReligion: newReligionRef,
+        faithPenalty: fine,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    cancelReligionChange()
+  } catch (e) {
+    console.error('[religion] Failed to change religion', e)
+    changeReligionError.value = e?.message || 'Не вдалося змінити конфесію.'
+  } finally {
+    changeReligionLoading.value = false
+  }
 }
 
 async function applyFaithChange(mode) {
@@ -1036,6 +1200,18 @@ async function applyFaithChange(mode) {
 
 .btns {
   justify-content: space-evenly;
+}
+
+.change-religion {
+  background-color: rgba(255, 255, 255, 0.35);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.change-religion__form {
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  padding: 12px;
 }
 
 @media (max-width: 960px) {

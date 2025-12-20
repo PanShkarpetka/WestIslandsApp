@@ -27,6 +27,22 @@
               </span>
             </button>
           </th>
+          <th class="text-left">
+            <button type="button" class="sort-btn" @click="emit('toggle-sort', 'faithMax')">
+              <b>Макс ОВ</b>
+              <span class="sort-indicator">
+                {{ sortDirection === 'desc' ? '▲' : '▼' }}
+              </span>
+            </button>
+          </th>
+          <th class="text-left">
+            <button type="button" class="sort-btn" @click="emit('toggle-sort', 'downtimeAvailable')">
+              <b>Дія у циклі</b>
+              <span class="sort-indicator">
+                {{ sortDirection === 'desc' ? '▲' : '▼' }}
+              </span>
+            </button>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -54,6 +70,18 @@
               mdi-dharmachakra
             </v-icon>
             <span>{{ record.faith }}</span>
+          </td>
+          <td>{{ record.faithMax ?? '—' }}</td>
+          <td class="downtime-cell">
+            <v-icon v-if="record.downtimeAvailable === false" color="success">
+              mdi-check-circle
+            </v-icon>
+            <v-icon v-else color="warning">
+              mdi-progress-clock
+            </v-icon>
+            <span class="downtime-label">
+              {{ record.downtimeAvailable === false ? 'Дію виконано' : 'Дію не виконано' }}
+            </span>
           </td>
         </tr>
       </tbody>
@@ -151,6 +179,17 @@ const emit = defineEmits(['toggle-sort', 'select'])
   align-content: center;
   flex-direction: row;
   width: 100px;
+}
+
+.downtime-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.downtime-label {
+  white-space: nowrap;
 }
 
 @media (max-width: 600px) {
