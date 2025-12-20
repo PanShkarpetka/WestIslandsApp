@@ -5,12 +5,11 @@ import {
   collection,
   doc,
   getDoc,
-  increment,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  updateDoc,
+  runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 
@@ -246,7 +245,25 @@ export const useReligionStore = defineStore('religion', () => {
 
     const clergyRef = doc(db, 'clergy', clergyId)
 
-    await updateDoc(clergyRef, { faith: increment(amount) })
+    await runTransaction(db, async (transaction) => {
+      const snapshot = await transaction.get(clergyRef)
+      if (!snapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const data = snapshot.data() || {}
+      const currentFaith = Number(data.faith ?? 0)
+      const currentFaithMax = Number(data.faithMax ?? 0)
+      const updatedFaith = currentFaith + amount
+
+      const updates = { faith: updatedFaith }
+
+      if (amount > 0 && updatedFaith > currentFaithMax) {
+        updates.faithMax = updatedFaith
+      }
+
+      transaction.update(clergyRef, updates)
+    })
     await addDoc(collection(clergyRef, 'logs'), {
       delta: amount,
       message: message || '',
