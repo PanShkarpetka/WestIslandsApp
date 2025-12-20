@@ -261,8 +261,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore'
-import { useReligionStore } from '@/store/religionStore'
+import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { BUILDING_LEVEL_BONUSES, useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
@@ -759,6 +759,70 @@ async function resetReligionsSvTemp() {
   await batch.commit()
 }
 
+function getBuildingFaithIncome(level) {
+  return BUILDING_LEVEL_BONUSES[level]?.passiveFaith || 0
+}
+
+async function distributeBuildingFaithIncome(cycleId) {
+  const religionsSnapshot = await getDocs(collection(db, 'religions'))
+  const religionsWithIncome = religionsSnapshot.docs
+    .map((docSnap) => {
+      const data = docSnap.data() || {}
+      const buildingLevel = data.buildingLevel || 'none'
+      return {
+        id: docSnap.id,
+        name: data.name || 'Невідома релігія',
+        ref: docSnap.ref,
+        buildingLevel,
+        passiveFaith: getBuildingFaithIncome(buildingLevel),
+      }
+    })
+    .filter((religion) => religion.passiveFaith > 0)
+
+  for (const religion of religionsWithIncome) {
+    const clergyQuery = query(collection(db, 'clergy'), where('religion', '==', religion.ref))
+    const clergySnapshot = await getDocs(clergyQuery)
+
+    if (clergySnapshot.empty) continue
+
+    const heroCount = clergySnapshot.size
+    const baseShare = Math.floor(religion.passiveFaith / heroCount)
+    const remainder = religion.passiveFaith - baseShare * heroCount
+    const remainderIndex = remainder > 0 ? Math.floor(Math.random() * heroCount) : -1
+
+    const tasks = clergySnapshot.docs.map(async (docSnap, index) => {
+      const bonus = baseShare + (index === remainderIndex ? remainder : 0)
+      if (!bonus) return
+
+      const data = docSnap.data() || {}
+      const currentFaith = Number(data.faith ?? 0)
+      const newFaith = currentFaith + bonus
+      const updates = { faith: newFaith }
+
+      const currentFaithMax = Number(data.faithMax ?? 0)
+      if (currentFaithMax < newFaith) {
+        updates.faithMax = newFaith
+      }
+
+      await updateDoc(docSnap.ref, updates)
+      await addDoc(collection(docSnap.ref, 'logs'), {
+        delta: bonus,
+        message: `Пасивний дохід від споруди (${religion.buildingLevel}) за цикл ${cycleId}.`,
+        user: 'Система',
+        cycleId,
+        religionId: religion.id,
+        religionName: religion.name,
+        buildingLevel: religion.buildingLevel,
+        buildingFaithIncome: religion.passiveFaith,
+        remainderBonus: index === remainderIndex && remainder > 0,
+        createdAt: serverTimestamp(),
+      })
+    })
+
+    await Promise.all(tasks)
+  }
+}
+
 async function createCycleStartAction(cycleId, notes) {
   const actionsRef = collection(db, 'religionActions')
   const actionTypeRef = doc(db, 'religionActionTypes', 'cycleStart')
@@ -768,7 +832,6 @@ async function createCycleStartAction(cycleId, notes) {
     cycleId,
     notes: notes?.trim() || '',
     createdAt: serverTimestamp(),
-    md: 0,
     convertedFollowers: 0,
     result: 0,
   })
@@ -830,6 +893,7 @@ async function createCycle() {
 
     await resetReligionsSvTemp()
     await createCycleStartAction(cycleDoc.id, cycleForm.notes)
+    await distributeBuildingFaithIncome(cycleDoc.id)
     await loadLatestCycle()
     closeNewCycleDialog()
   } catch (e) {

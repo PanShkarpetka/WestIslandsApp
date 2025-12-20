@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 
-const DEFAULT_VALUES = {
+export const DEFAULT_VALUES = {
   farmBase: 10,
   farmDCBase: 10,
   minSpreadFollowersResult: 5,
@@ -23,7 +23,7 @@ const DEFAULT_VALUES = {
   svTemp: 0,
 };
 
-const BUILDING_LEVEL_BONUSES = {
+export const BUILDING_LEVEL_BONUSES = {
   none: {
     svBonus: 0,
     passiveFaith: 0,
