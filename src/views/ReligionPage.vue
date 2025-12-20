@@ -295,6 +295,150 @@
             <v-sheet class="action-card" rounded="lg" elevation="0">
               <div class="action-card__header">
                 <div>
+                  <div class="text-subtitle-2 font-semibold">Захист духовенства</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Інвестуйте ОВ, щоб активувати щит конфесії героя. Кнопка недоступна, якщо щит вже увімкнено.
+                  </div>
+                </div>
+                <v-chip
+                  :color="activeClergyReligion?.shieldActive ? 'success' : 'default'"
+                  variant="tonal"
+                  class="shield-status-chip"
+                >
+                  {{ activeClergyReligion?.shieldActive ? `Активний (+${activeClergyReligion.shieldBonus})` : 'Неактивний' }}
+                </v-chip>
+              </div>
+
+              <v-alert v-if="clergyDefenseError" type="error" variant="tonal" class="mb-3">
+                {{ clergyDefenseError }}
+              </v-alert>
+
+              <v-alert v-else-if="clergyDefenseFaithError" type="error" variant="tonal" class="mb-3">
+                {{ clergyDefenseFaithError }}
+              </v-alert>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="activeClergy?.heroRef?.id || ''"
+                  label="ID героя"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                  hint="Герой вибраного духовенства"
+                />
+                <v-text-field
+                  :model-value="clergyDefenseTarget"
+                  label="Ціль"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="clergyDefenseForm.investedOV"
+                  type="number"
+                  min="50"
+                  step="50"
+                  label="Інвестовані ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  v-model.number="clergyDefenseForm.roll"
+                  type="number"
+                  label="Кидок"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="clergyDefenseForm.dmMod"
+                  type="number"
+                  label="DM Mod"
+                  prefix="±"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  :model-value="clergyDefenseTargetSVTotal"
+                  label="SV цілі (база + тимчасовий)"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="clergyDefenseDC"
+                  label="DC"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="clergyDefenseResult ?? '—'"
+                  label="R"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="clergyDefenseBonus"
+                  label="Бонус щита"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="currentFaithPoints"
+                  label="Поточні ОВ духовенства"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <v-textarea
+                v-model="clergyDefenseForm.notes"
+                label="Нотатки / посилання"
+                density="comfortable"
+                hide-details="auto"
+                rows="2"
+                auto-grow
+              />
+
+              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
+                <div class="d-flex gap-2 align-center">
+                  <v-btn
+                    color="primary"
+                    :loading="clergyDefenseLoading"
+                    :disabled="clergyDefenseDisabled"
+                    @click="applyClergyDefense"
+                  >
+                    <v-icon start>mdi-shield-plus</v-icon>
+                    Застосувати
+                  </v-btn>
+                  <v-chip v-if="activeClergyReligion?.shieldActive" color="warning" variant="tonal" class="shield-status-chip">
+                    Щит вже активний
+                  </v-chip>
+                  <v-chip v-else-if="!downtimeAvailable" color="warning" variant="tonal" class="shield-status-chip">
+                    Даутайм недоступний
+                  </v-chip>
+                </div>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
                   <div class="text-subtitle-2 font-semibold">Зміна конфесії</div>
                   <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
                 </div>
@@ -340,7 +484,7 @@
             <v-sheet class="action-card" rounded="lg" elevation="0">
               <div class="action-card__header">
                 <div>
-                  <div class="text-subtitle-2 font-semibold">Доступність даутайму</div>
+                  <div class="text-subtitle-2 font-semibold">Доступність давнтайму</div>
                   <div class="text-body-2 text-medium-emphasis">
                     Вкажіть чи доступний давнтайм в даному циклі.
                   </div>
@@ -376,6 +520,65 @@
                   Зберегти
                 </v-btn>
                 <v-btn variant="text" @click="resetDowntimeState">Скинути</v-btn>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Прапорець щита конфесії</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Адміністратори можуть вручну вмикати або вимикати щит конфесії героя.
+                  </div>
+                </div>
+                <v-chip
+                  :color="manualShieldActive ? 'success' : 'default'"
+                  variant="tonal"
+                  class="shield-status-chip"
+                >
+                  <v-icon>
+                    {{ manualShieldActive ? 'mdi-shield-check' : 'mdi-shield-off' }}
+                  </v-icon>
+                </v-chip>
+              </div>
+
+              <v-alert
+                v-if="shieldUpdateError"
+                type="error"
+                variant="tonal"
+                class="mb-3"
+              >
+                {{ shieldUpdateError }}
+              </v-alert>
+              <v-alert
+                v-else-if="shieldUpdateSuccess"
+                type="success"
+                variant="tonal"
+                class="mb-3"
+              >
+                Стан щита оновлено.
+              </v-alert>
+
+              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
+                <v-switch
+                  v-model="manualShieldActive"
+                  inset
+                  color="primary"
+                  hide-details="auto"
+                  label="Увімкнути щит вручну"
+                />
+                <div class="d-flex gap-2">
+                  <v-btn
+                    variant="tonal"
+                    color="primary"
+                    :loading="shieldUpdateLoading"
+                    @click="saveShieldState"
+                  >
+                    <v-icon start>mdi-content-save</v-icon>
+                    Оновити
+                  </v-btn>
+                  <v-btn variant="text" @click="resetShieldState">Скинути</v-btn>
+                </div>
               </div>
             </v-sheet>
           </div>
@@ -694,6 +897,18 @@ const activeFaithFarmForm = reactive({
 })
 const activeFaithFarmError = ref('')
 const activeFaithFarmLoading = ref(false)
+const clergyDefenseForm = reactive({
+  investedOV: 50,
+  roll: null,
+  dmMod: 0,
+  notes: '',
+})
+const clergyDefenseError = ref('')
+const clergyDefenseLoading = ref(false)
+const manualShieldActive = ref(false)
+const shieldUpdateLoading = ref(false)
+const shieldUpdateError = ref('')
+const shieldUpdateSuccess = ref(false)
 
 function getCycleDurationDays(cycle) {
   if (!cycle) return null
@@ -1112,6 +1327,54 @@ const activeFaithFarmFollowers = computed(() => {
   return activeFaithFarmBase.value + extra
 })
 
+const clergyDefenseTarget = computed(() => activeClergyReligion.value?.name || '—')
+const clergyDefenseTargetSVTotal = computed(() => {
+  const svBase = Number(activeClergyReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
+  const svTemp = Number(activeClergyReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)
+  return svBase + svTemp
+})
+const clergyDefenseDC = computed(() => {
+  const dmMod = Number(clergyDefenseForm.dmMod ?? 0)
+  return clergyDefenseTargetSVTotal.value + dmMod
+})
+const clergyDefenseResult = computed(() => {
+  const rollRaw = clergyDefenseForm.roll
+  const investedRaw = clergyDefenseForm.investedOV
+  const roll = Number(rollRaw)
+  const invested = Number(investedRaw)
+
+  if (rollRaw === null || rollRaw === undefined || Number.isNaN(roll)) return null
+  if (investedRaw === null || investedRaw === undefined || Number.isNaN(invested)) return null
+
+  return roll + Math.floor(invested / 50)
+})
+const clergyDefenseBonus = computed(() => {
+  const result = clergyDefenseResult.value
+  const dc = clergyDefenseDC.value
+
+  if (result === null) return 0
+
+  if (result >= dc) {
+    return 1 + Math.max(0, Math.floor((result - dc) / 5))
+  }
+
+  return 0
+})
+const clergyDefenseFaithError = computed(() => {
+  const available = currentFaithPoints.value
+  const invested = Number(clergyDefenseForm.investedOV)
+
+  if (available < 50) return 'Недостатньо ОВ для мінімальної інвестиції (50).'
+  if (!Number.isNaN(invested) && invested > available) return 'Недостатньо ОВ для інвестиції.'
+
+  return ''
+})
+const clergyDefenseDisabled = computed(() =>
+  Boolean(activeClergyReligion.value?.shieldActive) ||
+  !downtimeAvailable.value ||
+  Boolean(clergyDefenseFaithError.value),
+)
+
 const sortedRecords = computed(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
   return records.value.slice().sort((a, b) => {
@@ -1137,6 +1400,16 @@ function toggleSort(field) {
 }
 
 const activeClergy = computed(() => records.value.find((item) => item.id === selectedClergyId.value))
+
+watch(activeClergyReligion, () => {
+  manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
+})
+
+watch(manualShieldActive, () => {
+  shieldUpdateSuccess.value = false
+  shieldUpdateError.value = ''
+})
+
 const clergyLogs = computed(() => (activeClergy.value ? religionStore.logsByClergy[activeClergy.value.id] || [] : []))
 const logsLoading = computed(() => religionStore.logsLoading)
 const logsError = computed(() => religionStore.logsError)
@@ -1214,6 +1487,7 @@ function openClergy(record) {
   activeFaithFarmForm.notes = ''
   activeFaithFarmError.value = ''
   resetDowntimeState()
+  resetClergyDefenseState()
   cancelReligionChange()
   dialogOpen.value = true
   religionStore.listenLogs(record.id)
@@ -1544,7 +1818,30 @@ function resetDowntimeState() {
   downtimeUpdateSuccess.value = false
 }
 
-watch(activeClergy, resetDowntimeState)
+function resetClergyDefenseState() {
+  clergyDefenseForm.investedOV = 50
+  clergyDefenseForm.roll = null
+  clergyDefenseForm.dmMod = 0
+  clergyDefenseForm.notes = ''
+  clergyDefenseError.value = ''
+  clergyDefenseLoading.value = false
+  manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
+  shieldUpdateError.value = ''
+  shieldUpdateSuccess.value = false
+  shieldUpdateLoading.value = false
+}
+
+function resetShieldState() {
+  manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
+  shieldUpdateError.value = ''
+  shieldUpdateSuccess.value = false
+  shieldUpdateLoading.value = false
+}
+
+watch(activeClergy, () => {
+  resetDowntimeState()
+  resetClergyDefenseState()
+})
 
 async function saveDowntimeAvailability() {
   if (!isAdmin.value || !activeClergy.value) return
@@ -1570,6 +1867,186 @@ async function saveDowntimeAvailability() {
     downtimeUpdateError.value = e?.message || 'Не вдалося оновити статус даутайму.'
   } finally {
     downtimeUpdateLoading.value = false
+  }
+}
+
+async function applyClergyDefense() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const religionRefSource = activeClergy.value.religion
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const heroRefSource = activeClergy.value.heroRef
+
+  const invested = Number(clergyDefenseForm.investedOV)
+  const roll = Number(clergyDefenseForm.roll)
+  const dmMod = Number(clergyDefenseForm.dmMod ?? 0)
+  const notes = clergyDefenseForm.notes?.trim() || ''
+
+  if (!religionRefSource) {
+    clergyDefenseError.value = 'Не вдалося визначити конфесію духовенства.'
+    return
+  }
+
+  if (activeClergyReligion.value?.shieldActive) {
+    clergyDefenseError.value = 'Щит цієї конфесії вже активний.'
+    return
+  }
+
+  if (!downtimeAvailable.value) {
+    clergyDefenseError.value = 'Дія доступна лише коли є давнтайм.'
+    return
+  }
+
+  if (Number.isNaN(invested) || invested < 50) {
+    clergyDefenseError.value = 'Мінімальна інвестиція — 50 ОВ.'
+    return
+  }
+
+  if (invested % 50 !== 0) {
+    clergyDefenseError.value = 'Інвестиція має бути кратною 50 ОВ.'
+    return
+  }
+
+  const faithBlockReason = clergyDefenseFaithError.value
+  if (faithBlockReason) {
+    clergyDefenseError.value = faithBlockReason
+    return
+  }
+
+  if (Number.isNaN(roll)) {
+    clergyDefenseError.value = 'Вкажіть результат кидка.'
+    return
+  }
+
+  const religionRef = religionRefSource?.path
+    ? doc(db, religionRefSource.path)
+    : religionRefSource?.id
+      ? doc(db, 'religions', religionRefSource.id)
+      : religionRefSource
+  const heroRef = heroRefSource?.path ? doc(db, heroRefSource.path) : heroRefSource
+
+  if (!religionRef) {
+    clergyDefenseError.value = 'Не вдалося визначити конфесію духовенства.'
+    return
+  }
+
+  if (!heroRef) {
+    clergyDefenseError.value = 'Не вдалося визначити героя духовенства.'
+    return
+  }
+
+  const dc = clergyDefenseDC.value
+  const result = clergyDefenseResult.value
+  const bonus = clergyDefenseBonus.value
+
+  clergyDefenseError.value = ''
+  clergyDefenseLoading.value = true
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      if (!clergySnapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const clergyData = clergySnapshot.data() || {}
+      const currentFaith = Number(clergyData.faith ?? 0)
+      if (currentFaith < invested) {
+        throw new Error('Недостатньо ОВ для інвестиції.')
+      }
+
+      transaction.update(clergyRef, { faith: currentFaith - invested })
+
+      if (bonus > 0) {
+        const religionSnapshot = await transaction.get(religionRef)
+        if (!religionSnapshot.exists()) {
+          throw new Error('Конфесія не знайдена.')
+        }
+
+        transaction.update(religionRef, {
+          shieldBonus: bonus,
+          shieldActive: true,
+        })
+      }
+    })
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta: -invested,
+        message: `Захист духовенства: інвестиція ${invested} ОВ, кидок ${roll}, DM Mod ${dmMod}, DC ${dc}. ${
+          notes || 'Без нотаток'
+        }`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'shield'),
+        hero: heroRef,
+        heroId: heroRef.id,
+        clergy: clergyRef,
+        religion: religionRef,
+        investedFaith: invested,
+        roll,
+        dmMod,
+        notes,
+        target: religionRef,
+        targetSVTotal: clergyDefenseTargetSVTotal.value,
+        dc,
+        result,
+        bonus,
+        shieldApplied: bonus > 0,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    if (bonus > 0) {
+      manualShieldActive.value = true
+    }
+
+    clergyDefenseForm.roll = null
+    clergyDefenseForm.dmMod = 0
+    clergyDefenseForm.notes = ''
+  } catch (e) {
+    console.error('[religion] Failed to apply clergy defense', e)
+    clergyDefenseError.value = e?.message || 'Не вдалося застосувати захист духовенства.'
+  } finally {
+    clergyDefenseLoading.value = false
+  }
+}
+
+async function saveShieldState() {
+  if (!isAdmin.value || !activeClergyReligion.value) return
+
+  const religionRefSource = activeClergy.value?.religion
+  const religionRef = religionRefSource?.path
+    ? doc(db, religionRefSource.path)
+    : religionRefSource?.id
+      ? doc(db, 'religions', religionRefSource.id)
+      : religionRefSource
+
+  if (!religionRef) {
+    shieldUpdateError.value = 'Не вдалося визначити конфесію.'
+    return
+  }
+
+  shieldUpdateError.value = ''
+  shieldUpdateSuccess.value = false
+  shieldUpdateLoading.value = true
+
+  const updates = { shieldActive: manualShieldActive.value }
+  if (!manualShieldActive.value) {
+    updates.shieldBonus = 0
+  }
+
+  try {
+    await updateDoc(religionRef, updates)
+    shieldUpdateSuccess.value = true
+  } catch (e) {
+    console.error('[religion] Failed to update shield state', e)
+    shieldUpdateError.value = e?.message || 'Не вдалося оновити стан щита.'
+  } finally {
+    shieldUpdateLoading.value = false
   }
 }
 
@@ -1759,6 +2236,11 @@ async function applyActiveFaithFarm() {
 
 .chart-chip {
   font-weight: 600;
+}
+
+.shield-status-chip {
+  align-items: center;
+  flex: none;
 }
 
 .clergy-overview {
