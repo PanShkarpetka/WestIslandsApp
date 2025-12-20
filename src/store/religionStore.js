@@ -255,6 +255,18 @@ export const useReligionStore = defineStore('religion', () => {
     })
   }
 
+  function setDowntimeAvailability(clergyId, downtimeAvailable) {
+    const index = records.value.findIndex((item) => item.id === clergyId)
+    if (index === -1) return
+
+    const updated = { ...records.value[index], downtimeAvailable }
+    records.value = [
+      ...records.value.slice(0, index),
+      updated,
+      ...records.value.slice(index + 1),
+    ]
+  }
+
   return {
     records,
     loading,
@@ -268,5 +280,6 @@ export const useReligionStore = defineStore('religion', () => {
     listenLogs,
     stopLogs,
     changeFaith,
+    setDowntimeAvailability,
   }
 })

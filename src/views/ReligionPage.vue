@@ -212,6 +212,48 @@
             </div>
           </div>
 
+          <div v-if="isAdmin" class="mb-4 downtime-section">
+            <div class="d-flex justify-space-between align-center">
+              <div>
+                <div class="text-subtitle-2 font-medium"><b>Доступність даутайму</b></div>
+                <div class="text-body-2 text-medium-emphasis">
+                  Керуйте, чи виконав герой дію в цьому циклі.
+                </div>
+              </div>
+              <v-switch
+                v-model="downtimeAvailable"
+                inset
+                color="primary"
+                hide-details="auto"
+                :label="downtimeAvailable ? 'Дію не виконано' : 'Дію виконано'"
+              />
+            </div>
+
+            <v-alert
+              v-if="downtimeUpdateError"
+              type="error"
+              variant="tonal"
+              class="mt-3"
+            >
+              {{ downtimeUpdateError }}
+            </v-alert>
+            <v-alert
+              v-else-if="downtimeUpdateSuccess"
+              type="success"
+              variant="tonal"
+              class="mt-3"
+            >
+              Статус даутайму оновлено.
+            </v-alert>
+
+            <div class="d-flex gap-2 mt-3">
+              <v-btn color="primary" :loading="downtimeUpdateLoading" @click="saveDowntimeAvailability">
+                Зберегти статус
+              </v-btn>
+              <v-btn variant="text" @click="resetDowntimeState">Скинути</v-btn>
+            </div>
+          </div>
+
           <v-card class="log-card">
             <div class="d-flex align-center gap-2 mb-2">
               <v-icon size="18">mdi-history</v-icon>
@@ -715,6 +757,10 @@ const changeReligionMode = ref(false)
 const selectedReligionId = ref('')
 const changeReligionLoading = ref(false)
 const changeReligionError = ref('')
+const downtimeAvailable = ref(true)
+const downtimeUpdateLoading = ref(false)
+const downtimeUpdateError = ref('')
+const downtimeUpdateSuccess = ref(false)
 
 const sortedRecords = computed(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
@@ -813,6 +859,7 @@ function openClergy(record) {
   faithChange.value = null
   logMessage.value = ''
   actionError.value = ''
+  resetDowntimeState()
   cancelReligionChange()
   dialogOpen.value = true
   religionStore.listenLogs(record.id)
@@ -1134,6 +1181,41 @@ async function applyFaithChange(mode) {
     actionError.value = e?.message || 'Не вдалося оновити віру.'
   } finally {
     actionLoading.value = false
+  }
+}
+
+function resetDowntimeState() {
+  downtimeAvailable.value = activeClergy.value?.downtimeAvailable ?? true
+  downtimeUpdateError.value = ''
+  downtimeUpdateSuccess.value = false
+}
+
+watch(activeClergy, resetDowntimeState)
+
+async function saveDowntimeAvailability() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const heroRefValue = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef
+
+  if (!heroRefValue) {
+    downtimeUpdateError.value = 'Не вдалося визначити героя для оновлення.'
+    return
+  }
+
+  downtimeUpdateError.value = ''
+  downtimeUpdateSuccess.value = false
+  downtimeUpdateLoading.value = true
+
+  try {
+    await updateDoc(heroRefValue, { downtimeAvailable: downtimeAvailable.value })
+    religionStore.setDowntimeAvailability(activeClergy.value.id, downtimeAvailable.value)
+    downtimeUpdateSuccess.value = true
+  } catch (e) {
+    downtimeUpdateError.value = e?.message || 'Не вдалося оновити статус даутайму.'
+  } finally {
+    downtimeUpdateLoading.value = false
   }
 }
 
