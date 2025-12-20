@@ -1955,14 +1955,17 @@ async function applyClergyDefense() {
         throw new Error('Недостатньо ОВ для інвестиції.')
       }
 
-      transaction.update(clergyRef, { faith: currentFaith - invested })
-
+      let religionSnapshot = null
       if (bonus > 0) {
-        const religionSnapshot = await transaction.get(religionRef)
+        religionSnapshot = await transaction.get(religionRef)
         if (!religionSnapshot.exists()) {
           throw new Error('Конфесія не знайдена.')
         }
+      }
 
+      transaction.update(clergyRef, { faith: currentFaith - invested })
+
+      if (bonus > 0) {
         transaction.update(religionRef, {
           shieldBonus: bonus,
           shieldActive: true,
