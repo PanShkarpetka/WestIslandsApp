@@ -121,149 +121,192 @@
 
     <v-dialog v-model="dialogOpen" max-width="840">
       <v-card v-if="activeClergy" class="clergy-dialog" rounded="xl">
-        <v-card-title class="d-flex align-center gap-4">
-          <div>
-            <div class="text-subtitle-1 font-semibold">{{ activeClergy.heroName }}</div>
-            <div class="text-body-2 text-medium-emphasis">{{ activeClergy.religionName }}</div>
-          </div>
-          <v-chip color="primary" variant="elevated" class="ml-auto">
-            {{ activeClergy.faith }}
-            <v-icon v-if="hasIcon(activeClergy.religionName)">
-              <img
-                  :src="`/images/religions/${activeClergy.religionName}.png`"
-                  alt="Faith Icon"
-                  width="16"
-                  height="16"
-              />
-            </v-icon>
-            <v-icon v-else class="ml-1" size="18">
-              mdi-dharmachakra
-            </v-icon>
-          </v-chip>
-        </v-card-title>
-
-        <v-card-text class="pt-0">
+        <v-card-text class="pt-0 hero-clergy-modal">
           <v-alert v-if="actionError" type="error" variant="tonal" class="mb-3">
             {{ actionError }}
           </v-alert>
 
-          <div v-if="isAdmin" class="mb-4 admin-actions">
-            <v-text-field
-              v-model.number="faithChange"
-              type="number"
-              min="1"
-              label="Зміна очок віри"
-              density="comfortable"
-              prefix="±"
-              hide-details="auto"
-            />
-            <v-textarea
-              v-model="logMessage"
-              rows="2"
-              auto-grow
-              label="Коментар до зміни"
-              density="comfortable"
-              hide-details="auto"
-            />
-            <div class="d-flex btns">
-              <v-btn color="error" :loading="actionLoading" @click="applyFaithChange('remove')">
-                Зняти ОВ
-              </v-btn>
-              <v-btn color="success" :loading="actionLoading" @click="applyFaithChange('add')">
-                Додати ОВ
-              </v-btn>
-            </div>
-          </div>
-
-          <div v-if="isAdmin" class="mb-4 change-religion">
-            <div class="d-flex justify-space-between align-center mb-2">
+          <v-sheet class="clergy-overview" color="primary" variant="tonal" rounded="lg">
+            <div class="clergy-overview__top">
               <div>
-                <div class="text-subtitle-2 font-medium"><b>Зміна конфесії</b></div>
-                <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
+                <div class="text-caption text-medium-emphasis">Герой</div>
+                <div class="text-h6 font-semibold">{{ activeClergy.heroName }}</div>
+                <div class="text-body-2 text-medium-emphasis">{{ activeClergy.religionName }}</div>
               </div>
-              <v-btn v-if="!changeReligionMode" color="primary" variant="tonal" @click="startReligionChange">
-                Змінити конфесію
-              </v-btn>
-            </div>
-
-            <div v-if="changeReligionMode" class="change-religion__form">
-              <v-alert v-if="changeReligionError" type="error" variant="tonal" class="mb-3">{{ changeReligionError }}</v-alert>
-
-              <v-select
-                v-model="selectedReligionId"
-                :items="religionOptions"
-                item-title="title"
-                item-value="value"
-                label="Нова конфесія"
-                density="comfortable"
-                hide-details="auto"
-              />
-
-              <v-alert type="warning" variant="tonal" class="mt-3">
-                Буде знято {{ religionChangeFine }} ОВ ({{ religionChangeFinePercent }}%) з духовенства за зміну конфесії.
-              </v-alert>
-
-              <div class="d-flex gap-2 mt-3">
-                <v-btn color="primary" :loading="changeReligionLoading" @click="confirmReligionChange">
-                  Підтвердити зміну
-                </v-btn>
-                <v-btn variant="text" @click="cancelReligionChange">Скасувати</v-btn>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="isAdmin" class="mb-4 downtime-section">
-            <div class="d-flex justify-space-between align-center">
-              <div>
-                <div class="text-subtitle-2 font-medium"><b>Доступність даутайму</b></div>
-                <div class="text-body-2 text-medium-emphasis">
-                  Керуйте, чи виконав герой дію в цьому циклі.
+              <div class="meta-pills">
+                <div class="meta-pill">
+                  <v-icon size="18" color="primary" v-if="hasIcon(activeClergy.religionName)">
+                    <img
+                        :src="`/images/religions/${activeClergy.religionName}.png`"
+                        alt="Faith Icon"
+                        width="18"
+                        height="18"
+                    />
+                  </v-icon>
+                  <v-icon v-else class="ml-1" color="primary" size="18">
+                    mdi-dharmachakra
+                  </v-icon>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">Очки віри</div>
+                    <div class="text-subtitle-1 font-semibold text-black">
+                      {{ activeClergy.faith }}<span v-if="activeClergy.faithMax"> / {{ activeClergy.faithMax }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="meta-pill">
+                  <v-icon size="18" :color="downtimeAvailable ? 'warning' : 'success'">mdi-progress-clock</v-icon>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">Даутайм</div>
+                    <div class="text-subtitle-2 text-black">{{ downtimeAvailable ? 'Дію не виконано' : 'Дію виконано' }}</div>
+                  </div>
                 </div>
               </div>
-              <v-switch
-                v-model="downtimeAvailable"
-                inset
-                color="primary"
-                hide-details="auto"
-                :label="downtimeAvailable ? 'Дію не виконано' : 'Дію виконано'"
-              />
             </div>
+          </v-sheet>
 
-            <v-alert
-              v-if="downtimeUpdateError"
-              type="error"
-              variant="tonal"
-              class="mt-3"
-            >
-              {{ downtimeUpdateError }}
-            </v-alert>
-            <v-alert
-              v-else-if="downtimeUpdateSuccess"
-              type="success"
-              variant="tonal"
-              class="mt-3"
-            >
-              Статус даутайму оновлено.
-            </v-alert>
+          <div v-if="isAdmin" class="clergy-grid">
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Керування очками віри</div>
+                  <div class="text-body-2 text-medium-emphasis">Оновіть ОВ та залиште пояснення для журналу.</div>
+                </div>
+              </div>
 
-            <div class="d-flex gap-2 mt-3">
-              <v-btn color="primary" :loading="downtimeUpdateLoading" @click="saveDowntimeAvailability">
-                Зберегти статус
-              </v-btn>
-              <v-btn variant="text" @click="resetDowntimeState">Скинути</v-btn>
-            </div>
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="faithChange"
+                  type="number"
+                  min="1"
+                  label="Зміна ОВ"
+                  density="comfortable"
+                  prefix="±"
+                  hide-details="auto"
+                />
+                <v-textarea
+                  v-model="logMessage"
+                  rows="2"
+                  auto-grow
+                  label="Коментар до зміни"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="d-flex gap-2 justify-space-between">
+                <v-btn color="error" variant="tonal" :loading="actionLoading" @click="applyFaithChange('remove')">
+                  <v-icon start>mdi-minus-circle</v-icon>
+                  Зняти ОВ
+                </v-btn>
+                <v-btn color="success" :loading="actionLoading" @click="applyFaithChange('add')">
+                  <v-icon start>mdi-plus-circle</v-icon>
+                  Додати ОВ
+                </v-btn>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Зміна конфесії</div>
+                  <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
+                </div>
+                <v-btn
+                  v-if="!changeReligionMode"
+                  color="primary"
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-auto-fix"
+                  @click="startReligionChange"
+                >
+                  Змінити конфесію
+                </v-btn>
+              </div>
+
+              <div v-if="changeReligionMode" class="stacked-card">
+                <v-alert v-if="changeReligionError" type="error" variant="tonal" class="mb-3">{{ changeReligionError }}</v-alert>
+
+                <v-select
+                  v-model="selectedReligionId"
+                  :items="religionOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Нова конфесія"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+
+                <v-alert type="warning" variant="tonal" class="mt-3">
+                  Буде знято {{ religionChangeFine }} ОВ ({{ religionChangeFinePercent }}%) з духовенства за зміну конфесії.
+                </v-alert>
+
+                <div class="d-flex gap-2 mt-3 justify-space-between">
+                  <v-btn color="primary" :loading="changeReligionLoading" @click="confirmReligionChange">
+                    <v-icon start>mdi-check</v-icon>
+                    Підтвердити
+                  </v-btn>
+                  <v-btn variant="text" @click="cancelReligionChange">Скасувати</v-btn>
+                </div>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Доступність даутайму</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Вкажіть чи доступний давнтайм в даному циклі.
+                  </div>
+                </div>
+                <v-switch
+                  v-model="downtimeAvailable"
+                  inset
+                  color="primary"
+                  hide-details="auto"
+                />
+              </div>
+
+              <v-alert
+                v-if="downtimeUpdateError"
+                type="error"
+                variant="tonal"
+                class="mt-3"
+              >
+                {{ downtimeUpdateError }}
+              </v-alert>
+              <v-alert
+                v-else-if="downtimeUpdateSuccess"
+                type="success"
+                variant="tonal"
+                class="mt-3"
+              >
+                Статус давнтайму оновлено.
+              </v-alert>
+
+              <div class="d-flex gap-2 mt-3 justify-space-between">
+                <v-btn color="primary" :loading="downtimeUpdateLoading" @click="saveDowntimeAvailability">
+                  <v-icon start>mdi-content-save</v-icon>
+                  Зберегти
+                </v-btn>
+                <v-btn variant="text" @click="resetDowntimeState">Скинути</v-btn>
+              </div>
+            </v-sheet>
           </div>
 
-          <v-card class="log-card">
-            <div class="d-flex align-center gap-2 mb-2">
-              <v-icon size="18">mdi-history</v-icon>
-              <div class="text-subtitle-2 font-medium"><b>Журнал змін</b></div>
+          <v-sheet class="action-card log-card" rounded="lg" elevation="0">
+            <div class="d-flex align-center gap-2 mb-3">
+              <v-avatar color="primary" size="28" variant="tonal">
+                <v-icon size="18">mdi-history</v-icon>
+              </v-avatar>
+              <div style="margin-left: 5px">
+                <div class="text-subtitle-2 font-semibold">Журнал змін</div>
+              </div>
             </div>
             <div v-if="logsLoading" class="text-gray-500">Завантаження журналу…</div>
             <div v-else-if="logsError" class="error">{{ logsError }}</div>
             <div v-else-if="clergyLogs.length === 0" class="text-gray-500">Поки що немає записів.</div>
             <v-list v-else density="comfortable">
-              <v-list-item v-for="log in clergyLogs" :key="log.id">
+              <v-list-item v-for="log in clergyLogs" :key="log.id" class="log-entry">
                 <v-list-item-title>
                   <span :class="{ 'text-success': log.delta > 0, 'text-error': log.delta < 0 }">
                     {{ log.delta > 0 ? '+' : '' }}{{ log.delta }}
@@ -275,7 +318,7 @@
                 </v-list-item-subtitle>
               </v-list-item>
             </v-list>
-          </v-card>
+          </v-sheet>
         </v-card-text>
 
         <v-card-actions class="justify-end">
@@ -1296,33 +1339,81 @@ async function saveDowntimeAvailability() {
   font-weight: 600;
 }
 
-.clergy-dialog .log-card {
-  background-color: rgba(63, 81, 181, 0.01);
+.clergy-overview {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(63, 81, 181, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-.log-card div {
-  margin: 5px;
+.clergy-overview__top {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.admin-actions .v-text-field,
-.admin-actions .v-textarea {
-  margin-bottom: 10px;
+.meta-pills {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.btns {
-  justify-content: space-evenly;
-}
-
-.change-religion {
-  background-color: rgba(255, 255, 255, 0.35);
-  padding: 12px;
+.meta-pill {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 
-.change-religion__form {
-  background-color: rgba(255, 255, 255, 0.6);
+.clergy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.action-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 247, 255, 0.8));
+  border: 1px solid rgba(63, 81, 181, 0.08);
+  padding: 14px;
+}
+
+.action-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stacked-card {
+  background: rgba(255, 255, 255, 0.8);
   border-radius: 12px;
   padding: 12px;
+  border: 1px solid rgba(63, 81, 181, 0.08);
+}
+
+.log-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(244, 246, 255, 0.9));
+}
+
+.log-entry + .log-entry {
+  border-top: 1px dashed rgba(0, 0, 0, 0.05);
+}
+.hero-clergy-modal {
+  margin-top: 10px;
 }
 
 @media (max-width: 960px) {
@@ -1333,6 +1424,10 @@ async function saveDowntimeAvailability() {
   .distribution-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .field-row {
+    grid-template-columns: 1fr;
   }
 
   .section-overlay {
