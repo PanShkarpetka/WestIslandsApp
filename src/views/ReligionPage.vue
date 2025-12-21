@@ -399,7 +399,7 @@
                 />
                 <v-text-field
                   :model-value="currentFaithPoints"
-                  label="Поточні ОВ духовенства"
+                  label="ОВ духовенства"
                   density="comfortable"
                   hide-details="auto"
                   readonly
@@ -433,6 +433,140 @@
                     Даутайм недоступний
                   </v-chip>
                 </div>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Поширення релігії</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Витратьте ОВ, щоб конвертувати послідовників іншої конфесії та зняти щит за наявності.
+                  </div>
+                </div>
+              </div>
+
+              <v-alert v-if="spreadReligionError" type="error" variant="tonal" class="mb-3">
+                {{ spreadReligionError }}
+              </v-alert>
+
+              <v-alert v-else-if="spreadReligionFaithError" type="error" variant="tonal" class="mb-3">
+                {{ spreadReligionFaithError }}
+              </v-alert>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="activeClergy?.heroRef?.id || ''"
+                  label="ID героя"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                  hint="Герой вибраного духовенства"
+                />
+                <v-select
+                  v-model="spreadReligionForm.targetReligionId"
+                  :items="spreadTargetReligionOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Цільова конфесія"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="spreadReligionForm.investedOV"
+                  type="number"
+                  min="50"
+                  step="50"
+                  label="Витрачені ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  v-model.number="spreadReligionForm.roll"
+                  type="number"
+                  label="Кидок"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="spreadReligionForm.dmMod"
+                  type="number"
+                  label="DM Mod"
+                  prefix="±"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  :model-value="spreadTargetSVTotal"
+                  label="SV цілі (база + тимчасовий + щит)"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="spreadReligionDC"
+                  label="DC"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="spreadReligionResult ?? '—'"
+                  label="R = Кидок + floor(ОВ/50)"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="spreadReligionConverted ?? '—'"
+                  label="Сконвертовано"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="currentFaithPoints"
+                  label="ОВ духовенства"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <v-textarea
+                v-model="spreadReligionForm.notes"
+                label="Нотатки / посилання"
+                density="comfortable"
+                hide-details="auto"
+                rows="2"
+                auto-grow
+              />
+
+              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
+                <v-btn
+                  color="primary"
+                  :loading="spreadReligionLoading"
+                  :disabled="spreadReligionDisabled"
+                  @click="applySpreadReligion"
+                >
+                  <v-icon start>mdi-account-convert</v-icon>
+                  Застосувати
+                </v-btn>
+                <v-chip v-if="!downtimeAvailable" color="warning" variant="tonal" class="shield-status-chip">
+                  Даутайм недоступний
+                </v-chip>
               </div>
             </v-sheet>
 
@@ -897,6 +1031,15 @@ const activeFaithFarmForm = reactive({
 })
 const activeFaithFarmError = ref('')
 const activeFaithFarmLoading = ref(false)
+const spreadReligionForm = reactive({
+  targetReligionId: '',
+  investedOV: 50,
+  roll: null,
+  dmMod: 0,
+  notes: '',
+})
+const spreadReligionError = ref('')
+const spreadReligionLoading = ref(false)
 const clergyDefenseForm = reactive({
   investedOV: 50,
   roll: null,
@@ -1278,6 +1421,65 @@ const sectionBackgroundStyle = computed(() => {
   }
 })
 
+const dialogOpen = ref(false)
+const selectedClergyId = ref('')
+const activeClergy = computed(() => records.value.find((item) => item.id === selectedClergyId.value))
+const activeClergyReligion = computed(() => {
+  const religionId = activeClergy.value?.religion?.id
+  if (!religionId) return null
+
+  return religionStore.religions.find((item) => item.id === religionId) || null
+})
+
+const spreadTargetReligionOptions = computed(() =>
+  religionStore.religions
+    .filter((item) => item.id !== activeClergyReligion.value?.id)
+    .map((item) => ({
+      title: item.name,
+      value: item.id,
+    })),
+)
+const spreadTargetReligion = computed(() =>
+  religionStore.religions.find((item) => item.id === spreadReligionForm.targetReligionId) || null,
+)
+const spreadTargetSVTotal = computed(() => {
+  const svBase = Number(spreadTargetReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
+  const svTemp = Number(spreadTargetReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)
+  const shieldBonus = Number(spreadTargetReligion.value?.shieldBonus ?? DEFAULT_VALUES.shieldBonus)
+
+  return svBase + svTemp + shieldBonus
+})
+const spreadReligionDC = computed(() => spreadTargetSVTotal.value + Number(spreadReligionForm.dmMod ?? 0))
+const spreadReligionResult = computed(() => {
+  const rollRaw = spreadReligionForm.roll
+  const investedRaw = spreadReligionForm.investedOV
+  const roll = Number(rollRaw)
+  const invested = Number(investedRaw)
+
+  if (rollRaw === null || rollRaw === undefined || Number.isNaN(roll)) return null
+  if (investedRaw === null || investedRaw === undefined || Number.isNaN(invested)) return null
+
+  return roll + Math.floor(invested / 50)
+})
+const spreadReligionConverted = computed(() => {
+  const result = spreadReligionResult.value
+  if (result === null) return null
+
+  return result >= spreadReligionDC.value ? 5 + Math.max(0, result - spreadReligionDC.value) : 0
+})
+const spreadReligionFaithError = computed(() => {
+  const available = currentFaithPoints.value
+  const invested = Number(spreadReligionForm.investedOV)
+
+  if (available < 50) return 'Недостатньо ОВ для мінімальної інвестиції (50).'
+  if (!Number.isNaN(invested) && invested > available) return 'Недостатньо ОВ для інвестиції.'
+
+  return ''
+})
+const spreadReligionDisabled = computed(
+  () => !spreadTargetReligion.value || !downtimeAvailable.value || Boolean(spreadReligionFaithError.value),
+)
+
 watch(
   () => islandStore.currentId,
   (id) => {
@@ -1289,11 +1491,25 @@ watch(distribution, () => {
   hoveredReligion.value = null
 })
 
+watch(
+  spreadTargetReligionOptions,
+  (options) => {
+    if (!options.length) {
+      spreadReligionForm.targetReligionId = ''
+      return
+    }
+
+    const exists = options.some((option) => option.value === spreadReligionForm.targetReligionId)
+    if (!exists) {
+      spreadReligionForm.targetReligionId = options[0].value
+    }
+  },
+  { immediate: true },
+)
+
 const sortBy = ref('heroName')
 const sortDirection = ref('asc')
 
-const dialogOpen = ref(false)
-const selectedClergyId = ref('')
 const faithChange = ref(null)
 const logMessage = ref('')
 const actionError = ref('')
@@ -1306,12 +1522,6 @@ const downtimeAvailable = ref(true)
 const downtimeUpdateLoading = ref(false)
 const downtimeUpdateError = ref('')
 const downtimeUpdateSuccess = ref(false)
-const activeClergyReligion = computed(() => {
-  const religionId = activeClergy.value?.religion?.id
-  if (!religionId) return null
-
-  return religionStore.religions.find((item) => item.id === religionId) || null
-})
 const activeFaithFarmBase = computed(() => activeClergyReligion.value?.farmBase ?? DEFAULT_VALUES.farmBase)
 const activeFaithFarmDCBase = computed(() => activeClergyReligion.value?.farmDCBase ?? DEFAULT_VALUES.farmDCBase)
 const currentFaithPoints = computed(() => Number(activeClergy.value?.faith ?? 0))
@@ -1398,8 +1608,6 @@ function toggleSort(field) {
     sortDirection.value = 'asc'
   }
 }
-
-const activeClergy = computed(() => records.value.find((item) => item.id === selectedClergyId.value))
 
 watch(activeClergyReligion, () => {
   manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
@@ -1488,6 +1696,7 @@ function openClergy(record) {
   activeFaithFarmError.value = ''
   resetDowntimeState()
   resetClergyDefenseState()
+  resetSpreadReligionState()
   cancelReligionChange()
   dialogOpen.value = true
   religionStore.listenLogs(record.id)
@@ -1831,6 +2040,16 @@ function resetClergyDefenseState() {
   shieldUpdateLoading.value = false
 }
 
+function resetSpreadReligionState() {
+  spreadReligionForm.targetReligionId = ''
+  spreadReligionForm.investedOV = 50
+  spreadReligionForm.roll = null
+  spreadReligionForm.dmMod = 0
+  spreadReligionForm.notes = ''
+  spreadReligionError.value = ''
+  spreadReligionLoading.value = false
+}
+
 function resetShieldState() {
   manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
   shieldUpdateError.value = ''
@@ -1841,6 +2060,7 @@ function resetShieldState() {
 watch(activeClergy, () => {
   resetDowntimeState()
   resetClergyDefenseState()
+  resetSpreadReligionState()
 })
 
 async function saveDowntimeAvailability() {
@@ -2015,6 +2235,178 @@ async function applyClergyDefense() {
     clergyDefenseError.value = e?.message || 'Не вдалося застосувати захист духовенства.'
   } finally {
     clergyDefenseLoading.value = false
+  }
+}
+
+async function applySpreadReligion() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const targetReligion = spreadTargetReligion.value
+  const religionRefSource = activeClergy.value.religion
+  const heroRef = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef
+  const religionRef = religionRefSource?.path
+    ? doc(db, religionRefSource.path)
+    : religionRefSource?.id
+      ? doc(db, 'religions', religionRefSource.id)
+      : religionRefSource || null
+  const invested = Number(spreadReligionForm.investedOV)
+  const roll = Number(spreadReligionForm.roll)
+  const dmMod = Number(spreadReligionForm.dmMod ?? 0)
+  const dc = spreadReligionDC.value
+  const result = spreadReligionResult.value
+  const converted = spreadReligionConverted.value
+  const notes = spreadReligionForm.notes?.trim() || ''
+  const cycleId = latestCycle.value?.id || null
+
+  if (!downtimeAvailable.value) {
+    spreadReligionError.value = 'Даутайм недоступний для цього героя.'
+    return
+  }
+
+  if (!targetReligion) {
+    spreadReligionError.value = 'Оберіть цільову конфесію.'
+    return
+  }
+
+  if (targetReligion.id === activeClergyReligion.value?.id) {
+    spreadReligionError.value = 'Цільова конфесія має відрізнятися від конфесії героя.'
+    return
+  }
+
+  if (!religionRef) {
+    spreadReligionError.value = 'Не вдалося визначити конфесію духовенства.'
+    return
+  }
+
+  if (Number.isNaN(invested) || invested < 50) {
+    spreadReligionError.value = 'Мінімальна інвестиція — 50 ОВ.'
+    return
+  }
+
+  if (invested % 50 !== 0) {
+    spreadReligionError.value = 'Інвестиція має бути кратною 50 ОВ.'
+    return
+  }
+
+  const faithBlockReason = spreadReligionFaithError.value
+  if (faithBlockReason) {
+    spreadReligionError.value = faithBlockReason
+    return
+  }
+
+  if (Number.isNaN(roll)) {
+    spreadReligionError.value = 'Вкажіть результат кидка.'
+    return
+  }
+
+  if (converted === null) {
+    spreadReligionError.value = 'Не вдалося розрахувати результат.'
+    return
+  }
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const targetReligionRef = doc(db, 'religions', targetReligion.id)
+  let shieldBroken = false
+
+  spreadReligionError.value = ''
+  spreadReligionLoading.value = true
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      if (!clergySnapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const clergyData = clergySnapshot.data() || {}
+      const currentFaith = Number(clergyData.faith ?? 0)
+      if (currentFaith < invested) {
+        throw new Error('Недостатньо ОВ для інвестиції.')
+      }
+
+      const targetSnapshot = await transaction.get(targetReligionRef)
+      if (!targetSnapshot.exists()) {
+        throw new Error('Цільова конфесія не знайдена.')
+      }
+
+      const targetData = targetSnapshot.data() || {}
+      const targetFollowers = Number(targetData.followers ?? 0)
+      const targetSvTempRaw = Number(targetData.svTemp ?? DEFAULT_VALUES.svTemp)
+
+      const religionSnapshot = await transaction.get(religionRef)
+      if (!religionSnapshot.exists()) {
+        throw new Error('Конфесія духовенства не знайдена.')
+      }
+
+      const religionData = religionSnapshot.data() || {}
+      const sourceFollowers = Number(religionData.followers ?? 0)
+
+      transaction.update(clergyRef, { faith: currentFaith - invested })
+
+      transaction.update(religionRef, { followers: sourceFollowers + converted })
+
+      const targetUpdates = {
+        followers: Math.max(0, targetFollowers - converted),
+        svTemp: targetSvTempRaw + 1,
+      }
+
+      if (targetData.shieldActive) {
+        targetUpdates.shieldActive = false
+        targetUpdates.shieldBonus = 0
+        shieldBroken = true
+      }
+
+      transaction.update(targetReligionRef, targetUpdates)
+
+      if (heroRef) {
+        transaction.update(heroRef, { downtimeAvailable: false })
+      }
+    })
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta: -invested,
+        message: `Поширення релігії: інвестиція ${invested} ОВ, кидок ${roll}, DM Mod ${dmMod}, DC ${dc}, результат ${result}. Конвертовано ${converted}. ${
+          notes || 'Без нотаток'
+        }`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'influence'),
+        hero: heroRef || null,
+        heroId: heroRef?.id,
+        clergy: clergyRef,
+        religion: religionRef,
+        targetReligion: targetReligionRef,
+        investedFaith: invested,
+        roll,
+        dmMod,
+        notes,
+        targetSVTotal: spreadTargetSVTotal.value,
+        dc,
+        result,
+        convertedFollowers: converted,
+        shieldBroken,
+        downtimeConsumed: true,
+        cycleId,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    religionStore.setDowntimeAvailability(activeClergy.value.id, false)
+
+    spreadReligionForm.roll = null
+    spreadReligionForm.dmMod = 0
+    spreadReligionForm.notes = ''
+  } catch (e) {
+    console.error('[religion] Failed to apply spread religion', e)
+    spreadReligionError.value = e?.message || 'Не вдалося застосувати поширення релігії.'
+  } finally {
+    spreadReligionLoading.value = false
   }
 }
 
