@@ -41,6 +41,40 @@ const props = defineProps({
     required: true,
   },
 })
+
+const tableRows = computed(() =>
+  props.items.flatMap((religion) => {
+    const abilities = Array.isArray(religion.abilities) ? religion.abilities : []
+
+    if (abilities.length === 0) {
+      return [
+        {
+          key: `${religion.id}-empty`,
+          religion,
+          ability: null,
+          showReligionCell: true,
+          rowspan: 1,
+          isEmpty: true,
+        },
+      ]
+    }
+
+    return abilities.map((ability, index) => ({
+      key: `${religion.id}-${ability.id || index}`,
+      religion,
+      ability,
+      showReligionCell: index === 0,
+      rowspan: abilities.length,
+      isEmpty: false,
+    }))
+  })
+)
+
+function rowStyle(religion) {
+  return {
+    '--accent-color': religion.color || '#e5e7eb',
+  }
+}
 </script>
 
 <style scoped>
