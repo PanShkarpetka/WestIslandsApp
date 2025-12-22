@@ -100,6 +100,11 @@ function rowStyle(religion) {
   padding-left: 16px;
 }
 
+.v-table .v-table__wrapper > table > tbody > tr:not(:last-child) > td, .v-table .v-table__wrapper > table > tbody > tr:not(:last-child) > th {
+  /* Avoid double separators with the custom ::after line */
+  border-bottom: none;
+}
+
 .abilities-table td.religion-name {
   vertical-align: middle;
 }
