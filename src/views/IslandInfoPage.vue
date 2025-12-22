@@ -5,7 +5,6 @@
         <v-col cols="12">
           <v-text-field class="custom-v-field-background" v-model="form.name" label="Назва острова" :readonly="!isAdmin" />
           <v-text-field class="custom-v-field-background" v-model.number="form.population" type="number" min="0" label="Населення" :readonly="!isAdmin" />
-          <v-text-field class="custom-v-field-background" v-model.number="form.sailors" type="number" min="0" label="Моряки" :readonly="!isAdmin" />
           <v-text-field class="custom-v-field-background" v-model.number="form.characters" type="number" min="0" label="Персонажі" :readonly="!isAdmin" />
           <v-text-field class="custom-v-field-background" v-model.number="form.buildingDiscount" type="number" min="0" max="100"
                         label="Знижка на будівництво, %" :readonly="!isAdmin" />

@@ -78,6 +78,7 @@
                   >
                     <v-btn value="diagram" prepend-icon="mdi-chart-donut">Діаграма</v-btn>
                     <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
+                    <v-btn value="abilities" prepend-icon="mdi-shield-sword">Здібності</v-btn>
                   </v-btn-toggle>
                 </div>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
@@ -85,22 +86,31 @@
                 </v-chip>
               </header>
 
-              <template v-if="distribution.length">
-                <ReligionDistributionDiagram
-                  v-if="viewMode === 'diagram'"
-                  :chart-data="chartData"
-                  :chart-options="chartOptions"
+              <template v-if="viewMode === 'abilities'">
+                <ReligionAbilitiesTable
+                  v-if="religionAbilitiesTable.length"
+                  :items="religionAbilitiesTable"
                 />
-                <ReligionDistributionTable
-                  v-else
-                  :distribution="distribution"
-                  :hovered-religion="hoveredReligion"
-                  @hover="hoveredReligion = $event"
-                  @leave="hoveredReligion = null"
-                  @select="handleSliceClick"
-                />
+                <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
               </template>
-              <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
+              <template v-else>
+                <template v-if="distribution.length">
+                  <ReligionDistributionDiagram
+                    v-if="viewMode === 'diagram'"
+                    :chart-data="chartData"
+                    :chart-options="chartOptions"
+                  />
+                  <ReligionDistributionTable
+                    v-else
+                    :distribution="distribution"
+                    :hovered-religion="hoveredReligion"
+                    @hover="hoveredReligion = $event"
+                    @leave="hoveredReligion = null"
+                    @select="handleSliceClick"
+                  />
+                </template>
+                <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
+              </template>
 
               <v-divider class="my-6" />
             </section>
@@ -895,6 +905,7 @@ import { useIslandStore } from '@/store/islandStore'
 import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
 import ReligionDistributionDiagram from '@/components/ReligionDistributionDiagram.vue'
 import ReligionDistributionTable from '@/components/ReligionDistributionTable.vue'
+import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
 import FaerunDatePicker from '@/components/FaerunDatePicker.vue'
 import { db } from '@/services/firebase'
@@ -912,6 +923,32 @@ const defaultCardBackground = ''
 const latestCycle = ref(null)
 const latestCycleLoading = ref(false)
 const latestCycleError = ref('')
+
+const abilitiesById = computed(() =>
+  religionStore.abilities.reduce((acc, ability) => {
+    acc[ability.id] = ability
+    return acc
+  }, {})
+)
+
+const religionAbilitiesTable = computed(() =>
+  religionStore.religions.map((religion) => {
+    const resolvedAbilities = (religion.abilities || [])
+      .map((abilityId) =>
+        abilitiesById.value[abilityId] || {
+          id: abilityId || 'unknown',
+          name: 'Невідоме вміння',
+          description: 'Оновіть довідник умінь.',
+        }
+      )
+
+    return {
+      id: religion.id,
+      name: religion.name || 'Невідома релігія',
+      abilities: resolvedAbilities,
+    }
+  })
+)
 
 function hasIcon(name) {
   switch (name) {

@@ -51,6 +51,7 @@ function getTempSV(data) {
 export const useReligionStore = defineStore('religion', () => {
   const records = ref([])
   const religions = ref([])
+  const abilities = ref([])
   const loading = ref(false)
   const error = ref('')
   const logsByClergy = ref({})
@@ -59,6 +60,7 @@ export const useReligionStore = defineStore('religion', () => {
   let unsubscribe = null
   const logUnsubscribes = new Map()
   let religionUnsubscribe = null
+  let abilitiesUnsubscribe = null
 
   function stopLogs(clergyId) {
     const stop = logUnsubscribes.get(clergyId)
@@ -82,6 +84,10 @@ export const useReligionStore = defineStore('religion', () => {
     if (religionUnsubscribe) {
       religionUnsubscribe()
       religionUnsubscribe = null
+    }
+    if (abilitiesUnsubscribe) {
+      abilitiesUnsubscribe()
+      abilitiesUnsubscribe = null
     }
     stopAllLogs()
   }
@@ -136,6 +142,7 @@ export const useReligionStore = defineStore('religion', () => {
 
     const colRef = collection(db, 'clergy')
     const religionsRef = collection(db, 'religions')
+    const abilitiesRef = collection(db, 'religionsAbilities')
     const heroCache = new Map()
     const religionCache = new Map()
 
@@ -197,10 +204,25 @@ export const useReligionStore = defineStore('religion', () => {
           shieldBonus: Number(data.shieldBonus ?? DEFAULT_VALUES.shieldBonus),
           svBase: Number(data.svBase ?? DEFAULT_VALUES.svBase),
           svTemp: getTempSV(data),
+          abilities: Array.isArray(data.abilities) ? data.abilities : [],
         }
       })
     }, (err) => {
       console.error('[religion] Failed to fetch religions', err)
+    })
+
+    abilitiesUnsubscribe = onSnapshot(abilitiesRef, (snapshot) => {
+      abilities.value = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() || {}
+
+        return {
+          id: docSnap.id,
+          name: data.name || 'Без назви',
+          description: data.description || 'Опис відсутній.',
+        }
+      })
+    }, (err) => {
+      console.error('[religion] Failed to fetch religion abilities', err)
     })
   }
 
@@ -298,5 +320,6 @@ export const useReligionStore = defineStore('religion', () => {
     stopLogs,
     changeFaith,
     setDowntimeAvailability,
+    abilities,
   }
 })
