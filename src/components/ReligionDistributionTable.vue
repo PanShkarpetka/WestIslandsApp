@@ -102,7 +102,6 @@ function rowStyle(item) {
     '--row-color': item.color,
     backgroundColor: isActive ? withAlpha(item.color, 0.1) : undefined,
     borderLeft: `4px solid ${item.color}`,
-    boxShadow: 'inset 0 -1px 0 #e8eaed',
     cursor: 'pointer',
   }
 }
@@ -158,6 +157,10 @@ function formatShield(item) {
 
 .distribution-table tbody tr:not(:last-child) {
   border-bottom: 1px solid #e8eaed;
+}
+
+:deep(.v-table__wrapper > table > tbody > tr > td) {
+  border-bottom: none;
 }
 
 .distribution-name {

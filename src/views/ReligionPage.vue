@@ -76,9 +76,30 @@
                     variant="tonal"
                     class="view-toggle"
                   >
-                    <v-btn value="diagram" prepend-icon="mdi-chart-donut">Діаграма</v-btn>
-                    <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
-                    <v-btn value="abilities" prepend-icon="mdi-shield-sword">Здібності</v-btn>
+                    <v-btn
+                      value="diagram"
+                      prepend-icon="mdi-chart-donut"
+                      aria-label="Діаграма"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Діаграма</span>
+                    </v-btn>
+                    <v-btn
+                      value="table"
+                      prepend-icon="mdi-table"
+                      aria-label="Таблиця"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Таблиця</span>
+                    </v-btn>
+                    <v-btn
+                      value="abilities"
+                      prepend-icon="mdi-shield-sword"
+                      aria-label="Здібності"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Здібності</span>
+                    </v-btn>
                   </v-btn-toggle>
                 </div>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
@@ -2616,6 +2637,16 @@ async function applyActiveFaithFarm() {
   margin-left: 0;
 }
 
+.view-toggle__btn {
+  white-space: nowrap;
+}
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .religion-card {
   position: relative;
   overflow: hidden;
@@ -2806,6 +2837,27 @@ async function applyActiveFaithFarm() {
 
   .section-overlay {
     background-size: 65% !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .view-toggle {
+    width: 100%;
+  }
+
+  .view-toggle__btn {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 10px;
+    justify-content: center;
+  }
+
+  .view-toggle__btn .v-btn__prepend {
+    margin-inline-end: 0;
+  }
+
+  .toggle-label {
+    display: none;
   }
 }
 
