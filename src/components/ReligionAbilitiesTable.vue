@@ -9,25 +9,33 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for="religion in items" :key="religion.id">
-          <tr v-if="!religion.abilities.length">
-            <td class="religion-name">{{ religion.name }}</td>
-            <td></td>
-            <td>Немає доступних умінь</td>
-          </tr>
-          <tr v-else v-for="(ability, index) in religion.abilities" :key="ability.id">
-            <td v-if="index === 0" :rowspan="religion.abilities.length" class="religion-name">{{ religion.name }}</td>
-            <td class="ability-name">{{ ability.name }}</td>
-            <td class="ability-description">{{ ability.description }}</td>
-          </tr>
-        </template>
+        <tr
+          v-for="row in tableRows"
+          :key="row.key"
+          class="abilities-row"
+          :style="rowStyle(row.religion)"
+        >
+          <td v-if="row.showReligionCell" :rowspan="row.rowspan" class="religion-name">
+            <span class="color-bullet" :style="{ backgroundColor: row.religion.color }"></span>
+            {{ row.religion.name }}
+          </td>
+          <td class="ability-name">
+            <template v-if="row.ability">{{ row.ability.name }}</template>
+          </td>
+          <td class="ability-description" :class="{ 'text-no-abilities': row.isEmpty }">
+            <template v-if="row.ability">{{ row.ability.description }}</template>
+            <template v-else>Немає доступних умінь</template>
+          </td>
+        </tr>
       </tbody>
     </v-table>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   items: {
     type: Array,
     required: true,
@@ -55,11 +63,52 @@ defineProps({
 .abilities-table td {
   background-color: transparent;
   vertical-align: top;
+  padding-left: 16px;
+}
+
+.abilities-table td.religion-name {
+  vertical-align: middle;
+}
+
+.abilities-row {
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+:root {
+  --accent-color: #e5e7eb;
+}
+.abilities-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--accent-color, #e5e7eb);
+}
+
+.abilities-row::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background-color: #e8eaed;
+  pointer-events: none;
+}
+
+.abilities-row:hover,
+.abilities-row:focus-visible {
+  background-color: color-mix(in srgb, rgba(0, 0, 0, 0.08) 20%, transparent);
 }
 
 .religion-name {
   font-weight: 600;
   width: 160px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .ability-name {
   font-family: cursive;
@@ -72,5 +121,13 @@ defineProps({
 .text-no-abilities {
   color: #6b7280;
   font-style: italic;
+}
+
+.color-bullet {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 </style>

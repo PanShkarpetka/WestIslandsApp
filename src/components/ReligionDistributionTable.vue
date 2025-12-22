@@ -101,6 +101,8 @@ function rowStyle(item) {
   return {
     '--row-color': item.color,
     backgroundColor: isActive ? withAlpha(item.color, 0.1) : undefined,
+    borderLeft: `4px solid ${item.color}`,
+    boxShadow: 'inset 0 -1px 0 #e8eaed',
     cursor: 'pointer',
   }
 }
@@ -146,11 +148,16 @@ function formatShield(item) {
 
 .distribution-row {
   transition: background-color 0.2s ease, transform 0.2s ease;
+  border-radius: 8px;
 }
 
 .distribution-row:hover,
 .distribution-row:focus-visible {
   background-color: color-mix(in srgb, var(rgba(0, 0, 0, 0.08)) 20%, transparent);
+}
+
+.distribution-table tbody tr:not(:last-child) {
+  border-bottom: 1px solid #e8eaed;
 }
 
 .distribution-name {

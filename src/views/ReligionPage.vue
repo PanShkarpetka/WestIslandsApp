@@ -945,6 +945,7 @@ const religionAbilitiesTable = computed(() =>
     return {
       id: religion.id,
       name: religion.name || 'Невідома релігія',
+      color: getReligionColor(religion.name),
       abilities: resolvedAbilities,
     }
   })
@@ -2554,7 +2555,7 @@ async function applyActiveFaithFarm() {
     await Promise.all([
       addDoc(collection(clergyRef, 'logs'), {
         delta: gained,
-        message: `Активна ферма: кидок ${roll}, модифікатор ${dmMod}, DC ${dc}. ${
+        message: `Активний фарм: кидок ${roll}, модифікатор ${dmMod}, DC ${dc}. ${
           activeFaithFarmForm.notes?.trim() || 'Без нотаток'
         }`,
         user: userStore.nickname || 'Адміністратор',
