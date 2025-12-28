@@ -205,6 +205,10 @@ export const useReligionStore = defineStore('religion', () => {
           svBase: Number(data.svBase ?? DEFAULT_VALUES.svBase),
           svTemp: getTempSV(data),
           abilities: Array.isArray(data.abilities) ? data.abilities : [],
+          milestoneAbilities:
+            data.milestoneAbilities && typeof data.milestoneAbilities === 'object'
+              ? data.milestoneAbilities
+              : {},
         }
       })
     }, (err) => {

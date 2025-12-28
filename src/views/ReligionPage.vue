@@ -295,7 +295,7 @@
                 />
                 <v-text-field
                   :model-value="activeFaithFarmFollowers ?? '—'"
-                  label="Отриманті в результаті ОВ"
+                  label="Отримані в результаті ОВ"
                   density="comfortable"
                   hide-details="auto"
                   readonly
@@ -952,22 +952,49 @@ const abilitiesById = computed(() =>
   }, {})
 )
 
+function resolveAbility(abilityId) {
+  return (
+    abilitiesById.value[abilityId] || {
+      id: abilityId || 'unknown',
+      name: 'Невідоме вміння',
+      description: 'Оновіть довідник умінь.',
+    }
+  )
+}
+
+function resolveAbilitiesList(abilityIds) {
+  if (!Array.isArray(abilityIds)) return []
+
+  return abilityIds.map((abilityId) => resolveAbility(abilityId))
+}
+
+function resolveMilestoneAbilities(milestoneAbilities) {
+  if (!milestoneAbilities || typeof milestoneAbilities !== 'object') return []
+
+  return Object.entries(milestoneAbilities)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .flatMap(([milestone, abilities]) => {
+      if (!Array.isArray(abilities) || abilities.length === 0) return []
+
+      return abilities.map((abilityId, index) => ({
+        ability: resolveAbility(abilityId),
+        milestoneLabel: index === 0 ? `${milestone}%+` : '',
+        key: `${milestone}-${abilityId || index}`,
+      }))
+    })
+}
+
 const religionAbilitiesTable = computed(() =>
   religionStore.religions.map((religion) => {
-    const resolvedAbilities = (religion.abilities || [])
-      .map((abilityId) =>
-        abilitiesById.value[abilityId] || {
-          id: abilityId || 'unknown',
-          name: 'Невідоме вміння',
-          description: 'Оновіть довідник умінь.',
-        }
-      )
+    const resolvedAbilities = resolveAbilitiesList(religion.abilities)
+    const resolvedMilestoneAbilities = resolveMilestoneAbilities(religion.milestoneAbilities)
 
     return {
       id: religion.id,
       name: religion.name || 'Невідома релігія',
       color: getReligionColor(religion.name),
       abilities: resolvedAbilities,
+      milestoneAbilities: resolvedMilestoneAbilities,
     }
   })
 )
