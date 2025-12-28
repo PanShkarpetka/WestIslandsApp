@@ -8,6 +8,38 @@
       </v-col>
     </v-row>
 
+    <v-row class="my-4">
+      <v-col cols="12">
+        <v-alert
+          v-if="latestCycleError"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+        >
+          {{ latestCycleError }}
+        </v-alert>
+
+        <v-skeleton-loader
+          v-else-if="latestCycleLoading"
+          type="heading, subtitle"
+          class="pa-4"
+        />
+
+        <v-card v-else class="pa-4" variant="tonal">
+          <div class="current-cycle-header">
+            <v-avatar color="primary" variant="elevated">
+              <v-icon>mdi-timeline-clock</v-icon>
+            </v-avatar>
+            <div class="current-cycle-text">
+              <div class="text-overline text-medium-emphasis mb-1">Поточний цикл</div>
+              <div class="text-subtitle-1 font-semibold">{{ currentCycleHeadline }}</div>
+              <div class="text-body-2 text-medium-emphasis">{{ currentCycleDetails }}</div>
+            </div>
+          </div>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12">
         <v-card class="pa-6 religion-card" elevation="4" width="100%">
@@ -27,142 +59,92 @@
                   <p class="text-h6 font-semibold">{{ totalFollowersLabel }}</p>
                   <p class="text-caption text-medium-emphasis">Населення острова: {{ totalPopulationLabel }}</p>
                 </div>
-                <v-btn-toggle
-                  v-model="viewMode"
-                  mandatory
-                  density="comfortable"
-                  color="primary"
-                  variant="tonal"
-                  class="view-toggle"
-                >
-                  <v-btn value="diagram" prepend-icon="mdi-chart-donut">Діаграма</v-btn>
-                  <v-btn value="table" prepend-icon="mdi-table">Таблиця</v-btn>
-                </v-btn-toggle>
+                <div class="distribution-actions">
+                  <v-btn
+                    v-if="isAdmin"
+                    color="primary"
+                    prepend-icon="mdi-play-circle-outline"
+                    @click="openNewCycleDialog"
+                  >
+                    Почати новий цикл
+                  </v-btn>
+                  <v-btn-toggle
+                    v-model="viewMode"
+                    mandatory
+                    density="comfortable"
+                    color="primary"
+                    variant="tonal"
+                    class="view-toggle"
+                  >
+                    <v-btn
+                      value="diagram"
+                      prepend-icon="mdi-chart-donut"
+                      aria-label="Діаграма"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Діаграма</span>
+                    </v-btn>
+                    <v-btn
+                      value="table"
+                      prepend-icon="mdi-table"
+                      aria-label="Таблиця"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Таблиця</span>
+                    </v-btn>
+                    <v-btn
+                      value="abilities"
+                      prepend-icon="mdi-shield-sword"
+                      aria-label="Здібності"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Здібності</span>
+                    </v-btn>
+                  </v-btn-toggle>
+                </div>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
-                  {{ distribution.length }} духовенств
+                  {{ distribution.length }} конфесій
                 </v-chip>
               </header>
 
-              <template v-if="distribution.length">
-                <div v-if="viewMode === 'diagram'" class="chart-container">
-                  <Doughnut
-                    ref="religionChartRef"
-                    :data="chartData"
-                    :options="chartOptions"
-                    class="doughnut-chart"
-                  />
-                </div>
-                <div v-else class="distribution-table-wrapper" :class="{ 'distribution-table-wrapper-hovered': hoveredReligion !== null }">
-                  <v-table
-                      density="comfortable"
-                      class="distribution-table"
-
-                  >
-                    <thead>
-                      <tr>
-                        <th class="text-left">Духовенство</th>
-                        <th class="text-left">Віряни</th>
-                        <th class="text-left">Герої</th>
-                        <th class="text-left">Частка</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        v-for="item in distribution"
-                        :key="item.name"
-                        class="distribution-row"
-                        role="button"
-                        tabindex="0"
-                        :style="rowStyle(item)"
-                        @mouseenter="hoveredReligion = item"
-                        @mouseleave="hoveredReligion = null"
-                        @focus="hoveredReligion = item"
-                        @blur="hoveredReligion = null"
-                        @click="handleSliceClick(item)"
-                        @keydown.enter.prevent="handleSliceClick(item)"
-                      >
-                        <td class="distribution-name">
-                          <span
-                            class="color-bullet"
-                            :style="{ backgroundColor: item.color }"
-                            aria-hidden="true"
-                          ></span>
-                          {{ item.name }}
-                        </td>
-                        <td>{{ item.followers.toLocaleString('uk-UA') }}</td>
-                        <td>{{ item.heroes }}</td>
-                        <td>{{ item.percentRounded }}%</td>
-                      </tr>
-                    </tbody>
-                  </v-table>
-                </div>
+              <template v-if="viewMode === 'abilities'">
+                <ReligionAbilitiesTable
+                  v-if="religionAbilitiesTable.length"
+                  :items="religionAbilitiesTable"
+                />
+                <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
               </template>
-              <div v-else class="text-gray-500">Немає інформації про духовенства.</div>
+              <template v-else>
+                <template v-if="distribution.length">
+                  <ReligionDistributionDiagram
+                    v-if="viewMode === 'diagram'"
+                    :chart-data="chartData"
+                    :chart-options="chartOptions"
+                  />
+                  <ReligionDistributionTable
+                    v-else
+                    :distribution="distribution"
+                    :hovered-religion="hoveredReligion"
+                    @hover="hoveredReligion = $event"
+                    @leave="hoveredReligion = null"
+                    @select="handleSliceClick"
+                  />
+                </template>
+                <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
+              </template>
 
               <v-divider class="my-6" />
             </section>
 
-            <div v-if="records.length" class="table-scroll">
-              <v-table density="comfortable" class="religion-table">
-                <thead>
-                  <tr>
-                    <th class="text-left">
-                      <button type="button" class="sort-btn" @click="toggleSort('heroName')">
-                        <b>Герой</b>
-                        <span class="sort-indicator">
-                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                        </span>
-                      </button>
-                    </th>
-                    <th class="text-left">
-                      <button type="button" class="sort-btn" @click="toggleSort('religionName')">
-                        <b>Духовенство</b>
-                        <span class="sort-indicator">
-                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                        </span>
-                      </button>
-                    </th>
-                    <th class="text-left">
-                      <button type="button" class="sort-btn" @click="toggleSort('faith')">
-                        <b>Очки віри</b>
-                        <span class="sort-indicator">
-                          {{ sortDirection === 'desc' ? '▲' : '▼' }}
-                        </span>
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="record in sortedRecords"
-                    :key="record.id"
-                    class="clickable-row"
-                    role="button"
-                    tabindex="0"
-                    @click="openClergy(record)"
-                    @keydown.enter.prevent="openClergy(record)"
-                  >
-                    <td>{{ record.heroName }}</td>
-                    <td>{{ record.religionName }}</td>
-                    <td class="faith-cell">
-
-                      <v-icon v-if="hasIcon(record.religionName)">
-                        <img
-                            :src="`/images/religions/${record.religionName}.png`"
-                            alt="Faith Icon"
-                            width="32"
-                            height="32"
-                        />
-                      </v-icon>
-                      <v-icon v-else>
-                        mdi-dharmachakra
-                      </v-icon>
-                      <span>{{ record.faith }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </v-table>
-            </div>
+            <ReligionTable
+              v-if="records.length"
+              :records="sortedRecords"
+              :sort-by="sortBy"
+              :sort-direction="sortDirection"
+              :has-icon="hasIcon"
+              @toggle-sort="toggleSort"
+              @select="openClergy"
+            />
           </v-card-text>
         </v-card>
       </v-col>
@@ -170,70 +152,616 @@
 
     <v-dialog v-model="dialogOpen" max-width="840">
       <v-card v-if="activeClergy" class="clergy-dialog" rounded="xl">
-        <v-card-title class="d-flex align-center gap-4">
-          <div>
-            <div class="text-subtitle-1 font-semibold">{{ activeClergy.heroName }}</div>
-            <div class="text-body-2 text-medium-emphasis">{{ activeClergy.religionName }}</div>
-          </div>
-          <v-chip color="primary" variant="elevated" class="ml-auto">
-            {{ activeClergy.faith }}
-            <v-icon v-if="hasIcon(activeClergy.religionName)">
-              <img
-                  :src="`/images/religions/${activeClergy.religionName}.png`"
-                  alt="Faith Icon"
-                  width="16"
-                  height="16"
-              />
-            </v-icon>
-            <v-icon v-else class="ml-1" size="18">
-              mdi-dharmachakra
-            </v-icon>
-          </v-chip>
-        </v-card-title>
-
-        <v-card-text class="pt-0">
+        <v-card-text class="pt-0 hero-clergy-modal">
           <v-alert v-if="actionError" type="error" variant="tonal" class="mb-3">
             {{ actionError }}
           </v-alert>
 
-          <div v-if="isAdmin" class="mb-4 admin-actions">
-            <v-text-field
-              v-model.number="faithChange"
-              type="number"
-              min="1"
-              label="Зміна очок віри"
-              density="comfortable"
-              prefix="±"
-              hide-details="auto"
-            />
-            <v-textarea
-              v-model="logMessage"
-              rows="2"
-              auto-grow
-              label="Коментар до зміни"
-              density="comfortable"
-              hide-details="auto"
-            />
-            <div class="d-flex btns">
-              <v-btn color="error" :loading="actionLoading" @click="applyFaithChange('remove')">
-                Зняти ОВ
-              </v-btn>
-              <v-btn color="success" :loading="actionLoading" @click="applyFaithChange('add')">
-                Додати ОВ
-              </v-btn>
+          <v-sheet class="clergy-overview" color="primary" variant="tonal" rounded="lg">
+            <div class="clergy-overview__top">
+              <div>
+                <div class="text-caption text-medium-emphasis">Герой</div>
+                <div class="text-h6 font-semibold">{{ activeClergy.heroName }}</div>
+                <div class="text-body-2 text-medium-emphasis">{{ activeClergy.religionName }}</div>
+              </div>
+              <div class="meta-pills">
+                <div class="meta-pill">
+                  <v-icon size="18" color="primary" v-if="hasIcon(activeClergy.religionName)">
+                    <img
+                        :src="`/images/religions/${activeClergy.religionName}.png`"
+                        alt="Faith Icon"
+                        width="18"
+                        height="18"
+                    />
+                  </v-icon>
+                  <v-icon v-else class="ml-1" color="primary" size="18">
+                    mdi-dharmachakra
+                  </v-icon>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">Очки віри</div>
+                    <div class="text-subtitle-1 font-semibold text-black">
+                      {{ activeClergy.faith }}<span v-if="activeClergy.faithMax"> / {{ activeClergy.faithMax }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="meta-pill">
+                  <v-icon size="18" :color="downtimeAvailable ? 'warning' : 'success'">mdi-progress-clock</v-icon>
+                  <div>
+                    <div class="text-caption text-medium-emphasis">Даутайм</div>
+                    <div class="text-subtitle-2 text-black">{{ downtimeAvailable ? 'Дію не виконано' : 'Дію виконано' }}</div>
+                  </div>
+                </div>
+              </div>
             </div>
+          </v-sheet>
+
+          <div v-if="isAdmin" class="clergy-grid">
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Керування очками віри</div>
+                  <div class="text-body-2 text-medium-emphasis">Оновіть ОВ та залиште пояснення для журналу.</div>
+                </div>
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="faithChange"
+                  type="number"
+                  min="1"
+                  label="Зміна ОВ"
+                  density="comfortable"
+                  prefix="±"
+                  hide-details="auto"
+                />
+                <v-textarea
+                  v-model="logMessage"
+                  rows="2"
+                  auto-grow
+                  label="Коментар до зміни"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="d-flex gap-2 justify-space-between">
+                <v-btn color="error" variant="tonal" :loading="actionLoading" @click="applyFaithChange('remove')">
+                  <v-icon start>mdi-minus-circle</v-icon>
+                  Зняти ОВ
+                </v-btn>
+                <v-btn color="success" :loading="actionLoading" @click="applyFaithChange('add')">
+                  <v-icon start>mdi-plus-circle</v-icon>
+                  Додати ОВ
+                </v-btn>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Активний фарм віри</div>
+                  <div class="text-body-2 text-medium-emphasis">Дія потребує доступного давнтайму та витрачає його</div>
+                </div>
+              </div>
+
+              <v-alert v-if="activeFaithFarmError" type="error" variant="tonal" class="mb-3">
+                {{ activeFaithFarmError }}
+              </v-alert>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="activeClergy?.heroRef?.id || ''"
+                  label="ID героя"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                  hint="Герой вибраного духовенства"
+                />
+                <v-text-field
+                  v-model.number="activeFaithFarmForm.roll"
+                  type="number"
+                  label="Кидок"
+                  density="comfortable"
+                  hide-details="auto"
+                  hint="Результат d20 скіл чека"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="activeFaithFarmForm.dmMod"
+                  type="number"
+                  label="DM Mod"
+                  density="comfortable"
+                  hide-details="auto"
+                  prefix="±"
+                />
+                <v-text-field
+                  :model-value="activeFaithFarmDC"
+                  label="Базове DC"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="currentFaithPoints"
+                  label="Поточні ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="activeFaithFarmFollowers ?? '—'"
+                  label="Отриманті в результаті ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <v-text-field
+                v-model="activeFaithFarmForm.notes"
+                label="Нотатки / посилання"
+                density="comfortable"
+                hide-details="auto"
+                hint="Наприклад, посилання на пост у Telegram"
+              />
+
+              <div class="d-flex gap-2 mt-3 justify-space-between">
+                <v-btn
+                  color="primary"
+                  :loading="activeFaithFarmLoading"
+                  :disabled="!downtimeAvailable"
+                  @click="applyActiveFaithFarm"
+                >
+                  <v-icon start>mdi-shield-sun</v-icon>
+                  Застосувати
+                </v-btn>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Захист духовенства</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Інвестуйте ОВ, щоб активувати щит конфесії героя. Кнопка недоступна, якщо щит вже увімкнено.
+                  </div>
+                </div>
+                <v-chip
+                  :color="activeClergyReligion?.shieldActive ? 'success' : 'default'"
+                  variant="tonal"
+                  class="shield-status-chip"
+                >
+                  {{ activeClergyReligion?.shieldActive ? `Активний (+${activeClergyReligion.shieldBonus})` : 'Неактивний' }}
+                </v-chip>
+              </div>
+
+              <v-alert v-if="clergyDefenseError" type="error" variant="tonal" class="mb-3">
+                {{ clergyDefenseError }}
+              </v-alert>
+
+              <v-alert v-else-if="clergyDefenseFaithError" type="error" variant="tonal" class="mb-3">
+                {{ clergyDefenseFaithError }}
+              </v-alert>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="activeClergy?.heroRef?.id || ''"
+                  label="ID героя"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                  hint="Герой вибраного духовенства"
+                />
+                <v-text-field
+                  :model-value="clergyDefenseTarget"
+                  label="Ціль"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="clergyDefenseForm.investedOV"
+                  type="number"
+                  min="50"
+                  step="50"
+                  label="Інвестовані ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  v-model.number="clergyDefenseForm.roll"
+                  type="number"
+                  label="Кидок"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="clergyDefenseForm.dmMod"
+                  type="number"
+                  label="DM Mod"
+                  prefix="±"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  :model-value="clergyDefenseTargetSVTotal"
+                  label="SV цілі (база + тимчасовий)"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="clergyDefenseDC"
+                  label="DC"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="clergyDefenseResult ?? '—'"
+                  label="R"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="clergyDefenseBonus"
+                  label="Бонус щита"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="currentFaithPoints"
+                  label="ОВ духовенства"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <v-textarea
+                v-model="clergyDefenseForm.notes"
+                label="Нотатки / посилання"
+                density="comfortable"
+                hide-details="auto"
+                rows="2"
+                auto-grow
+              />
+
+              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
+                <div class="d-flex gap-2 align-center">
+                  <v-btn
+                    color="primary"
+                    :loading="clergyDefenseLoading"
+                    :disabled="clergyDefenseDisabled"
+                    @click="applyClergyDefense"
+                  >
+                    <v-icon start>mdi-shield-plus</v-icon>
+                    Застосувати
+                  </v-btn>
+                  <v-chip v-if="activeClergyReligion?.shieldActive" color="warning" variant="tonal" class="shield-status-chip">
+                    Щит вже активний
+                  </v-chip>
+                  <v-chip v-else-if="!downtimeAvailable" color="warning" variant="tonal" class="shield-status-chip">
+                    Даутайм недоступний
+                  </v-chip>
+                </div>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Поширення релігії</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Витратьте ОВ, щоб конвертувати послідовників іншої конфесії та зняти щит за наявності.
+                  </div>
+                </div>
+              </div>
+
+              <v-alert v-if="spreadReligionError" type="error" variant="tonal" class="mb-3">
+                {{ spreadReligionError }}
+              </v-alert>
+
+              <v-alert v-else-if="spreadReligionFaithError" type="error" variant="tonal" class="mb-3">
+                {{ spreadReligionFaithError }}
+              </v-alert>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="activeClergy?.heroRef?.id || ''"
+                  label="ID героя"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                  hint="Герой вибраного духовенства"
+                />
+                <v-select
+                  v-model="spreadReligionForm.targetReligionId"
+                  :items="spreadTargetReligionOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Цільова конфесія"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="spreadReligionForm.investedOV"
+                  type="number"
+                  min="50"
+                  step="50"
+                  label="Витрачені ОВ"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  v-model.number="spreadReligionForm.roll"
+                  type="number"
+                  label="Кидок"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  v-model.number="spreadReligionForm.dmMod"
+                  type="number"
+                  label="DM Mod"
+                  prefix="±"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+                <v-text-field
+                  :model-value="spreadTargetSVTotal"
+                  label="SV цілі (база + тимчасовий + щит)"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="spreadReligionDC"
+                  label="DC"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="spreadReligionResult ?? '—'"
+                  label="R = Кидок + floor(ОВ/50)"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="spreadReligionConverted ?? '—'"
+                  label="Сконвертовано"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="currentFaithPoints"
+                  label="ОВ духовенства"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <v-textarea
+                v-model="spreadReligionForm.notes"
+                label="Нотатки / посилання"
+                density="comfortable"
+                hide-details="auto"
+                rows="2"
+                auto-grow
+              />
+
+              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
+                <v-btn
+                  color="primary"
+                  :loading="spreadReligionLoading"
+                  :disabled="spreadReligionDisabled"
+                  @click="applySpreadReligion"
+                >
+                  <v-icon start>mdi-account-convert</v-icon>
+                  Застосувати
+                </v-btn>
+                <v-chip v-if="!downtimeAvailable" color="warning" variant="tonal" class="shield-status-chip">
+                  Даутайм недоступний
+                </v-chip>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Зміна конфесії</div>
+                  <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
+                </div>
+                <v-btn
+                  v-if="!changeReligionMode"
+                  color="primary"
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-auto-fix"
+                  @click="startReligionChange"
+                >
+                  Змінити конфесію
+                </v-btn>
+              </div>
+
+              <div v-if="changeReligionMode" class="stacked-card">
+                <v-alert v-if="changeReligionError" type="error" variant="tonal" class="mb-3">{{ changeReligionError }}</v-alert>
+
+                <v-select
+                  v-model="selectedReligionId"
+                  :items="religionOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Нова конфесія"
+                  density="comfortable"
+                  hide-details="auto"
+                />
+
+                <v-alert type="warning" variant="tonal" class="mt-3">
+                  Буде знято {{ religionChangeFine }} ОВ ({{ religionChangeFinePercent }}%) з духовенства за зміну конфесії.
+                </v-alert>
+
+                <div class="d-flex gap-2 mt-3 justify-space-between">
+                  <v-btn color="primary" :loading="changeReligionLoading" @click="confirmReligionChange">
+                    <v-icon start>mdi-check</v-icon>
+                    Підтвердити
+                  </v-btn>
+                  <v-btn variant="text" @click="cancelReligionChange">Скасувати</v-btn>
+                </div>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Доступність давнтайму</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Вкажіть чи доступний давнтайм в даному циклі.
+                  </div>
+                </div>
+                <v-switch
+                  v-model="downtimeAvailable"
+                  inset
+                  color="primary"
+                  hide-details="auto"
+                />
+              </div>
+
+              <v-alert
+                v-if="downtimeUpdateError"
+                type="error"
+                variant="tonal"
+                class="mt-3"
+              >
+                {{ downtimeUpdateError }}
+              </v-alert>
+              <v-alert
+                v-else-if="downtimeUpdateSuccess"
+                type="success"
+                variant="tonal"
+                class="mt-3"
+              >
+                Статус давнтайму оновлено.
+              </v-alert>
+
+              <div class="d-flex gap-2 mt-3 justify-space-between">
+                <v-btn color="primary" :loading="downtimeUpdateLoading" @click="saveDowntimeAvailability">
+                  <v-icon start>mdi-content-save</v-icon>
+                  Зберегти
+                </v-btn>
+                <v-btn variant="text" @click="resetDowntimeState">Скинути</v-btn>
+              </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Прапорець щита конфесії</div>
+                  <div class="text-body-2 text-medium-emphasis">
+                    Адміністратори можуть вручну вмикати або вимикати щит конфесії героя.
+                  </div>
+                </div>
+                <v-chip
+                  :color="manualShieldActive ? 'success' : 'default'"
+                  variant="tonal"
+                  class="shield-status-chip"
+                >
+                  <v-icon>
+                    {{ manualShieldActive ? 'mdi-shield-check' : 'mdi-shield-off' }}
+                  </v-icon>
+                </v-chip>
+              </div>
+
+              <v-alert
+                v-if="shieldUpdateError"
+                type="error"
+                variant="tonal"
+                class="mb-3"
+              >
+                {{ shieldUpdateError }}
+              </v-alert>
+              <v-alert
+                v-else-if="shieldUpdateSuccess"
+                type="success"
+                variant="tonal"
+                class="mb-3"
+              >
+                Стан щита оновлено.
+              </v-alert>
+
+              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
+                <v-switch
+                  v-model="manualShieldActive"
+                  inset
+                  color="primary"
+                  hide-details="auto"
+                  label="Увімкнути щит вручну"
+                />
+                <div class="d-flex gap-2">
+                  <v-btn
+                    variant="tonal"
+                    color="primary"
+                    :loading="shieldUpdateLoading"
+                    @click="saveShieldState"
+                  >
+                    <v-icon start>mdi-content-save</v-icon>
+                    Оновити
+                  </v-btn>
+                  <v-btn variant="text" @click="resetShieldState">Скинути</v-btn>
+                </div>
+              </div>
+            </v-sheet>
           </div>
 
-          <v-card class="log-card">
-            <div class="d-flex align-center gap-2 mb-2">
-              <v-icon size="18">mdi-history</v-icon>
-              <div class="text-subtitle-2 font-medium"><b>Журнал змін</b></div>
+          <v-sheet class="action-card log-card" rounded="lg" elevation="0">
+            <div class="d-flex align-center gap-2 mb-3">
+              <v-avatar color="primary" size="28" variant="tonal">
+                <v-icon size="18">mdi-history</v-icon>
+              </v-avatar>
+              <div style="margin-left: 5px">
+                <div class="text-subtitle-2 font-semibold">Журнал змін</div>
+              </div>
             </div>
             <div v-if="logsLoading" class="text-gray-500">Завантаження журналу…</div>
             <div v-else-if="logsError" class="error">{{ logsError }}</div>
             <div v-else-if="clergyLogs.length === 0" class="text-gray-500">Поки що немає записів.</div>
             <v-list v-else density="comfortable">
-              <v-list-item v-for="log in clergyLogs" :key="log.id">
+              <v-list-item v-for="log in clergyLogs" :key="log.id" class="log-entry">
                 <v-list-item-title>
                   <span :class="{ 'text-success': log.delta > 0, 'text-error': log.delta < 0 }">
                     {{ log.delta > 0 ? '+' : '' }}{{ log.delta }}
@@ -245,7 +773,7 @@
                 </v-list-item-subtitle>
               </v-list-item>
             </v-list>
-          </v-card>
+          </v-sheet>
         </v-card-text>
 
         <v-card-actions class="justify-end">
@@ -253,17 +781,156 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="followersDialogOpen" max-width="720">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center justify-space-between">
+          <div>
+            <div class="text-subtitle-1 font-semibold">Розподіл послідовників</div>
+            <div class="text-body-2 text-medium-emphasis">Оберіть кількість послідовників для кожної конфесії.</div>
+          </div>
+          <v-chip v-if="distributionSelected" color="primary" variant="tonal">
+            {{ distributionSelected.name }}
+          </v-chip>
+        </v-card-title>
+
+        <v-card-text>
+          <v-alert
+            v-if="followersError"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+          >
+            {{ followersError }}
+          </v-alert>
+
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            Загалом населення: {{ totalPopulationLabel }}. Розподіліть послідовників між конфесіями. Залишок: {{ followersRemaining }}.
+          </p>
+
+          <div
+            v-for="item in editedFollowers"
+            :key="item.name"
+            class="followers-row"
+            :class="{ 'followers-row--selected': item.name === distributionSelected?.name }"
+          >
+            <div class="followers-row__header">
+              <div class="d-flex align-center gap-2">
+                <span class="color-bullet" :style="{ backgroundColor: item.color }"></span>
+                <div>
+                  <div class="text-subtitle-2 font-semibold">{{ item.name }}</div>
+                  <div class="text-caption text-medium-emphasis">Було: {{ item.followers.toLocaleString('uk-UA') }} вірян</div>
+                </div>
+              </div>
+              <div class="text-caption text-medium-emphasis">≈ {{ followersPercentFor(item.newFollowers) }}%</div>
+            </div>
+
+            <div class="followers-row__controls">
+              <v-slider
+                v-model.number="item.newFollowers"
+                :min="0"
+                :max="followersSliderCeiling"
+                step="1"
+                color="primary"
+                thumb-label="always"
+                hide-details
+              />
+              <v-text-field
+                v-model.number="item.newFollowers"
+                type="number"
+                label="Послідовники"
+                density="comfortable"
+                hide-details
+                class="count-input"
+                variant="outlined"
+                :min="0"
+              />
+            </div>
+
+            <div class="text-caption text-medium-emphasis">
+              Буде: <b>{{ Number(item.newFollowers || 0).toLocaleString('uk-UA') }}</b> вірян (Δ {{ followersDelta(item) }})
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeFollowersDialog" :disabled="followersSaving">Скасувати</v-btn>
+          <v-btn color="primary" :loading="followersSaving" :disabled="followersOverLimit" @click="saveFollowersDistribution">
+            Зберегти розподіл
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="newCycleDialog" max-width="640">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center">
+          <v-icon color="primary" class="mr-3">mdi-playlist-plus</v-icon>
+          <span class="text-h6">Почати новий цикл</span>
+        </v-card-title>
+        <v-card-text>
+          <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">
+            {{ cycleError }}
+          </v-alert>
+          <v-form ref="newCycleForm">
+            <FaerunDatePicker
+              v-model="cycleForm.startedDate"
+              label="Початок"
+              placeholder="Оберіть дату початку"
+              :year="currentFaerunYear"
+            />
+            <FaerunDatePicker
+              v-model="cycleForm.finishedDate"
+              label="Завершення (необов'язково)"
+              placeholder="Оберіть дату завершення"
+              :year="currentFaerunYear"
+              clearable
+              hint="Залиште поле порожнім, якщо цикл ще триває"
+            />
+            <v-text-field
+              :model-value="cycleDurationLabel"
+              label="Тривалість"
+              density="comfortable"
+              hide-details="auto"
+              class="mb-4"
+              readonly
+            />
+            <v-textarea
+              v-model="cycleForm.notes"
+              label="Нотатки до дії"
+              auto-grow
+              rows="2"
+              density="comfortable"
+              hide-details="auto"
+            />
+          </v-form>
+        </v-card-text>
+        <v-card-actions class="justify-end">
+          <v-btn variant="text" @click="closeNewCycleDialog">Скасувати</v-btn>
+          <v-btn color="primary" :loading="cycleSaving" @click="createCycle">
+            Створити цикл
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useReligionStore } from '@/store/religionStore'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where, writeBatch, runTransaction } from 'firebase/firestore'
+import { BUILDING_LEVEL_BONUSES, DEFAULT_VALUES, useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
-import { Doughnut } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Legend, Title, Tooltip } from 'chart.js'
+import ReligionDistributionDiagram from '@/components/ReligionDistributionDiagram.vue'
+import ReligionDistributionTable from '@/components/ReligionDistributionTable.vue'
+import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
+import ReligionTable from '@/components/ReligionTable.vue'
+import FaerunDatePicker from '@/components/FaerunDatePicker.vue'
+import { db } from '@/services/firebase'
+import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
 
 const iconCache = new Map()
 
@@ -271,10 +938,39 @@ const religionStore = useReligionStore()
 const userStore = useUserStore()
 const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
-const religionChartRef = ref(null)
 const hoveredReligion = ref(null)
 const viewMode = ref('diagram')
 const defaultCardBackground = ''
+const latestCycle = ref(null)
+const latestCycleLoading = ref(false)
+const latestCycleError = ref('')
+
+const abilitiesById = computed(() =>
+  religionStore.abilities.reduce((acc, ability) => {
+    acc[ability.id] = ability
+    return acc
+  }, {})
+)
+
+const religionAbilitiesTable = computed(() =>
+  religionStore.religions.map((religion) => {
+    const resolvedAbilities = (religion.abilities || [])
+      .map((abilityId) =>
+        abilitiesById.value[abilityId] || {
+          id: abilityId || 'unknown',
+          name: 'Невідоме вміння',
+          description: 'Оновіть довідник умінь.',
+        }
+      )
+
+    return {
+      id: religion.id,
+      name: religion.name || 'Невідома релігія',
+      color: getReligionColor(religion.name),
+      abilities: resolvedAbilities,
+    }
+  })
+)
 
 function hasIcon(name) {
   switch (name) {
@@ -293,7 +989,6 @@ function hasIcon(name) {
 }
 
 function getIconImage(name) {
-  console.log(name)
   if (!iconCache.has(name)) {
     const img = new Image()
     img.src = `/images/religions/${name}.png`
@@ -308,7 +1003,7 @@ const religionImages = {
   Ашкарот: 'Ashkarot',
   Девіл: 'Devil',
   'Не визначено': 'Unknown',
-  Атеїзм: 'Atheism',
+  Відсутність: 'Godless',
   Трійка: 'trio',
   Четвірка: 'quadro',
   Блібдулпулп: 'Blibdoolpoolp',
@@ -376,11 +1071,99 @@ onMounted(() => {
 
 onBeforeUnmount(() => populationStore.stopListener())
 
+onMounted(loadLatestCycle)
+
 const loading = computed(() => religionStore.loading)
 const error = computed(() => religionStore.error)
 const records = computed(() => religionStore.records)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
 const totalPopulation = computed(() => populationStore.totalPopulation || 0)
+const followersDialogOpen = ref(false)
+const distributionSelected = ref(null)
+const editedFollowers = ref([])
+const followersError = ref('')
+const followersSaving = ref(false)
+const activeFaithFarmForm = reactive({
+  roll: null,
+  dmMod: 0,
+  notes: '',
+})
+const activeFaithFarmError = ref('')
+const activeFaithFarmLoading = ref(false)
+const spreadReligionForm = reactive({
+  targetReligionId: '',
+  investedOV: 50,
+  roll: null,
+  dmMod: 0,
+  notes: '',
+})
+const spreadReligionError = ref('')
+const spreadReligionLoading = ref(false)
+const clergyDefenseForm = reactive({
+  investedOV: 50,
+  roll: null,
+  dmMod: 0,
+  notes: '',
+})
+const clergyDefenseError = ref('')
+const clergyDefenseLoading = ref(false)
+const manualShieldActive = ref(false)
+const shieldUpdateLoading = ref(false)
+const shieldUpdateError = ref('')
+const shieldUpdateSuccess = ref(false)
+
+function getCycleDurationDays(cycle) {
+  if (!cycle) return null
+  if (cycle.duration) return Number(cycle.duration)
+
+  const start = parseFaerunDate(cycle.startedAt)
+  const end = parseFaerunDate(cycle.finishedAt)
+  const diff = start && end ? diffInDays(start, end) : null
+  return diff > 0 ? diff : null
+}
+
+const currentCycleHeadline = computed(() => {
+  if (!latestCycle.value) return 'Цикл ще не розпочато'
+
+  const start = latestCycle.value.startedAt || '—'
+  const end = latestCycle.value.finishedAt
+
+  return end ? `${start} — ${end}` : `${start} (триває)`
+})
+
+const currentCycleDetails = computed(() => {
+  if (!latestCycle.value) return 'Додайте перший цикл, щоб відстежувати дії релігії.'
+
+  const durationDays = getCycleDurationDays(latestCycle.value)
+  const durationLabel = durationDays ? `${durationDays} днів` : 'Тривалість не вказана'
+  const status = latestCycle.value.finishedAt ? 'Цикл завершено' : 'Цикл триває'
+  const notes = latestCycle.value.notes?.trim()
+
+  return [durationLabel, status, notes ? `Нотатки: ${notes}` : null].filter(Boolean).join(' • ')
+})
+const newCycleDialog = ref(false)
+const cycleSaving = ref(false)
+const cycleError = ref('')
+const newCycleForm = ref(null)
+const currentFaerunYear = DEFAULT_YEAR
+const cycleForm = reactive({
+  startedDate: null,
+  finishedDate: null,
+  notes: '',
+})
+
+const cycleDurationLabel = computed(() => {
+  const start = normalizeFaerunDate(cycleForm.startedDate)
+  const end = normalizeFaerunDate(cycleForm.finishedDate)
+
+  if (!start || !end) return 'Тривалість буде розрахована автоматично'
+
+  const diff = diffInDays(start, end)
+  if (diff === null) return 'Тривалість буде розрахована автоматично'
+  if (diff <= 0) return 'Дата завершення має бути пізнішою за початок'
+
+  return `${diff} днів`
+})
 
 const heroCountsByReligion = computed(() => {
   const result = new Map()
@@ -401,18 +1184,36 @@ const followersByReligion = computed(() => {
   for (const religion of religionStore.religions) {
     const name = religion.name || 'Невідома релігія'
     result.set(name, {
+      id: religion.id,
       name,
       followers: Number(religion.followers ?? 0),
       heroes: heroCountsByReligion.value.get(name)?.heroes || 0,
+      buildingLevel: religion.buildingLevel || '—',
+      buildingFaithIncome: religion.buildingFaithIncome,
+      farmBase: Number(religion.farmBase),
+      farmDCBase: Number(religion.farmDCBase),
+      shieldActive: Boolean(religion.shieldActive),
+      shieldBonus: Number(religion.shieldBonus),
+      svTemp: Number(religion.svTemp),
+      svBase: Number(religion.svBase),
+      minSpreadFollowersResult: Number(religion.minSpreadFollowersResult),
     })
   }
 
   for (const [name, stats] of heroCountsByReligion.value.entries()) {
     if (!result.has(name)) {
       result.set(name, {
+        id: null,
         name,
         followers: 0,
         heroes: stats.heroes,
+        buildingLevel: '—',
+        farmName: '—',
+        farmDCBase: 0,
+        farmDCBonus: 0,
+        shieldActive: false,
+        shieldBonus: 0,
+        svTemp: 0,
       })
     }
   }
@@ -436,6 +1237,23 @@ const distribution = computed(() => {
     })
     .sort((a, b) => b.followers - a.followers)
 })
+
+const followersSliderCeiling = computed(() => {
+  const base = totalPopulation.value || 0
+  const maxValue = editedFollowers.value.reduce(
+    (max, item) => Math.max(max, Number(item.newFollowers) || 0),
+    0,
+  )
+
+  return Math.max(base, maxValue, 100)
+})
+
+const editedFollowersTotal = computed(() =>
+  editedFollowers.value.reduce((sum, item) => sum + (Number(item.newFollowers) || 0), 0),
+)
+
+const followersRemaining = computed(() => (totalPopulation.value || 0) - editedFollowersTotal.value)
+const followersOverLimit = computed(() => followersRemaining.value < 0)
 
 const totalFollowersLabel = computed(() => {
   const total = followersByReligion.value.reduce((sum, item) => sum + item.followers, 0)
@@ -528,36 +1346,98 @@ const externalTooltipHandler = (context) => {
   tooltipEl.style.transform = 'translate(-50%, -100%) translateY(-8px)'
 }
 
-function handleSliceClick(item) {
-  if (!item) return
-  console.info('[religion] slice clicked:', item.name)
+function openFollowersDialog(item) {
+  if (!isAdmin.value) return
+
+  distributionSelected.value = item || null
+  editedFollowers.value = distribution.value.map((entry) => ({
+    ...entry,
+    newFollowers: entry.followers,
+  }))
+  followersError.value = ''
+  followersDialogOpen.value = true
 }
 
-function withAlpha(hex, alpha) {
-  const value = hex?.startsWith('#') ? hex.slice(1) : hex
-  if (!value) return hex
-
-  const expanded = value.length === 3
-    ? value.split('').map((char) => char + char).join('')
-    : value
-
-  if (expanded.length !== 6) return hex
-
-  const r = parseInt(expanded.slice(0, 2), 16)
-  const g = parseInt(expanded.slice(2, 4), 16)
-  const b = parseInt(expanded.slice(4, 6), 16)
-
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+function closeFollowersDialog() {
+  followersDialogOpen.value = false
+  distributionSelected.value = null
 }
 
-function rowStyle(item) {
-  const isActive = hoveredReligion.value?.name === item.name
+function followersPercentFor(value) {
+  const base = totalPopulation.value || editedFollowersTotal.value || 1
+  return Math.round(((Number(value) || 0) / base) * 1000) / 10
+}
 
-  return {
-    '--row-color': item.color,
-    backgroundColor: isActive ? withAlpha(item.color, 0.1) : undefined,
-    cursor: 'pointer',
+function followersDelta(item) {
+  const previous = Number(item.followers || 0)
+  const current = Number(item.newFollowers || 0)
+  const diff = current - previous
+  const sign = diff > 0 ? '+' : ''
+
+  return `${sign}${diff.toLocaleString('uk-UA')}`
+}
+
+async function saveFollowersDistribution() {
+  if (!isAdmin.value) return
+
+  followersError.value = ''
+
+  if (followersOverLimit.value) {
+    followersError.value = 'Сума послідовників перевищує населення острова.'
+    return
   }
+
+  followersSaving.value = true
+  try {
+    const batch = writeBatch(db)
+    const changes = []
+
+    for (const item of editedFollowers.value) {
+      if (!item.id) continue
+
+      const previous = Number(item.followers || 0)
+      const updatedFollowers = Number(item.newFollowers || 0)
+
+      if (updatedFollowers === previous) continue
+
+      batch.update(doc(db, 'religions', item.id), { followers: updatedFollowers })
+      changes.push({
+        religionId: item.id,
+        religionName: item.name,
+        previousFollowers: previous,
+        updatedFollowers,
+        delta: updatedFollowers - previous,
+      })
+    }
+
+    if (!changes.length) {
+      followersError.value = 'Немає змін для збереження.'
+      return
+    }
+
+    await batch.commit()
+
+    await addDoc(collection(db, 'religionActions'), {
+      actionType: doc(db, 'religionActionTypes', 'religionsDistributionChange'),
+      changes,
+      totalPopulation: totalPopulation.value,
+      remaining: followersRemaining.value,
+      user: userStore.nickname || 'Адміністратор',
+      createdAt: serverTimestamp(),
+    })
+
+    closeFollowersDialog()
+  } catch (e) {
+    console.error('[religion] Failed to save distribution', e)
+    followersError.value = e?.message || 'Не вдалося зберегти розподіл.'
+  } finally {
+    followersSaving.value = false
+  }
+}
+
+function handleSliceClick(item) {
+  if (!item || !isAdmin.value) return
+  openFollowersDialog(item)
 }
 
 const chartOptions = computed(() => ({
@@ -565,7 +1445,7 @@ const chartOptions = computed(() => ({
   maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
-    title: { display: true, text: 'Духовенства' },
+    title: { display: true, text: 'Конфесії' },
     tooltip: {
       enabled: false,
       external: externalTooltipHandler,
@@ -600,6 +1480,65 @@ const sectionBackgroundStyle = computed(() => {
   }
 })
 
+const dialogOpen = ref(false)
+const selectedClergyId = ref('')
+const activeClergy = computed(() => records.value.find((item) => item.id === selectedClergyId.value))
+const activeClergyReligion = computed(() => {
+  const religionId = activeClergy.value?.religion?.id
+  if (!religionId) return null
+
+  return religionStore.religions.find((item) => item.id === religionId) || null
+})
+
+const spreadTargetReligionOptions = computed(() =>
+  religionStore.religions
+    .filter((item) => item.id !== activeClergyReligion.value?.id)
+    .map((item) => ({
+      title: item.name,
+      value: item.id,
+    })),
+)
+const spreadTargetReligion = computed(() =>
+  religionStore.religions.find((item) => item.id === spreadReligionForm.targetReligionId) || null,
+)
+const spreadTargetSVTotal = computed(() => {
+  const svBase = Number(spreadTargetReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
+  const svTemp = Number(spreadTargetReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)
+  const shieldBonus = Number(spreadTargetReligion.value?.shieldBonus ?? DEFAULT_VALUES.shieldBonus)
+
+  return svBase + svTemp + shieldBonus
+})
+const spreadReligionDC = computed(() => spreadTargetSVTotal.value + Number(spreadReligionForm.dmMod ?? 0))
+const spreadReligionResult = computed(() => {
+  const rollRaw = spreadReligionForm.roll
+  const investedRaw = spreadReligionForm.investedOV
+  const roll = Number(rollRaw)
+  const invested = Number(investedRaw)
+
+  if (rollRaw === null || rollRaw === undefined || Number.isNaN(roll)) return null
+  if (investedRaw === null || investedRaw === undefined || Number.isNaN(invested)) return null
+
+  return roll + Math.floor(invested / 50)
+})
+const spreadReligionConverted = computed(() => {
+  const result = spreadReligionResult.value
+  if (result === null) return null
+
+  return result >= spreadReligionDC.value ? 5 + Math.max(0, result - spreadReligionDC.value) : 0
+})
+const spreadReligionFaithError = computed(() => {
+  const available = currentFaithPoints.value
+  const invested = Number(spreadReligionForm.investedOV)
+
+  if (available < 50) return 'Недостатньо ОВ для мінімальної інвестиції (50).'
+  if (!Number.isNaN(invested) && invested > available) return 'Недостатньо ОВ для інвестиції.'
+
+  return ''
+})
+const spreadReligionDisabled = computed(
+  () => !spreadTargetReligion.value || !downtimeAvailable.value || Boolean(spreadReligionFaithError.value),
+)
+
 watch(
   () => islandStore.currentId,
   (id) => {
@@ -611,15 +1550,99 @@ watch(distribution, () => {
   hoveredReligion.value = null
 })
 
+watch(
+  spreadTargetReligionOptions,
+  (options) => {
+    if (!options.length) {
+      spreadReligionForm.targetReligionId = ''
+      return
+    }
+
+    const exists = options.some((option) => option.value === spreadReligionForm.targetReligionId)
+    if (!exists) {
+      spreadReligionForm.targetReligionId = options[0].value
+    }
+  },
+  { immediate: true },
+)
+
 const sortBy = ref('heroName')
 const sortDirection = ref('asc')
 
-const dialogOpen = ref(false)
-const selectedClergyId = ref('')
 const faithChange = ref(null)
 const logMessage = ref('')
 const actionError = ref('')
 const actionLoading = ref(false)
+const changeReligionMode = ref(false)
+const selectedReligionId = ref('')
+const changeReligionLoading = ref(false)
+const changeReligionError = ref('')
+const downtimeAvailable = ref(true)
+const downtimeUpdateLoading = ref(false)
+const downtimeUpdateError = ref('')
+const downtimeUpdateSuccess = ref(false)
+const activeFaithFarmBase = computed(() => activeClergyReligion.value?.farmBase ?? DEFAULT_VALUES.farmBase)
+const activeFaithFarmDCBase = computed(() => activeClergyReligion.value?.farmDCBase ?? DEFAULT_VALUES.farmDCBase)
+const currentFaithPoints = computed(() => Number(activeClergy.value?.faith ?? 0))
+const activeFaithFarmDC = computed(() => {
+  const dmMod = Number(activeFaithFarmForm.dmMod ?? 0)
+  return activeFaithFarmDCBase.value + Math.floor(currentFaithPoints.value / 100) + dmMod
+})
+const activeFaithFarmFollowers = computed(() => {
+  const roll = Number(activeFaithFarmForm.roll)
+  if (Number.isNaN(roll)) return null
+
+  const extra = Math.max(0, roll - activeFaithFarmDC.value)
+  return activeFaithFarmBase.value + extra
+})
+
+const clergyDefenseTarget = computed(() => activeClergyReligion.value?.name || '—')
+const clergyDefenseTargetSVTotal = computed(() => {
+  const svBase = Number(activeClergyReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
+  const svTemp = Number(activeClergyReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)
+  return svBase + svTemp
+})
+const clergyDefenseDC = computed(() => {
+  const dmMod = Number(clergyDefenseForm.dmMod ?? 0)
+  return clergyDefenseTargetSVTotal.value + dmMod
+})
+const clergyDefenseResult = computed(() => {
+  const rollRaw = clergyDefenseForm.roll
+  const investedRaw = clergyDefenseForm.investedOV
+  const roll = Number(rollRaw)
+  const invested = Number(investedRaw)
+
+  if (rollRaw === null || rollRaw === undefined || Number.isNaN(roll)) return null
+  if (investedRaw === null || investedRaw === undefined || Number.isNaN(invested)) return null
+
+  return roll + Math.floor(invested / 50)
+})
+const clergyDefenseBonus = computed(() => {
+  const result = clergyDefenseResult.value
+  const dc = clergyDefenseDC.value
+
+  if (result === null) return 0
+
+  if (result >= dc) {
+    return 1 + Math.max(0, Math.floor((result - dc) / 5))
+  }
+
+  return 0
+})
+const clergyDefenseFaithError = computed(() => {
+  const available = currentFaithPoints.value
+  const invested = Number(clergyDefenseForm.investedOV)
+
+  if (available < 50) return 'Недостатньо ОВ для мінімальної інвестиції (50).'
+  if (!Number.isNaN(invested) && invested > available) return 'Недостатньо ОВ для інвестиції.'
+
+  return ''
+})
+const clergyDefenseDisabled = computed(() =>
+  Boolean(activeClergyReligion.value?.shieldActive) ||
+  !downtimeAvailable.value ||
+  Boolean(clergyDefenseFaithError.value),
+)
 
 const sortedRecords = computed(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
@@ -632,7 +1655,7 @@ const sortedRecords = computed(() => {
       return (aVal - bVal) * dir
     }
 
-    return aVal.localeCompare(bVal, 'uk', { sensitivity: 'base' }) * dir
+    return String(aVal ?? '').localeCompare(String(bVal ?? ''), 'uk', { sensitivity: 'base' }) * dir
   })
 })
 
@@ -645,18 +1668,253 @@ function toggleSort(field) {
   }
 }
 
-const activeClergy = computed(() => records.value.find((item) => item.id === selectedClergyId.value))
+watch(activeClergyReligion, () => {
+  manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
+})
+
+watch(manualShieldActive, () => {
+  shieldUpdateSuccess.value = false
+  shieldUpdateError.value = ''
+})
+
 const clergyLogs = computed(() => (activeClergy.value ? religionStore.logsByClergy[activeClergy.value.id] || [] : []))
 const logsLoading = computed(() => religionStore.logsLoading)
 const logsError = computed(() => religionStore.logsError)
+const religionOptions = computed(() => {
+  const currentReligionId = activeClergy.value?.religion?.id
+  return religionStore.religions
+    .filter((item) => item.id !== currentReligionId)
+    .map((item) => ({
+      ...item,
+      value: item.id,
+      title: item.name,
+    }))
+})
+const selectedReligion = computed(() => religionStore.religions.find((item) => item.id === selectedReligionId.value))
+
+function getReligionChangeRate(faithMax) {
+  if (faithMax < 200) return 0.5
+  if (faithMax < 400) return 0.6
+  return 0.7
+}
+
+function calculateReligionChangeFine(clergy) {
+  const faith = Number(clergy?.faith ?? 0)
+  const faithMax = Number(clergy?.faithMax ?? 0)
+  const rate = getReligionChangeRate(faithMax)
+
+  return { fine: Math.floor(faith * rate), rate }
+}
+
+const religionChangeFine = computed(() => calculateReligionChangeFine(activeClergy.value).fine)
+const religionChangeFinePercent = computed(() => Math.round(calculateReligionChangeFine(activeClergy.value).rate * 100))
+
+async function loadLatestCycle() {
+  latestCycleLoading.value = true
+  latestCycleError.value = ''
+
+  try {
+    const cyclesRef = collection(db, 'cycles')
+    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1))
+    const snapshot = await getDocs(latestCycleQuery)
+
+    if (snapshot.docs.length) {
+      const docSnap = snapshot.docs[0]
+      latestCycle.value = { id: docSnap.id, ...docSnap.data() }
+    } else {
+      latestCycle.value = null
+    }
+  } catch (e) {
+    console.error('[religion] Failed to load latest cycle', e)
+    latestCycleError.value = 'Не вдалося завантажити дані про цикл.'
+  } finally {
+    latestCycleLoading.value = false
+  }
+}
+
+function openNewCycleDialog() {
+  cycleForm.startedDate = null
+  cycleForm.finishedDate = null
+  cycleForm.notes = ''
+  cycleError.value = ''
+  newCycleDialog.value = true
+}
+
+function closeNewCycleDialog() {
+  newCycleDialog.value = false
+}
 
 function openClergy(record) {
   selectedClergyId.value = record.id
   faithChange.value = null
   logMessage.value = ''
   actionError.value = ''
+  activeFaithFarmForm.roll = null
+  activeFaithFarmForm.dmMod = 0
+  activeFaithFarmForm.notes = ''
+  activeFaithFarmError.value = ''
+  resetDowntimeState()
+  resetClergyDefenseState()
+  resetSpreadReligionState()
+  cancelReligionChange()
   dialogOpen.value = true
   religionStore.listenLogs(record.id)
+}
+
+async function resetReligionsSvTemp() {
+  const religionsSnapshot = await getDocs(collection(db, 'religions'))
+  const batch = writeBatch(db)
+
+  religionsSnapshot.forEach((docSnap) => {
+    batch.update(docSnap.ref, { svTemp: 0 })
+  })
+
+  await batch.commit()
+}
+
+function getBuildingFaithIncome(level) {
+  return BUILDING_LEVEL_BONUSES[level]?.passiveFaith || 0
+}
+
+async function distributeBuildingFaithIncome(cycleId) {
+  const religionsSnapshot = await getDocs(collection(db, 'religions'))
+  const religionsWithIncome = religionsSnapshot.docs
+    .map((docSnap) => {
+      const data = docSnap.data() || {}
+      const buildingLevel = data.buildingLevel || 'none'
+      return {
+        id: docSnap.id,
+        name: data.name || 'Невідома релігія',
+        ref: docSnap.ref,
+        buildingLevel,
+        passiveFaith: getBuildingFaithIncome(buildingLevel),
+      }
+    })
+    .filter((religion) => religion.passiveFaith > 0)
+
+  for (const religion of religionsWithIncome) {
+    const clergyQuery = query(collection(db, 'clergy'), where('religion', '==', religion.ref))
+    const clergySnapshot = await getDocs(clergyQuery)
+
+    if (clergySnapshot.empty) continue
+
+    const heroCount = clergySnapshot.size
+    const baseShare = Math.floor(religion.passiveFaith / heroCount)
+    const remainder = religion.passiveFaith - baseShare * heroCount
+    const remainderIndex = remainder > 0 ? Math.floor(Math.random() * heroCount) : -1
+
+    const tasks = clergySnapshot.docs.map(async (docSnap, index) => {
+      const bonus = baseShare + (index === remainderIndex ? remainder : 0)
+      if (!bonus) return
+
+      const data = docSnap.data() || {}
+      const currentFaith = Number(data.faith ?? 0)
+      const newFaith = currentFaith + bonus
+      const updates = { faith: newFaith }
+
+      const currentFaithMax = Number(data.faithMax ?? 0)
+      if (currentFaithMax < newFaith) {
+        updates.faithMax = newFaith
+      }
+
+      await updateDoc(docSnap.ref, updates)
+      await addDoc(collection(docSnap.ref, 'logs'), {
+        delta: bonus,
+        message: `Пасивний дохід від споруди (${religion.buildingLevel}) за цикл ${cycleId}.`,
+        user: 'Система',
+        cycleId,
+        religionId: religion.id,
+        religionName: religion.name,
+        buildingLevel: religion.buildingLevel,
+        buildingFaithIncome: religion.passiveFaith,
+        remainderBonus: index === remainderIndex && remainder > 0,
+        createdAt: serverTimestamp(),
+      })
+    })
+
+    await Promise.all(tasks)
+  }
+}
+
+async function createCycleStartAction(cycleId, notes) {
+  const actionsRef = collection(db, 'religionActions')
+  const actionTypeRef = doc(db, 'religionActionTypes', 'cycleStart')
+
+  await addDoc(actionsRef, {
+    actionType: actionTypeRef,
+    cycleId,
+    notes: notes?.trim() || '',
+    createdAt: serverTimestamp(),
+    convertedFollowers: 0,
+    result: 0,
+  })
+}
+
+async function createCycle() {
+  cycleError.value = ''
+
+  const startedDate = normalizeFaerunDate(cycleForm.startedDate)
+  const finishedDate = normalizeFaerunDate(cycleForm.finishedDate)
+
+  if (!startedDate) {
+    cycleError.value = 'Вкажіть початок циклу.'
+    return
+  }
+
+  if (finishedDate) {
+    const diff = diffInDays(startedDate, finishedDate)
+    if (!diff || diff <= 0) {
+      cycleError.value = 'Дата завершення має бути пізнішою за початок.'
+      return
+    }
+  }
+
+  cycleSaving.value = true
+  try {
+    const cyclesRef = collection(db, 'cycles')
+    const lastCycleSnapshot = await getDocs(query(cyclesRef, orderBy('createdAt', 'desc'), limit(1)))
+    const lastCycleDoc = lastCycleSnapshot.docs[0]
+
+    const startedAt = formatFaerunDate(startedDate)
+    const finishedAt = finishedDate ? formatFaerunDate(finishedDate) : null
+    const calculatedDuration = finishedDate ? diffInDays(startedDate, finishedDate) : null
+
+    const newCycleData = {
+      startedAt,
+      duration: calculatedDuration,
+      createdAt: serverTimestamp(),
+    }
+
+    if (finishedAt) {
+      newCycleData.finishedAt = finishedAt
+    }
+
+    const cycleDoc = await addDoc(cyclesRef, newCycleData)
+
+    if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
+      const previousCycle = lastCycleDoc.data()
+      const parsedPreviousStart = parseFaerunDate(previousCycle.startedAt)
+      const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, startedDate) : null
+
+      const previousUpdate = { finishedAt: startedAt }
+      if (previousDuration && previousDuration > 0) {
+        previousUpdate.duration = previousDuration
+      }
+
+      await updateDoc(lastCycleDoc.ref, previousUpdate)
+    }
+
+    await resetReligionsSvTemp()
+    await createCycleStartAction(cycleDoc.id, cycleForm.notes)
+    await distributeBuildingFaithIncome(cycleDoc.id)
+    await loadLatestCycle()
+    closeNewCycleDialog()
+  } catch (e) {
+    console.error('[religion] Failed to create cycle', e)
+    cycleError.value = 'Не вдалося створити новий цикл.'
+  } finally {
+    cycleSaving.value = false
+  }
 }
 
 function closeDialog() {
@@ -664,11 +1922,128 @@ function closeDialog() {
   if (selectedClergyId.value) {
     religionStore.stopLogs(selectedClergyId.value)
   }
+  cancelReligionChange()
 }
 
 function formatLogMeta(log) {
   const time = log.createdAt ? log.createdAt.toLocaleString('uk-UA') : 'Очікує на час'
   return `${log.user || 'Невідомо'} • ${time}`
+}
+
+function startReligionChange() {
+  changeReligionMode.value = true
+  selectedReligionId.value = ''
+  changeReligionError.value = ''
+}
+
+function cancelReligionChange() {
+  changeReligionMode.value = false
+  selectedReligionId.value = ''
+  changeReligionError.value = ''
+  changeReligionLoading.value = false
+}
+
+async function confirmReligionChange() {
+  if (!isAdmin.value || !activeClergy.value) return
+  changeReligionError.value = ''
+
+  if (!selectedReligionId.value) {
+    changeReligionError.value = 'Оберіть конфесію для зміни.'
+    return
+  }
+
+  if (selectedReligionId.value === activeClergy.value.religion?.id) {
+    changeReligionError.value = 'Оберіть іншу конфесію.'
+    return
+  }
+
+  const newReligion = selectedReligion.value
+  if (!newReligion) {
+    changeReligionError.value = 'Обрана конфесія недоступна.'
+    return
+  }
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const newReligionRef = doc(db, 'religions', selectedReligionId.value)
+  const heroRef = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef
+
+  const currentReligionRef = activeClergy.value.religion?.path
+    ? doc(db, activeClergy.value.religion.path)
+    : activeClergy.value.religion?.id
+      ? doc(db, 'religions', activeClergy.value.religion.id)
+      : null
+
+  const fine = religionChangeFine.value
+  const delta = -fine
+  const updatedFaith = Math.max(0, Number(activeClergy.value.faith ?? 0) + delta)
+
+  changeReligionLoading.value = true
+  try {
+    const batch = writeBatch(db)
+    batch.update(clergyRef, {
+      religion: newReligionRef,
+      faith: updatedFaith,
+    })
+
+    if (heroRef) {
+      batch.update(heroRef, { religion: newReligionRef })
+    }
+
+    await batch.commit()
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta,
+        message: `Зміна конфесії на ${newReligion.name}. Штраф ${fine} ОВ.`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+        previousReligion: activeClergy.value.religionName,
+        newReligion: newReligion.name,
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'changeReligion'),
+        hero: heroRef || null,
+        clergy: clergyRef,
+        fromReligion: currentReligionRef,
+        toReligion: newReligionRef,
+        faithPenalty: fine,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    cancelReligionChange()
+  } catch (e) {
+    console.error('[religion] Failed to change religion', e)
+    changeReligionError.value = e?.message || 'Не вдалося змінити конфесію.'
+  } finally {
+    changeReligionLoading.value = false
+  }
+}
+
+async function createFaithAwardAction(delta) {
+  const heroRef = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef || null
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+
+  const religionRef = activeClergy.value.religion?.path
+    ? doc(db, activeClergy.value.religion.path)
+    : activeClergy.value.religion || null
+
+  await addDoc(collection(db, 'religionActions'), {
+    actionType: doc(db, 'religionActionTypes', 'awardAdventure'),
+    hero: heroRef,
+    clergy: clergyRef,
+    religion: religionRef,
+    faithDelta: delta,
+    message: logMessage.value?.trim() || '',
+    user: userStore.nickname || 'Адміністратор',
+    createdAt: serverTimestamp(),
+  })
 }
 
 async function applyFaithChange(mode) {
@@ -684,12 +2059,18 @@ async function applyFaithChange(mode) {
 
   actionLoading.value = true
   try {
-    await religionStore.changeFaith({
+    const tasks = [religionStore.changeFaith({
       clergyId: activeClergy.value.id,
       delta,
       message: logMessage.value,
       user: userStore.nickname || 'Адміністратор',
-    })
+    })]
+
+    if (delta > 0) {
+      tasks.push(createFaithAwardAction(delta))
+    }
+
+    await Promise.all(tasks)
     faithChange.value = null
     logMessage.value = ''
   } catch (e) {
@@ -699,76 +2080,572 @@ async function applyFaithChange(mode) {
   }
 }
 
+function resetDowntimeState() {
+  downtimeAvailable.value = activeClergy.value?.downtimeAvailable ?? true
+  downtimeUpdateError.value = ''
+  downtimeUpdateSuccess.value = false
+}
+
+function resetClergyDefenseState() {
+  clergyDefenseForm.investedOV = 50
+  clergyDefenseForm.roll = null
+  clergyDefenseForm.dmMod = 0
+  clergyDefenseForm.notes = ''
+  clergyDefenseError.value = ''
+  clergyDefenseLoading.value = false
+  manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
+  shieldUpdateError.value = ''
+  shieldUpdateSuccess.value = false
+  shieldUpdateLoading.value = false
+}
+
+function resetSpreadReligionState() {
+  spreadReligionForm.targetReligionId = ''
+  spreadReligionForm.investedOV = 50
+  spreadReligionForm.roll = null
+  spreadReligionForm.dmMod = 0
+  spreadReligionForm.notes = ''
+  spreadReligionError.value = ''
+  spreadReligionLoading.value = false
+}
+
+function resetShieldState() {
+  manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
+  shieldUpdateError.value = ''
+  shieldUpdateSuccess.value = false
+  shieldUpdateLoading.value = false
+}
+
+watch(activeClergy, () => {
+  resetDowntimeState()
+  resetClergyDefenseState()
+  resetSpreadReligionState()
+})
+
+async function saveDowntimeAvailability() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const heroRefValue = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef
+
+  if (!heroRefValue) {
+    downtimeUpdateError.value = 'Не вдалося визначити героя для оновлення.'
+    return
+  }
+
+  downtimeUpdateError.value = ''
+  downtimeUpdateSuccess.value = false
+  downtimeUpdateLoading.value = true
+
+  try {
+    await updateDoc(heroRefValue, { downtimeAvailable: downtimeAvailable.value })
+    religionStore.setDowntimeAvailability(activeClergy.value.id, downtimeAvailable.value)
+    downtimeUpdateSuccess.value = true
+  } catch (e) {
+    downtimeUpdateError.value = e?.message || 'Не вдалося оновити статус даутайму.'
+  } finally {
+    downtimeUpdateLoading.value = false
+  }
+}
+
+async function applyClergyDefense() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const religionRefSource = activeClergy.value.religion
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const heroRefSource = activeClergy.value.heroRef
+
+  const invested = Number(clergyDefenseForm.investedOV)
+  const roll = Number(clergyDefenseForm.roll)
+  const dmMod = Number(clergyDefenseForm.dmMod ?? 0)
+  const notes = clergyDefenseForm.notes?.trim() || ''
+
+  if (!religionRefSource) {
+    clergyDefenseError.value = 'Не вдалося визначити конфесію духовенства.'
+    return
+  }
+
+  if (activeClergyReligion.value?.shieldActive) {
+    clergyDefenseError.value = 'Щит цієї конфесії вже активний.'
+    return
+  }
+
+  if (!downtimeAvailable.value) {
+    clergyDefenseError.value = 'Дія доступна лише коли є давнтайм.'
+    return
+  }
+
+  if (Number.isNaN(invested) || invested < 50) {
+    clergyDefenseError.value = 'Мінімальна інвестиція — 50 ОВ.'
+    return
+  }
+
+  if (invested % 50 !== 0) {
+    clergyDefenseError.value = 'Інвестиція має бути кратною 50 ОВ.'
+    return
+  }
+
+  const faithBlockReason = clergyDefenseFaithError.value
+  if (faithBlockReason) {
+    clergyDefenseError.value = faithBlockReason
+    return
+  }
+
+  if (Number.isNaN(roll)) {
+    clergyDefenseError.value = 'Вкажіть результат кидка.'
+    return
+  }
+
+  const religionRef = religionRefSource?.path
+    ? doc(db, religionRefSource.path)
+    : religionRefSource?.id
+      ? doc(db, 'religions', religionRefSource.id)
+      : religionRefSource
+  const heroRef = heroRefSource?.path ? doc(db, heroRefSource.path) : heroRefSource
+
+  if (!religionRef) {
+    clergyDefenseError.value = 'Не вдалося визначити конфесію духовенства.'
+    return
+  }
+
+  if (!heroRef) {
+    clergyDefenseError.value = 'Не вдалося визначити героя духовенства.'
+    return
+  }
+
+  const dc = clergyDefenseDC.value
+  const result = clergyDefenseResult.value
+  const bonus = clergyDefenseBonus.value
+
+  clergyDefenseError.value = ''
+  clergyDefenseLoading.value = true
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      if (!clergySnapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const clergyData = clergySnapshot.data() || {}
+      const currentFaith = Number(clergyData.faith ?? 0)
+      if (currentFaith < invested) {
+        throw new Error('Недостатньо ОВ для інвестиції.')
+      }
+
+      let religionSnapshot = null
+      if (bonus > 0) {
+        religionSnapshot = await transaction.get(religionRef)
+        if (!religionSnapshot.exists()) {
+          throw new Error('Конфесія не знайдена.')
+        }
+      }
+
+      transaction.update(clergyRef, { faith: currentFaith - invested })
+
+      if (bonus > 0) {
+        transaction.update(religionRef, {
+          shieldBonus: bonus,
+          shieldActive: true,
+        })
+      }
+    })
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta: -invested,
+        message: `Захист духовенства: інвестиція ${invested} ОВ, кидок ${roll}, DM Mod ${dmMod}, DC ${dc}. ${
+          notes || 'Без нотаток'
+        }`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'shield'),
+        hero: heroRef,
+        heroId: heroRef.id,
+        clergy: clergyRef,
+        religion: religionRef,
+        investedFaith: invested,
+        roll,
+        dmMod,
+        notes,
+        target: religionRef,
+        targetSVTotal: clergyDefenseTargetSVTotal.value,
+        dc,
+        result,
+        bonus,
+        shieldApplied: bonus > 0,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    if (bonus > 0) {
+      manualShieldActive.value = true
+    }
+
+    clergyDefenseForm.roll = null
+    clergyDefenseForm.dmMod = 0
+    clergyDefenseForm.notes = ''
+  } catch (e) {
+    console.error('[religion] Failed to apply clergy defense', e)
+    clergyDefenseError.value = e?.message || 'Не вдалося застосувати захист духовенства.'
+  } finally {
+    clergyDefenseLoading.value = false
+  }
+}
+
+async function applySpreadReligion() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const targetReligion = spreadTargetReligion.value
+  const religionRefSource = activeClergy.value.religion
+  const heroRef = activeClergy.value.heroRef?.path
+    ? doc(db, activeClergy.value.heroRef.path)
+    : activeClergy.value.heroRef
+  const religionRef = religionRefSource?.path
+    ? doc(db, religionRefSource.path)
+    : religionRefSource?.id
+      ? doc(db, 'religions', religionRefSource.id)
+      : religionRefSource || null
+  const invested = Number(spreadReligionForm.investedOV)
+  const roll = Number(spreadReligionForm.roll)
+  const dmMod = Number(spreadReligionForm.dmMod ?? 0)
+  const dc = spreadReligionDC.value
+  const result = spreadReligionResult.value
+  const converted = spreadReligionConverted.value
+  const notes = spreadReligionForm.notes?.trim() || ''
+  const cycleId = latestCycle.value?.id || null
+
+  if (!downtimeAvailable.value) {
+    spreadReligionError.value = 'Даутайм недоступний для цього героя.'
+    return
+  }
+
+  if (!targetReligion) {
+    spreadReligionError.value = 'Оберіть цільову конфесію.'
+    return
+  }
+
+  if (targetReligion.id === activeClergyReligion.value?.id) {
+    spreadReligionError.value = 'Цільова конфесія має відрізнятися від конфесії героя.'
+    return
+  }
+
+  if (!religionRef) {
+    spreadReligionError.value = 'Не вдалося визначити конфесію духовенства.'
+    return
+  }
+
+  if (Number.isNaN(invested) || invested < 50) {
+    spreadReligionError.value = 'Мінімальна інвестиція — 50 ОВ.'
+    return
+  }
+
+  if (invested % 50 !== 0) {
+    spreadReligionError.value = 'Інвестиція має бути кратною 50 ОВ.'
+    return
+  }
+
+  const faithBlockReason = spreadReligionFaithError.value
+  if (faithBlockReason) {
+    spreadReligionError.value = faithBlockReason
+    return
+  }
+
+  if (Number.isNaN(roll)) {
+    spreadReligionError.value = 'Вкажіть результат кидка.'
+    return
+  }
+
+  if (converted === null) {
+    spreadReligionError.value = 'Не вдалося розрахувати результат.'
+    return
+  }
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const targetReligionRef = doc(db, 'religions', targetReligion.id)
+  let shieldBroken = false
+
+  spreadReligionError.value = ''
+  spreadReligionLoading.value = true
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      if (!clergySnapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const clergyData = clergySnapshot.data() || {}
+      const currentFaith = Number(clergyData.faith ?? 0)
+      if (currentFaith < invested) {
+        throw new Error('Недостатньо ОВ для інвестиції.')
+      }
+
+      const targetSnapshot = await transaction.get(targetReligionRef)
+      if (!targetSnapshot.exists()) {
+        throw new Error('Цільова конфесія не знайдена.')
+      }
+
+      const targetData = targetSnapshot.data() || {}
+      const targetFollowers = Number(targetData.followers ?? 0)
+      const targetSvTempRaw = Number(targetData.svTemp ?? DEFAULT_VALUES.svTemp)
+
+      const religionSnapshot = await transaction.get(religionRef)
+      if (!religionSnapshot.exists()) {
+        throw new Error('Конфесія духовенства не знайдена.')
+      }
+
+      const religionData = religionSnapshot.data() || {}
+      const sourceFollowers = Number(religionData.followers ?? 0)
+
+      transaction.update(clergyRef, { faith: currentFaith - invested })
+
+      transaction.update(religionRef, { followers: sourceFollowers + converted })
+
+      const targetUpdates = {
+        followers: Math.max(0, targetFollowers - converted),
+        svTemp: targetSvTempRaw + 1,
+      }
+
+      if (targetData.shieldActive) {
+        targetUpdates.shieldActive = false
+        targetUpdates.shieldBonus = 0
+        shieldBroken = true
+      }
+
+      transaction.update(targetReligionRef, targetUpdates)
+
+      if (heroRef) {
+        transaction.update(heroRef, { downtimeAvailable: false })
+      }
+    })
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta: -invested,
+        message: `Поширення релігії: інвестиція ${invested} ОВ, кидок ${roll}, DM Mod ${dmMod}, DC ${dc}, результат ${result}. Конвертовано ${converted}. ${
+          notes || 'Без нотаток'
+        }`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'influence'),
+        hero: heroRef || null,
+        heroId: heroRef?.id,
+        clergy: clergyRef,
+        religion: religionRef,
+        targetReligion: targetReligionRef,
+        investedFaith: invested,
+        roll,
+        dmMod,
+        notes,
+        targetSVTotal: spreadTargetSVTotal.value,
+        dc,
+        result,
+        convertedFollowers: converted,
+        shieldBroken,
+        downtimeConsumed: true,
+        cycleId,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    religionStore.setDowntimeAvailability(activeClergy.value.id, false)
+
+    spreadReligionForm.roll = null
+    spreadReligionForm.dmMod = 0
+    spreadReligionForm.notes = ''
+  } catch (e) {
+    console.error('[religion] Failed to apply spread religion', e)
+    spreadReligionError.value = e?.message || 'Не вдалося застосувати поширення релігії.'
+  } finally {
+    spreadReligionLoading.value = false
+  }
+}
+
+async function saveShieldState() {
+  if (!isAdmin.value || !activeClergyReligion.value) return
+
+  const religionRefSource = activeClergy.value?.religion
+  const religionRef = religionRefSource?.path
+    ? doc(db, religionRefSource.path)
+    : religionRefSource?.id
+      ? doc(db, 'religions', religionRefSource.id)
+      : religionRefSource
+
+  if (!religionRef) {
+    shieldUpdateError.value = 'Не вдалося визначити конфесію.'
+    return
+  }
+
+  shieldUpdateError.value = ''
+  shieldUpdateSuccess.value = false
+  shieldUpdateLoading.value = true
+
+  const updates = { shieldActive: manualShieldActive.value }
+  if (!manualShieldActive.value) {
+    updates.shieldBonus = 0
+  }
+
+  try {
+    await updateDoc(religionRef, updates)
+    shieldUpdateSuccess.value = true
+  } catch (e) {
+    console.error('[religion] Failed to update shield state', e)
+    shieldUpdateError.value = e?.message || 'Не вдалося оновити стан щита.'
+  } finally {
+    shieldUpdateLoading.value = false
+  }
+}
+
+async function applyActiveFaithFarm() {
+  if (!isAdmin.value || !activeClergy.value) return
+
+  const roll = Number(activeFaithFarmForm.roll)
+  const dmMod = Number(activeFaithFarmForm.dmMod ?? 0)
+  const heroRefSource = activeClergy.value.heroRef
+  const cycleId = latestCycle.value?.id
+  const gained = activeFaithFarmFollowers.value
+  const dc = activeFaithFarmDC.value
+
+  if (!downtimeAvailable.value) {
+    activeFaithFarmError.value = 'Даутайм недоступний для цього героя.'
+    return
+  }
+
+  if (!cycleId) {
+    activeFaithFarmError.value = 'Спочатку додайте поточний цикл.'
+    return
+  }
+
+  const heroRef = heroRefSource?.path ? doc(db, heroRefSource.path) : heroRefSource
+
+  if (!heroRef) {
+    activeFaithFarmError.value = 'Не вдалося визначити героя духовенства.'
+    return
+  }
+
+  if (Number.isNaN(roll)) {
+    activeFaithFarmError.value = 'Вкажіть результат кидка.'
+    return
+  }
+
+  if (gained === null) {
+    activeFaithFarmError.value = 'Не вдалося розрахувати здобуті ОВ.'
+    return
+  }
+
+  activeFaithFarmError.value = ''
+  activeFaithFarmLoading.value = true
+
+  const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+  const religionRef = activeClergy.value.religion?.path
+    ? doc(db, activeClergy.value.religion.path)
+    : activeClergy.value.religion || null
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      if (!clergySnapshot.exists()) {
+        throw new Error('Духовенство не знайдено.')
+      }
+
+      const clergyData = clergySnapshot.data() || {}
+      const currentFaith = Number(clergyData.faith ?? 0)
+      const currentFaithMax = Number(clergyData.faithMax ?? 0)
+      const updatedFaith = currentFaith + gained
+      const updates = { faith: updatedFaith }
+
+      if (updatedFaith > currentFaithMax) {
+        updates.faithMax = updatedFaith
+      }
+
+      transaction.update(clergyRef, updates)
+      transaction.update(heroRef, {
+        lastDowntimeCycleId: cycleId,
+        downtimeAvailable: false,
+      })
+    })
+
+    await Promise.all([
+      addDoc(collection(clergyRef, 'logs'), {
+        delta: gained,
+        message: `Активний фарм: кидок ${roll}, модифікатор ${dmMod}, DC ${dc}. ${
+          activeFaithFarmForm.notes?.trim() || 'Без нотаток'
+        }`,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+      addDoc(collection(db, 'religionActions'), {
+        actionType: doc(db, 'religionActionTypes', 'generate'),
+        hero: heroRef,
+        clergy: clergyRef,
+        religion: religionRef,
+        heroId: heroRef.id,
+        roll,
+        dmMod,
+        notes: activeFaithFarmForm.notes?.trim() || '',
+        dc,
+        faithGained: gained,
+        farmBase: activeFaithFarmBase.value,
+        farmDCBase: activeFaithFarmDCBase.value,
+        currentFaith: currentFaithPoints.value,
+        cycleId,
+        user: userStore.nickname || 'Адміністратор',
+        createdAt: serverTimestamp(),
+      }),
+    ])
+
+    religionStore.setDowntimeAvailability(activeClergy.value.id, false)
+
+    activeFaithFarmForm.roll = null
+    activeFaithFarmForm.notes = ''
+    activeFaithFarmForm.dmMod = 0
+  } catch (e) {
+    console.error('[religion] Failed to apply active faith farm', e)
+    activeFaithFarmError.value = e?.message || 'Не вдалося застосувати ферму віри.'
+  } finally {
+    activeFaithFarmLoading.value = false
+  }
+}
+
 </script>
 <style scoped>
-.error{ color:#dc2626; font-size: 15px; margin-top: 8px; }
-
-.view-toggle {
-  margin-left: auto;
+.error {
+  color: #dc2626;
+  font-size: 15px;
+  margin-top: 8px;
 }
 
-.distribution-table-wrapper {
-  margin-top: 12px;
-  background-color: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.distribution-table-wrapper-hovered {
-  opacity: 0.5;
-}
-
-.distribution-table th {
-  background-color: #fff;
-  font-weight: 700;
-}
-
-.distribution-table td {
-  background-color: transparent;
-}
-
-.distribution-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-.distribution-row:hover,
-.distribution-row:focus-visible {
-  background-color: color-mix(in srgb, var(rgba(0, 0, 0, 0.08)) 20%, transparent);
-}
-
-.distribution-name {
+.current-cycle-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 600;
+  gap: 16px;
 }
 
-.color-bullet {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+.current-cycle-text {
+  padding-left: 6px;
 }
 
-.religion-table {
-  background-color: rgba(255, 255, 255, 0.62);
-  color: #0f172a;
-  min-width: 540px;
+.view-toggle {
+  margin-left: 0;
 }
-.religion-table td {
-  background-color: transparent;
+
+.view-toggle__btn {
+  white-space: nowrap;
 }
-.religion-table th {
-  font-weight: 600;
-  background-color: rgba(255, 255, 255, 0.72);
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
-.religion-table tbody tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.4);
-}
-.sort-btn { background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-.sort-btn:hover { text-decoration: underline; }
-.sort-indicator { font-size: 12px; }
 
 .religion-card {
   position: relative;
@@ -786,6 +2663,7 @@ async function applyFaithChange(mode) {
   opacity: 1;
   z-index: 0;
 }
+
 .section-overlay {
   inset: 0;
   z-index: 0;
@@ -813,79 +2691,134 @@ async function applyFaithChange(mode) {
   flex-wrap: wrap;
 }
 
-.chart-container {
-  min-height: 520px;
-  position: relative;
-  padding: 12px 8px 0;
-}
-
-:deep(.chart-tooltip) {
-  position: absolute;
-  z-index: 5;
-  pointer-events: none;
-  background-color: #0f172a;
-  color: #fff;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-  opacity: 0;
-  transition: opacity 0.12s ease, transform 0.12s ease;
-  white-space: nowrap;
-}
-
-:deep(.chart-tooltip__content) {
-  display: block;
-}
-
-.doughnut-chart {
-  width: 100%;
-  max-width: 640px;
-  height: 320px;
-  margin: 0 auto;
+.distribution-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .chart-chip {
   font-weight: 600;
 }
 
-.clickable-row {
-  cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
+.shield-status-chip {
+  align-items: center;
+  flex: none;
 }
 
-.clickable-row:hover {
-  background-color: rgba(255, 255, 255, 0.32);
-  transform: translateY(-1px);
+.clergy-overview {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(63, 81, 181, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-.clickable-row:focus-visible {
-  outline: 2px solid #3f51b5;
-  outline-offset: -2px;
+.clergy-overview__top {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.clergy-dialog .log-card {
-  background-color: rgba(63, 81, 181, 0.01);
-}
-.log-card div {
-  margin: 5px;
+.meta-pills {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.admin-actions .v-text-field,
-.admin-actions .v-textarea {
-  margin-bottom: 10px;
+.meta-pill {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
-.btns {
-  justify-content: space-evenly;
+
+.clergy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
-.faith-cell {
+
+.action-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 247, 255, 0.8));
+  border: 1px solid rgba(63, 81, 181, 0.08);
+  padding: 14px;
+}
+
+.action-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stacked-card {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(63, 81, 181, 0.08);
+}
+
+.log-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(244, 246, 255, 0.9));
+}
+
+.log-entry + .log-entry {
+  border-top: 1px dashed rgba(0, 0, 0, 0.05);
+}
+.hero-clergy-modal {
+  margin-top: 10px;
+}
+
+.color-bullet {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.followers-row {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background-color: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.followers-row--selected {
+  border-color: #3f51b5;
+  box-shadow: 0 4px 18px rgba(63, 81, 181, 0.15);
+}
+
+.followers-row__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  align-content: center;
-  flex-direction: row;
-  width: 100px;
+  margin-bottom: 8px;
+}
+
+.followers-row__controls {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 6px;
 }
 
 @media (max-width: 960px) {
@@ -898,87 +2831,43 @@ async function applyFaithChange(mode) {
     align-items: flex-start;
   }
 
-  .section-overlay {
-    background-size: 65% !important;
-  }
-
-  .chart-container {
-    min-height: 380px;
-    padding: 8px 0 0;
-  }
-
-  .doughnut-chart {
-    max-width: 100%;
-    height: 260px;
-  }
-}
-
-@media (max-width: 600px) {
-  .section-overlay {
-    background-size: 80% !important;
-  }
-
-  .chart-container {
-    min-height: 320px;
-  }
-
-  .doughnut-chart {
-    height: 220px;
-  }
-}
-
-.table-scroll {
-  width: 100%;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-@media (max-width: 960px) {
-  .distribution-section {
-    padding: 12px 12px 0;
-  }
-
-  .distribution-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .field-row {
+    grid-template-columns: 1fr;
   }
 
   .section-overlay {
     background-size: 65% !important;
   }
+}
 
-  .chart-container {
-    min-height: 380px;
-    padding: 8px 0 0;
+@media (max-width: 520px) {
+  .view-toggle {
+    width: 100%;
   }
 
-  .doughnut-chart {
-    max-width: 100%;
-    height: 260px;
+  .view-toggle__btn {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 10px;
+    justify-content: center;
+  }
+
+  .view-toggle__btn .v-btn__prepend {
+    margin-inline-end: 0;
+  }
+
+  .toggle-label {
+    display: none;
   }
 }
 
 @media (max-width: 600px) {
+  .followers-row__controls {
+    grid-template-columns: 1fr;
+  }
+
   .section-overlay {
     background-size: 80% !important;
-  }
-
-  .chart-container {
-    min-height: 320px;
-  }
-
-  .doughnut-chart {
-    height: 220px;
-  }
-
-  .religion-table {
-    font-size: 14px;
-    min-width: 100%;
-  }
-
-  .faith-cell {
-    gap: 8px;
-    width: auto;
   }
 }
 </style>

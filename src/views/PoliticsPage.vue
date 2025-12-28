@@ -136,8 +136,9 @@
       </v-col>
     </v-row>
     <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="12" class="matrix-wrap rounded-xl border">
-        <table class="matrix">
+      <v-col cols="12" sm="12" class="rounded-xl border">
+        <div class="matrix-wrap">
+          <table class="matrix">
           <thead>
           <tr>
             <th class="sticky-col p-3 text-left">Населення групи</th>
@@ -175,7 +176,8 @@
             </td>
           </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
       </v-col>
 
       <p :hidden="!isAdmin" class="text-sm text-gray-600">
@@ -448,6 +450,8 @@ async function updatePeople(groupId, proposalId, value) {
 .matrix-wrap {
   max-height: 70vh;        /* можна підкрутити під сторінку */
   overflow: auto;          /* і вертикальний, і горизонтальний скрол */
+  width: 100%;
+  -webkit-overflow-scrolling: touch; /* плавний скрол на мобільних */
   background: #fff;
 }
 

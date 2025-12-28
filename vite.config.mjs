@@ -18,6 +18,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),
+            'faerun-date': fileURLToPath(new URL('./src/utils/faerun-date.js', import.meta.url)),
             crypto: 'node:crypto'
         }
     },
