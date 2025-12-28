@@ -43,6 +43,9 @@
               </span>
             </button>
           </th>
+          <th class="text-left">
+            <b>Активні бонуси</b>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -82,6 +85,21 @@
             <span class="downtime-label">
               {{ record.downtimeAvailable === false ? 'Дію виконано' : 'Дію не виконано' }}
             </span>
+          </td>
+          <td class="bonuses-cell">
+            <template v-if="record.activeBonuses?.length">
+              <v-chip
+                v-for="(bonus, index) in record.activeBonuses"
+                :key="`${record.id}-${bonus.id || bonus.name || index}`"
+                color="primary"
+                variant="tonal"
+                class="mr-2 mb-2"
+                size="small"
+              >
+                {{ bonus.name }}
+              </v-chip>
+            </template>
+            <span v-else class="text-medium-emphasis">—</span>
           </td>
         </tr>
       </tbody>
@@ -132,6 +150,10 @@ const emit = defineEmits(['toggle-sort', 'select'])
 .religion-table th {
   font-weight: 600;
   background-color: rgba(255, 255, 255, 0.82);
+}
+
+.bonuses-cell {
+  min-width: 200px;
 }
 
 .religion-table tbody tr:nth-child(even) {

@@ -14,6 +14,7 @@
           v-for="row in tableRows"
           :key="row.key"
           class="abilities-row"
+          :class="{ 'ability-active': row.isActive }"
           :style="rowStyle(row.religion)"
         >
           <td v-if="row.showReligionCell" :rowspan="row.rowspan" class="religion-name">
@@ -21,7 +22,7 @@
             {{ row.religion.name }}
           </td>
           <td class="milestone" :class="{ 'text-no-abilities': row.isEmpty }">
-            <template v-if="row.isEmpty">—</template>
+            <template v-if="row.isEmpty"></template>
             <template v-else>{{ row.milestoneLabel }}</template>
           </td>
           <td class="ability-name">
@@ -54,7 +55,12 @@ const tableRows = computed(() =>
       ? religion.milestoneAbilities
       : []
 
-    const totalRows = Math.max(abilities.length + milestoneAbilities.length, 1)
+    const visibleMilestones = getVisibleMilestoneAbilities(
+      milestoneAbilities,
+      religion.followersPercent,
+    )
+
+    const totalRows = Math.max(abilities.length + visibleMilestones.length, 1)
 
     const combinedRows = [
       ...abilities.map((ability, index) => ({
@@ -65,8 +71,9 @@ const tableRows = computed(() =>
         showReligionCell: index === 0,
         rowspan: totalRows,
         isEmpty: false,
+        isActive: true,
       })),
-      ...milestoneAbilities.map((item, index) => ({
+      ...visibleMilestones.map((item, index) => ({
         key: `${religion.id}-milestone-${item.key || index}`,
         religion,
         ability: item.ability,
@@ -74,6 +81,7 @@ const tableRows = computed(() =>
         showReligionCell: abilities.length === 0 && index === 0,
         rowspan: totalRows,
         isEmpty: false,
+        isActive: isMilestoneActive(item, religion.followersPercent),
       })),
     ]
 
@@ -87,6 +95,7 @@ const tableRows = computed(() =>
           showReligionCell: true,
           rowspan: 1,
           isEmpty: true,
+          isActive: false,
         },
       ]
     }
@@ -102,6 +111,31 @@ function rowStyle(religion) {
   return {
     '--accent-color': religion.color || '#e5e7eb',
   }
+}
+
+function getVisibleMilestoneAbilities(milestoneAbilities, followersPercent = 0) {
+  if (!Array.isArray(milestoneAbilities) || milestoneAbilities.length === 0) return []
+
+  const milestones = Array.from(
+    new Set(
+      milestoneAbilities
+        .map((item) => Number.isFinite(item.milestone) ? item.milestone : null)
+        .filter((value) => value !== null),
+    ),
+  ).sort((a, b) => a - b)
+
+  if (milestones.length === 0) return []
+
+  const nextMilestone = milestones.find((milestone) => milestone > followersPercent)
+  const maxVisible = nextMilestone ?? milestones[milestones.length - 1]
+
+  return milestoneAbilities.filter((item) =>
+    Number.isFinite(item.milestone) ? item.milestone <= maxVisible : false,
+  )
+}
+
+function isMilestoneActive(item, followersPercent = 0) {
+  return Number.isFinite(item.milestone) && item.milestone <= followersPercent
 }
 </script>
 
@@ -168,6 +202,10 @@ function rowStyle(religion) {
 .abilities-row:hover,
 .abilities-row:focus-visible {
   background-color: color-mix(in srgb, rgba(0, 0, 0, 0.08) 20%, transparent);
+}
+
+.ability-active {
+  background-color: color-mix(in srgb, var(--accent-color, #0ea5e9) 14%, transparent);
 }
 
 .religion-name {

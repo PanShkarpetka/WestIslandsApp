@@ -978,26 +978,12 @@ function resolveMilestoneAbilities(milestoneAbilities) {
 
       return abilities.map((abilityId, index) => ({
         ability: resolveAbility(abilityId),
+        milestone: Number(milestone),
         milestoneLabel: index === 0 ? `${milestone}%+` : '',
         key: `${milestone}-${abilityId || index}`,
       }))
     })
 }
-
-const religionAbilitiesTable = computed(() =>
-  religionStore.religions.map((religion) => {
-    const resolvedAbilities = resolveAbilitiesList(religion.abilities)
-    const resolvedMilestoneAbilities = resolveMilestoneAbilities(religion.milestoneAbilities)
-
-    return {
-      id: religion.id,
-      name: religion.name || 'Невідома релігія',
-      color: getReligionColor(religion.name),
-      abilities: resolvedAbilities,
-      milestoneAbilities: resolvedMilestoneAbilities,
-    }
-  })
-)
 
 function hasIcon(name) {
   switch (name) {
@@ -1264,6 +1250,62 @@ const distribution = computed(() => {
     })
     .sort((a, b) => b.followers - a.followers)
 })
+
+const distributionByName = computed(() => {
+  const map = new Map()
+  for (const item of distribution.value) {
+    map.set(item.name, item.percent)
+  }
+  return map
+})
+
+const activeBonusesByReligion = computed(() => {
+  const map = new Map()
+
+  for (const religion of religionStore.religions) {
+    const religionName = religion.name || 'Невідома релігія'
+    const followersPercent = distributionByName.value.get(religionName) ?? 0
+
+    const innateAbilities = resolveAbilitiesList(religion.abilities)
+    const activeMilestoneAbilities = resolveMilestoneAbilities(religion.milestoneAbilities)
+      .filter((item) => Number.isFinite(item.milestone) && item.milestone <= followersPercent)
+      .map((item) => item.ability)
+
+    const merged = [...innateAbilities, ...activeMilestoneAbilities]
+    const unique = []
+    const seen = new Set()
+
+    for (const ability of merged) {
+      const key = ability.id || ability.name
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      unique.push(ability)
+    }
+
+    map.set(religionName, unique)
+  }
+
+  return map
+})
+
+const religionAbilitiesTable = computed(() =>
+  religionStore.religions.map((religion) => {
+    const resolvedAbilities = resolveAbilitiesList(religion.abilities)
+    const resolvedMilestoneAbilities = resolveMilestoneAbilities(religion.milestoneAbilities)
+
+    const religionName = religion.name || 'Невідома релігія'
+    const followersPercent = distributionByName.value.get(religionName) ?? 0
+
+    return {
+      id: religion.id,
+      name: religionName,
+      color: getReligionColor(religion.name),
+      abilities: resolvedAbilities,
+      milestoneAbilities: resolvedMilestoneAbilities,
+      followersPercent,
+    }
+  })
+)
 
 const followersSliderCeiling = computed(() => {
   const base = totalPopulation.value || 0
@@ -1671,9 +1713,16 @@ const clergyDefenseDisabled = computed(() =>
   Boolean(clergyDefenseFaithError.value),
 )
 
+const recordsWithBonuses = computed(() =>
+  records.value.map((record) => ({
+    ...record,
+    activeBonuses: activeBonusesByReligion.value.get(record.religionName) || [],
+  })),
+)
+
 const sortedRecords = computed(() => {
   const dir = sortDirection.value === 'asc' ? 1 : -1
-  return records.value.slice().sort((a, b) => {
+  return recordsWithBonuses.value.slice().sort((a, b) => {
     const field = sortBy.value
     const aVal = a[field]
     const bVal = b[field]
