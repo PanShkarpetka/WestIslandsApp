@@ -2736,7 +2736,7 @@ async function applyActiveFaithFarm() {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 1;
+  opacity: 0.7;
   z-index: 0;
 }
 
