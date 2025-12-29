@@ -150,769 +150,96 @@
       </v-col>
     </v-row>
 
-    <v-dialog v-model="dialogOpen" max-width="840">
-      <v-card v-if="activeClergy" class="clergy-dialog" rounded="xl">
-        <v-card-text class="pt-0 hero-clergy-modal">
-          <v-alert v-if="actionError" type="error" variant="tonal" class="mb-3">
-            {{ actionError }}
-          </v-alert>
-
-          <v-sheet class="clergy-overview" color="primary" variant="tonal" rounded="lg">
-            <div class="clergy-overview__top">
-              <div>
-                <div class="text-caption text-medium-emphasis">Герой</div>
-                <div class="text-h6 font-semibold">{{ activeClergy.heroName }}</div>
-                <div class="text-body-2 text-medium-emphasis">{{ activeClergy.religionName }}</div>
-              </div>
-              <div class="meta-pills">
-                <div class="meta-pill">
-                  <v-icon size="18" color="primary" v-if="hasIcon(activeClergy.religionName)">
-                    <img
-                        :src="`/images/religions/${activeClergy.religionName}.png`"
-                        alt="Faith Icon"
-                        width="18"
-                        height="18"
-                    />
-                  </v-icon>
-                  <v-icon v-else class="ml-1" color="primary" size="18">
-                    mdi-dharmachakra
-                  </v-icon>
-                  <div>
-                    <div class="text-caption text-medium-emphasis">Очки віри</div>
-                    <div class="text-subtitle-1 font-semibold text-black">
-                      {{ activeClergy.faith }}<span v-if="activeClergy.faithMax"> / {{ activeClergy.faithMax }}</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="meta-pill">
-                  <v-icon size="18" :color="downtimeAvailable ? 'warning' : 'success'">mdi-progress-clock</v-icon>
-                  <div>
-                    <div class="text-caption text-medium-emphasis">Даутайм</div>
-                    <div class="text-subtitle-2 text-black">{{ downtimeAvailable ? 'Дію не виконано' : 'Дію виконано' }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </v-sheet>
-
-          <div v-if="isAdmin" class="clergy-grid">
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Керування очками віри</div>
-                  <div class="text-body-2 text-medium-emphasis">Оновіть ОВ та залиште пояснення для журналу.</div>
-                </div>
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  v-model.number="faithChange"
-                  type="number"
-                  min="1"
-                  label="Зміна ОВ"
-                  density="comfortable"
-                  prefix="±"
-                  hide-details="auto"
-                />
-                <v-textarea
-                  v-model="logMessage"
-                  rows="2"
-                  auto-grow
-                  label="Коментар до зміни"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-              </div>
-
-              <div class="d-flex gap-2 justify-space-between">
-                <v-btn color="error" variant="tonal" :loading="actionLoading" @click="applyFaithChange('remove')">
-                  <v-icon start>mdi-minus-circle</v-icon>
-                  Зняти ОВ
-                </v-btn>
-                <v-btn color="success" :loading="actionLoading" @click="applyFaithChange('add')">
-                  <v-icon start>mdi-plus-circle</v-icon>
-                  Додати ОВ
-                </v-btn>
-              </div>
-            </v-sheet>
-
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Активний фарм віри</div>
-                  <div class="text-body-2 text-medium-emphasis">Дія потребує доступного давнтайму та витрачає його</div>
-                </div>
-              </div>
-
-              <v-alert v-if="activeFaithFarmError" type="error" variant="tonal" class="mb-3">
-                {{ activeFaithFarmError }}
-              </v-alert>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="activeClergy?.heroRef?.id || ''"
-                  label="ID героя"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                  hint="Герой вибраного духовенства"
-                />
-                <v-text-field
-                  v-model.number="activeFaithFarmForm.roll"
-                  type="number"
-                  label="Кидок"
-                  density="comfortable"
-                  hide-details="auto"
-                  hint="Результат d20 скіл чека"
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  v-model.number="activeFaithFarmForm.dmMod"
-                  type="number"
-                  label="DM Mod"
-                  density="comfortable"
-                  hide-details="auto"
-                  prefix="±"
-                />
-                <v-text-field
-                  :model-value="activeFaithFarmDC"
-                  label="Базове DC"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="currentFaithPoints"
-                  label="Поточні ОВ"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-                <v-text-field
-                  :model-value="activeFaithFarmFollowers ?? '—'"
-                  label="Отримані в результаті ОВ"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <v-text-field
-                v-model="activeFaithFarmForm.notes"
-                label="Нотатки / посилання"
-                density="comfortable"
-                hide-details="auto"
-                hint="Наприклад, посилання на пост у Telegram"
-              />
-
-              <div class="d-flex gap-2 mt-3 justify-space-between">
-                <v-btn
-                  color="primary"
-                  :loading="activeFaithFarmLoading"
-                  :disabled="!downtimeAvailable"
-                  @click="applyActiveFaithFarm"
-                >
-                  <v-icon start>mdi-shield-sun</v-icon>
-                  Застосувати
-                </v-btn>
-              </div>
-            </v-sheet>
-
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Захист духовенства</div>
-                  <div class="text-body-2 text-medium-emphasis">
-                    Інвестуйте ОВ, щоб активувати щит конфесії героя. Кнопка недоступна, якщо щит вже увімкнено.
-                  </div>
-                </div>
-                <v-chip
-                  :color="activeClergyReligion?.shieldActive ? 'success' : 'default'"
-                  variant="tonal"
-                  class="shield-status-chip"
-                >
-                  {{ activeClergyReligion?.shieldActive ? `Активний (+${activeClergyReligion.shieldBonus})` : 'Неактивний' }}
-                </v-chip>
-              </div>
-
-              <v-alert v-if="clergyDefenseError" type="error" variant="tonal" class="mb-3">
-                {{ clergyDefenseError }}
-              </v-alert>
-
-              <v-alert v-else-if="clergyDefenseFaithError" type="error" variant="tonal" class="mb-3">
-                {{ clergyDefenseFaithError }}
-              </v-alert>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="activeClergy?.heroRef?.id || ''"
-                  label="ID героя"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                  hint="Герой вибраного духовенства"
-                />
-                <v-text-field
-                  :model-value="clergyDefenseTarget"
-                  label="Ціль"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  v-model.number="clergyDefenseForm.investedOV"
-                  type="number"
-                  min="50"
-                  step="50"
-                  label="Інвестовані ОВ"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-                <v-text-field
-                  v-model.number="clergyDefenseForm.roll"
-                  type="number"
-                  label="Кидок"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  v-model.number="clergyDefenseForm.dmMod"
-                  type="number"
-                  label="DM Mod"
-                  prefix="±"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-                <v-text-field
-                  :model-value="clergyDefenseTargetSVTotal"
-                  label="SV цілі (база + тимчасовий)"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="clergyDefenseDC"
-                  label="DC"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-                <v-text-field
-                  :model-value="clergyDefenseResult ?? '—'"
-                  label="R"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="clergyDefenseBonus"
-                  label="Бонус щита"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-                <v-text-field
-                  :model-value="currentFaithPoints"
-                  label="ОВ духовенства"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <v-textarea
-                v-model="clergyDefenseForm.notes"
-                label="Нотатки / посилання"
-                density="comfortable"
-                hide-details="auto"
-                rows="2"
-                auto-grow
-              />
-
-              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
-                <div class="d-flex gap-2 align-center">
-                  <v-btn
-                    color="primary"
-                    :loading="clergyDefenseLoading"
-                    :disabled="clergyDefenseDisabled"
-                    @click="applyClergyDefense"
-                  >
-                    <v-icon start>mdi-shield-plus</v-icon>
-                    Застосувати
-                  </v-btn>
-                  <v-chip v-if="activeClergyReligion?.shieldActive" color="warning" variant="tonal" class="shield-status-chip">
-                    Щит вже активний
-                  </v-chip>
-                  <v-chip v-else-if="!downtimeAvailable" color="warning" variant="tonal" class="shield-status-chip">
-                    Даутайм недоступний
-                  </v-chip>
-                </div>
-              </div>
-            </v-sheet>
-
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Поширення релігії</div>
-                  <div class="text-body-2 text-medium-emphasis">
-                    Витратьте ОВ, щоб конвертувати послідовників іншої конфесії та зняти щит за наявності.
-                  </div>
-                </div>
-              </div>
-
-              <v-alert v-if="spreadReligionError" type="error" variant="tonal" class="mb-3">
-                {{ spreadReligionError }}
-              </v-alert>
-
-              <v-alert v-else-if="spreadReligionFaithError" type="error" variant="tonal" class="mb-3">
-                {{ spreadReligionFaithError }}
-              </v-alert>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="activeClergy?.heroRef?.id || ''"
-                  label="ID героя"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                  hint="Герой вибраного духовенства"
-                />
-                <v-select
-                  v-model="spreadReligionForm.targetReligionId"
-                  :items="spreadTargetReligionOptions"
-                  item-title="title"
-                  item-value="value"
-                  label="Цільова конфесія"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  v-model.number="spreadReligionForm.investedOV"
-                  type="number"
-                  min="50"
-                  step="50"
-                  label="Витрачені ОВ"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-                <v-text-field
-                  v-model.number="spreadReligionForm.roll"
-                  type="number"
-                  label="Кидок"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  v-model.number="spreadReligionForm.dmMod"
-                  type="number"
-                  label="DM Mod"
-                  prefix="±"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-                <v-text-field
-                  :model-value="spreadTargetSVTotal"
-                  label="SV цілі (база + тимчасовий + щит)"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="spreadReligionDC"
-                  label="DC"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-                <v-text-field
-                  :model-value="spreadReligionResult ?? '—'"
-                  label="R = Кидок + floor(ОВ/50)"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <div class="field-row">
-                <v-text-field
-                  :model-value="spreadReligionConverted ?? '—'"
-                  label="Сконвертовано"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-                <v-text-field
-                  :model-value="currentFaithPoints"
-                  label="ОВ духовенства"
-                  density="comfortable"
-                  hide-details="auto"
-                  readonly
-                />
-              </div>
-
-              <v-textarea
-                v-model="spreadReligionForm.notes"
-                label="Нотатки / посилання"
-                density="comfortable"
-                hide-details="auto"
-                rows="2"
-                auto-grow
-              />
-
-              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
-                <v-btn
-                  color="primary"
-                  :loading="spreadReligionLoading"
-                  :disabled="spreadReligionDisabled"
-                  @click="applySpreadReligion"
-                >
-                  <v-icon start>mdi-account-convert</v-icon>
-                  Застосувати
-                </v-btn>
-                <v-chip v-if="!downtimeAvailable" color="warning" variant="tonal" class="shield-status-chip">
-                  Даутайм недоступний
-                </v-chip>
-              </div>
-            </v-sheet>
-
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Зміна конфесії</div>
-                  <div class="text-body-2 text-medium-emphasis">Можна змінити конфесію героя з автоматичним штрафом віри.</div>
-                </div>
-                <v-btn
-                  v-if="!changeReligionMode"
-                  color="primary"
-                  variant="tonal"
-                  size="small"
-                  prepend-icon="mdi-auto-fix"
-                  @click="startReligionChange"
-                >
-                  Змінити конфесію
-                </v-btn>
-              </div>
-
-              <div v-if="changeReligionMode" class="stacked-card">
-                <v-alert v-if="changeReligionError" type="error" variant="tonal" class="mb-3">{{ changeReligionError }}</v-alert>
-
-                <v-select
-                  v-model="selectedReligionId"
-                  :items="religionOptions"
-                  item-title="title"
-                  item-value="value"
-                  label="Нова конфесія"
-                  density="comfortable"
-                  hide-details="auto"
-                />
-
-                <v-alert type="warning" variant="tonal" class="mt-3">
-                  Буде знято {{ religionChangeFine }} ОВ ({{ religionChangeFinePercent }}%) з духовенства за зміну конфесії.
-                </v-alert>
-
-                <div class="d-flex gap-2 mt-3 justify-space-between">
-                  <v-btn color="primary" :loading="changeReligionLoading" @click="confirmReligionChange">
-                    <v-icon start>mdi-check</v-icon>
-                    Підтвердити
-                  </v-btn>
-                  <v-btn variant="text" @click="cancelReligionChange">Скасувати</v-btn>
-                </div>
-              </div>
-            </v-sheet>
-
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Доступність давнтайму</div>
-                  <div class="text-body-2 text-medium-emphasis">
-                    Вкажіть чи доступний давнтайм в даному циклі.
-                  </div>
-                </div>
-                <v-switch
-                  v-model="downtimeAvailable"
-                  inset
-                  color="primary"
-                  hide-details="auto"
-                />
-              </div>
-
-              <v-alert
-                v-if="downtimeUpdateError"
-                type="error"
-                variant="tonal"
-                class="mt-3"
-              >
-                {{ downtimeUpdateError }}
-              </v-alert>
-              <v-alert
-                v-else-if="downtimeUpdateSuccess"
-                type="success"
-                variant="tonal"
-                class="mt-3"
-              >
-                Статус давнтайму оновлено.
-              </v-alert>
-
-              <div class="d-flex gap-2 mt-3 justify-space-between">
-                <v-btn color="primary" :loading="downtimeUpdateLoading" @click="saveDowntimeAvailability">
-                  <v-icon start>mdi-content-save</v-icon>
-                  Зберегти
-                </v-btn>
-                <v-btn variant="text" @click="resetDowntimeState">Скинути</v-btn>
-              </div>
-            </v-sheet>
-
-            <v-sheet class="action-card" rounded="lg" elevation="0">
-              <div class="action-card__header">
-                <div>
-                  <div class="text-subtitle-2 font-semibold">Прапорець щита конфесії</div>
-                  <div class="text-body-2 text-medium-emphasis">
-                    Адміністратори можуть вручну вмикати або вимикати щит конфесії героя.
-                  </div>
-                </div>
-                <v-chip
-                  :color="manualShieldActive ? 'success' : 'default'"
-                  variant="tonal"
-                  class="shield-status-chip"
-                >
-                  <v-icon>
-                    {{ manualShieldActive ? 'mdi-shield-check' : 'mdi-shield-off' }}
-                  </v-icon>
-                </v-chip>
-              </div>
-
-              <v-alert
-                v-if="shieldUpdateError"
-                type="error"
-                variant="tonal"
-                class="mb-3"
-              >
-                {{ shieldUpdateError }}
-              </v-alert>
-              <v-alert
-                v-else-if="shieldUpdateSuccess"
-                type="success"
-                variant="tonal"
-                class="mb-3"
-              >
-                Стан щита оновлено.
-              </v-alert>
-
-              <div class="d-flex gap-2 mt-3 justify-space-between align-center flex-wrap">
-                <v-switch
-                  v-model="manualShieldActive"
-                  inset
-                  color="primary"
-                  hide-details="auto"
-                  label="Увімкнути щит вручну"
-                />
-                <div class="d-flex gap-2">
-                  <v-btn
-                    variant="tonal"
-                    color="primary"
-                    :loading="shieldUpdateLoading"
-                    @click="saveShieldState"
-                  >
-                    <v-icon start>mdi-content-save</v-icon>
-                    Оновити
-                  </v-btn>
-                  <v-btn variant="text" @click="resetShieldState">Скинути</v-btn>
-                </div>
-              </div>
-            </v-sheet>
-          </div>
-
-          <v-sheet class="action-card log-card" rounded="lg" elevation="0">
-            <div class="d-flex align-center gap-2 mb-3">
-              <v-avatar color="primary" size="28" variant="tonal">
-                <v-icon size="18">mdi-history</v-icon>
-              </v-avatar>
-              <div style="margin-left: 5px">
-                <div class="text-subtitle-2 font-semibold">Журнал змін</div>
-              </div>
-            </div>
-            <div v-if="logsLoading" class="text-gray-500">Завантаження журналу…</div>
-            <div v-else-if="logsError" class="error">{{ logsError }}</div>
-            <div v-else-if="clergyLogs.length === 0" class="text-gray-500">Поки що немає записів.</div>
-            <v-list v-else density="comfortable">
-              <v-list-item v-for="log in clergyLogs" :key="log.id" class="log-entry">
-                <v-list-item-title>
-                  <span :class="{ 'text-success': log.delta > 0, 'text-error': log.delta < 0 }">
-                    {{ log.delta > 0 ? '+' : '' }}{{ log.delta }}
-                  </span>
-                  — {{ log.message || 'Без коментаря' }}
-                </v-list-item-title>
-                <v-list-item-subtitle>
-                  {{ formatLogMeta(log) }}
-                </v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-sheet>
-        </v-card-text>
-
-        <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="closeDialog">Закрити</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="followersDialogOpen" max-width="720">
-      <v-card rounded="xl">
-        <v-card-title class="d-flex align-center justify-space-between">
-          <div>
-            <div class="text-subtitle-1 font-semibold">Розподіл послідовників</div>
-            <div class="text-body-2 text-medium-emphasis">Оберіть кількість послідовників для кожної конфесії.</div>
-          </div>
-          <v-chip v-if="distributionSelected" color="primary" variant="tonal">
-            {{ distributionSelected.name }}
-          </v-chip>
-        </v-card-title>
-
-        <v-card-text>
-          <v-alert
-            v-if="followersError"
-            type="error"
-            variant="tonal"
-            class="mb-4"
-          >
-            {{ followersError }}
-          </v-alert>
-
-          <p class="text-body-2 text-medium-emphasis mb-4">
-            Загалом населення: {{ totalPopulationLabel }}. Розподіліть послідовників між конфесіями. Залишок: {{ followersRemaining }}.
-          </p>
-
-          <div
-            v-for="item in editedFollowers"
-            :key="item.name"
-            class="followers-row"
-            :class="{ 'followers-row--selected': item.name === distributionSelected?.name }"
-          >
-            <div class="followers-row__header">
-              <div class="d-flex align-center gap-2">
-                <span class="color-bullet" :style="{ backgroundColor: item.color }"></span>
-                <div>
-                  <div class="text-subtitle-2 font-semibold">{{ item.name }}</div>
-                  <div class="text-caption text-medium-emphasis">Було: {{ item.followers.toLocaleString('uk-UA') }} вірян</div>
-                </div>
-              </div>
-              <div class="text-caption text-medium-emphasis">≈ {{ followersPercentFor(item.newFollowers) }}%</div>
-            </div>
-
-            <div class="followers-row__controls">
-              <v-slider
-                v-model.number="item.newFollowers"
-                :min="0"
-                :max="followersSliderCeiling"
-                step="1"
-                color="primary"
-                thumb-label="always"
-                hide-details
-              />
-              <v-text-field
-                v-model.number="item.newFollowers"
-                type="number"
-                label="Послідовники"
-                density="comfortable"
-                hide-details
-                class="count-input"
-                variant="outlined"
-                :min="0"
-              />
-            </div>
-
-            <div class="text-caption text-medium-emphasis">
-              Буде: <b>{{ Number(item.newFollowers || 0).toLocaleString('uk-UA') }}</b> вірян (Δ {{ followersDelta(item) }})
-            </div>
-          </div>
-        </v-card-text>
-
-        <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="closeFollowersDialog" :disabled="followersSaving">Скасувати</v-btn>
-          <v-btn color="primary" :loading="followersSaving" :disabled="followersOverLimit" @click="saveFollowersDistribution">
-            Зберегти розподіл
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="newCycleDialog" max-width="640">
-      <v-card rounded="xl">
-        <v-card-title class="d-flex align-center">
-          <v-icon color="primary" class="mr-3">mdi-playlist-plus</v-icon>
-          <span class="text-h6">Почати новий цикл</span>
-        </v-card-title>
-        <v-card-text>
-          <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">
-            {{ cycleError }}
-          </v-alert>
-          <v-form ref="newCycleForm">
-            <FaerunDatePicker
-              v-model="cycleForm.startedDate"
-              label="Початок"
-              placeholder="Оберіть дату початку"
-              :year="currentFaerunYear"
-            />
-            <FaerunDatePicker
-              v-model="cycleForm.finishedDate"
-              label="Завершення (необов'язково)"
-              placeholder="Оберіть дату завершення"
-              :year="currentFaerunYear"
-              clearable
-              hint="Залиште поле порожнім, якщо цикл ще триває"
-            />
-            <v-text-field
-              :model-value="cycleDurationLabel"
-              label="Тривалість"
-              density="comfortable"
-              hide-details="auto"
-              class="mb-4"
-              readonly
-            />
-            <v-textarea
-              v-model="cycleForm.notes"
-              label="Нотатки до дії"
-              auto-grow
-              rows="2"
-              density="comfortable"
-              hide-details="auto"
-            />
-          </v-form>
-        </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="closeNewCycleDialog">Скасувати</v-btn>
-          <v-btn color="primary" :loading="cycleSaving" @click="createCycle">
-            Створити цикл
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <ReligionModals
+      v-model:open="dialogOpen"
+      v-model:faith-change="faithChange"
+      v-model:log-message="logMessage"
+      v-model:active-faith-farm-form="activeFaithFarmForm"
+      v-model:clergy-defense-form="clergyDefenseForm"
+      v-model:spread-religion-form="spreadReligionForm"
+      v-model:downtime-available="downtimeAvailable"
+      v-model:manual-shield-active="manualShieldActive"
+      v-model:change-religion-mode="changeReligionMode"
+      v-model:selected-religion-id="selectedReligionId"
+      v-model:followers-dialog-open="followersDialogOpen"
+      v-model:edited-followers="editedFollowers"
+      v-model:new-cycle-dialog="newCycleDialog"
+      v-model:cycle-form="cycleForm"
+      :active-clergy="activeClergy"
+      :action-error="actionError"
+      :has-icon="hasIcon"
+      :is-admin="isAdmin"
+      :action-loading="actionLoading"
+      :apply-faith-change="applyFaithChange"
+      :active-faith-farm-error="activeFaithFarmError"
+      :active-faith-farm-loading="activeFaithFarmLoading"
+      :active-faith-farm-dc="activeFaithFarmDC"
+      :current-faith-points="currentFaithPoints"
+      :active-faith-farm-followers="activeFaithFarmFollowers"
+      :apply-active-faith-farm="applyActiveFaithFarm"
+      :clergy-defense-error="clergyDefenseError"
+      :clergy-defense-faith-error="clergyDefenseFaithError"
+      :clergy-defense-target="clergyDefenseTarget"
+      :clergy-defense-target-s-v-total="clergyDefenseTargetSVTotal"
+      :clergy-defense-dc="clergyDefenseDC"
+      :clergy-defense-result="clergyDefenseResult"
+      :clergy-defense-bonus="clergyDefenseBonus"
+      :clergy-defense-loading="clergyDefenseLoading"
+      :clergy-defense-disabled="clergyDefenseDisabled"
+      :apply-clergy-defense="applyClergyDefense"
+      :active-clergy-religion="activeClergyReligion"
+      :spread-religion-error="spreadReligionError"
+      :spread-religion-faith-error="spreadReligionFaithError"
+      :spread-target-religion-options="spreadTargetReligionOptions"
+      :spread-target-s-v-total="spreadTargetSVTotal"
+      :spread-religion-dc="spreadReligionDC"
+      :spread-religion-result="spreadReligionResult"
+      :spread-religion-converted="spreadReligionConverted"
+      :spread-religion-loading="spreadReligionLoading"
+      :spread-religion-disabled="spreadReligionDisabled"
+      :spread-religion-target-shield-active="spreadReligionTargetShieldActive"
+      :apply-spread-religion="applySpreadReligion"
+      :downtime-update-error="downtimeUpdateError"
+      :downtime-update-success="downtimeUpdateSuccess"
+      :downtime-update-loading="downtimeUpdateLoading"
+      :save-downtime-availability="saveDowntimeAvailability"
+      :reset-downtime-state="resetDowntimeState"
+      :shield-update-error="shieldUpdateError"
+      :shield-update-success="shieldUpdateSuccess"
+      :shield-update-loading="shieldUpdateLoading"
+      :save-shield-state="saveShieldState"
+      :reset-shield-state="resetShieldState"
+      :logs-loading="logsLoading"
+      :logs-error="logsError"
+      :clergy-logs="clergyLogs"
+      :format-log-meta="formatLogMeta"
+      :close-dialog="closeDialog"
+      :change-religion-loading="changeReligionLoading"
+      :change-religion-error="changeReligionError"
+      :start-religion-change="startReligionChange"
+      :cancel-religion-change="cancelReligionChange"
+      :confirm-religion-change="confirmReligionChange"
+      :religion-options="religionOptions"
+      :religion-change-fine="religionChangeFine"
+      :religion-change-fine-percent="religionChangeFinePercent"
+      :followers-error="followersError"
+      :total-population-label="totalPopulationLabel"
+      :followers-remaining="followersRemaining"
+      :distribution-selected="distributionSelected"
+      :followers-slider-ceiling="followersSliderCeiling"
+      :followers-percent-for="followersPercentFor"
+      :followers-delta="followersDelta"
+      :followers-saving="followersSaving"
+      :followers-over-limit="followersOverLimit"
+      :close-followers-dialog="closeFollowersDialog"
+      :save-followers-distribution="saveFollowersDistribution"
+      :cycle-error="cycleError"
+      :current-faerun-year="currentFaerunYear"
+      :cycle-duration-label="cycleDurationLabel"
+      :cycle-saving="cycleSaving"
+      :create-cycle="createCycle"
+      :close-new-cycle-dialog="closeNewCycleDialog"
+    />
   </v-container>
 </template>
 
@@ -928,7 +255,7 @@ import ReligionDistributionDiagram from '@/components/ReligionDistributionDiagra
 import ReligionDistributionTable from '@/components/ReligionDistributionTable.vue'
 import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
-import FaerunDatePicker from '@/components/FaerunDatePicker.vue'
+import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
 import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
 
@@ -1157,7 +484,6 @@ const currentCycleDetails = computed(() => {
 const newCycleDialog = ref(false)
 const cycleSaving = ref(false)
 const cycleError = ref('')
-const newCycleForm = ref(null)
 const currentFaerunYear = DEFAULT_YEAR
 const cycleForm = reactive({
   startedDate: null,
@@ -2779,124 +2105,6 @@ async function applyActiveFaithFarm() {
   font-weight: 600;
 }
 
-.shield-status-chip {
-  align-items: center;
-  flex: none;
-}
-
-.clergy-overview {
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  border: 1px solid rgba(63, 81, 181, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.clergy-overview__top {
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.meta-pills {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.meta-pill {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
-  padding: 8px 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-}
-
-.clergy-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.action-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 247, 255, 0.8));
-  border: 1px solid rgba(63, 81, 181, 0.08);
-  padding: 14px;
-}
-
-.action-card__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.stacked-card {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 12px;
-  padding: 12px;
-  border: 1px solid rgba(63, 81, 181, 0.08);
-}
-
-.log-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(244, 246, 255, 0.9));
-}
-
-.log-entry + .log-entry {
-  border-top: 1px dashed rgba(0, 0, 0, 0.05);
-}
-.hero-clergy-modal {
-  margin-top: 10px;
-}
-
-.color-bullet {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
-}
-
-.followers-row {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 12px;
-  background-color: #fff;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.followers-row--selected {
-  border-color: #3f51b5;
-  box-shadow: 0 4px 18px rgba(63, 81, 181, 0.15);
-}
-
-.followers-row__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.followers-row__controls {
-  display: grid;
-  grid-template-columns: 1fr 160px;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 6px;
-}
 
 @media (max-width: 960px) {
   .distribution-section {
@@ -2906,10 +2114,6 @@ async function applyActiveFaithFarm() {
   .distribution-header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .field-row {
-    grid-template-columns: 1fr;
   }
 
   .section-overlay {
@@ -2939,10 +2143,6 @@ async function applyActiveFaithFarm() {
 }
 
 @media (max-width: 600px) {
-  .followers-row__controls {
-    grid-template-columns: 1fr;
-  }
-
   .section-overlay {
     background-size: 80% !important;
   }
