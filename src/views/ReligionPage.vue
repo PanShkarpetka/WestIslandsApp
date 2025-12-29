@@ -1717,6 +1717,7 @@ const recordsWithBonuses = computed(() =>
   records.value.map((record) => ({
     ...record,
     activeBonuses: activeBonusesByReligion.value.get(record.religionName) || [],
+    religionColor: getReligionColor(record.religionName),
   })),
 )
 
@@ -2736,7 +2737,7 @@ async function applyActiveFaithFarm() {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 0.7;
+  opacity: 1;
   z-index: 0;
 }
 

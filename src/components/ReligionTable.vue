@@ -91,7 +91,7 @@
               <v-chip
                 v-for="(bonus, index) in record.activeBonuses"
                 :key="`${record.id}-${bonus.id || bonus.name || index}`"
-                color="primary"
+                :color="record.religionColor || 'primary'"
                 variant="tonal"
                 class="mr-2 mb-2"
                 size="small"
