@@ -92,7 +92,7 @@
                 v-for="(bonus, index) in record.activeBonuses"
                 :key="`${record.id}-${bonus.id || bonus.name || index}`"
                 :color="record.religionColor || 'primary'"
-                variant="tonal"
+                variant="flat"
                 class="mr-2 mb-2"
                 size="small"
               >
