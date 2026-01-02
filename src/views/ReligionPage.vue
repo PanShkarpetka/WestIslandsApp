@@ -585,7 +585,9 @@ const distributionByName = computed(() => {
   return map
 })
 
-const activeBonusesByReligion = computed(() => {
+const MILESTONE_FAITH_THRESHOLD = 100
+
+const bonusesByReligion = computed(() => {
   const map = new Map()
 
   for (const religion of religionStore.religions) {
@@ -597,18 +599,7 @@ const activeBonusesByReligion = computed(() => {
       .filter((item) => Number.isFinite(item.milestone) && item.milestone <= followersPercent)
       .map((item) => item.ability)
 
-    const merged = [...innateAbilities, ...activeMilestoneAbilities]
-    const unique = []
-    const seen = new Set()
-
-    for (const ability of merged) {
-      const key = ability.id || ability.name
-      if (!key || seen.has(key)) continue
-      seen.add(key)
-      unique.push(ability)
-    }
-
-    map.set(religionName, unique)
+    map.set(religionName, { innateAbilities, activeMilestoneAbilities })
   }
 
   return map
@@ -1042,7 +1033,39 @@ const clergyDefenseDisabled = computed(() =>
 const recordsWithBonuses = computed(() =>
   records.value.map((record) => ({
     ...record,
-    activeBonuses: activeBonusesByReligion.value.get(record.religionName) || [],
+    activeBonuses: (() => {
+      const religionBonuses = bonusesByReligion.value.get(record.religionName) || {
+        innateAbilities: [],
+        activeMilestoneAbilities: [],
+      }
+      const hasMilestoneFaith = Number(record.faith ?? 0) >= MILESTONE_FAITH_THRESHOLD
+
+      const innateBonuses = religionBonuses.innateAbilities.map((ability) => ({
+        ...ability,
+        active: true,
+      }))
+
+      const milestoneBonuses = religionBonuses.activeMilestoneAbilities.map((ability) => ({
+        ...ability,
+        active: hasMilestoneFaith,
+        hint: hasMilestoneFaith
+          ? ''
+          : `Бонус стане активним при ${MILESTONE_FAITH_THRESHOLD}+ ОВ віри.`,
+      }))
+
+      const merged = [...innateBonuses, ...milestoneBonuses]
+      const unique = []
+      const seen = new Set()
+
+      for (const ability of merged) {
+        const key = ability.id || ability.name
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        unique.push(ability)
+      }
+
+      return unique
+    })(),
     religionColor: getReligionColor(record.religionName),
   })),
 )

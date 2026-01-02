@@ -93,7 +93,8 @@
                 :key="`${record.id}-${bonus.id || bonus.name || index}`"
                 :color="record.religionColor || 'primary'"
                 variant="flat"
-                class="mr-2 mb-2"
+                :class="['mr-2', 'mb-2', { 'bonus-chip--inactive': bonus.active === false }]"
+                :title="bonus.active === false ? bonus.hint || 'Бонус неактивний' : ''"
                 size="small"
               >
                 {{ bonus.name }}
@@ -182,6 +183,10 @@ const emit = defineEmits(['toggle-sort', 'select'])
 .clickable-row {
   cursor: pointer;
   transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.bonus-chip--inactive {
+  opacity: 0.55;
 }
 
 .clickable-row:hover {
