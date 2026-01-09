@@ -2145,6 +2145,16 @@ async function applyActiveFaithFarm() {
 }
 
 @media (max-width: 520px) {
+  .distribution-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .distribution-actions > .v-btn {
+    width: 100%;
+  }
+
   .view-toggle {
     width: 100%;
   }
