@@ -43,6 +43,9 @@
               </span>
             </button>
           </th>
+          <th class="text-left">
+            <b>Активні бонуси</b>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -82,6 +85,22 @@
             <span class="downtime-label">
               {{ record.downtimeAvailable === false ? 'Дію виконано' : 'Дію не виконано' }}
             </span>
+          </td>
+          <td class="bonuses-cell">
+            <template v-if="record.activeBonuses?.length">
+              <v-chip
+                v-for="(bonus, index) in record.activeBonuses"
+                :key="`${record.id}-${bonus.id || bonus.name || index}`"
+                :color="record.religionColor || 'primary'"
+                variant="flat"
+                :class="['mr-2', 'mb-2', { 'bonus-chip--inactive': bonus.active === false }]"
+                :title="bonus.active === false ? bonus.hint || 'Бонус неактивний' : ''"
+                size="small"
+              >
+                {{ bonus.name }}
+              </v-chip>
+            </template>
+            <span v-else class="text-medium-emphasis">—</span>
           </td>
         </tr>
       </tbody>
@@ -134,6 +153,10 @@ const emit = defineEmits(['toggle-sort', 'select'])
   background-color: rgba(255, 255, 255, 0.82);
 }
 
+.bonuses-cell {
+  min-width: 200px;
+}
+
 .religion-table tbody tr:nth-child(even) {
   background-color: rgba(255, 255, 255, 0.6);
 }
@@ -160,6 +183,10 @@ const emit = defineEmits(['toggle-sort', 'select'])
 .clickable-row {
   cursor: pointer;
   transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.bonus-chip--inactive {
+  opacity: 0.55;
 }
 
 .clickable-row:hover {

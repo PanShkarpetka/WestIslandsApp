@@ -4,6 +4,7 @@
       <thead>
         <tr>
           <th class="text-left">Конфесія</th>
+          <th class="text-left">Майлстоун % послідовників</th>
           <th class="text-left">Вміння</th>
           <th class="text-left">Опис</th>
         </tr>
@@ -13,11 +14,16 @@
           v-for="row in tableRows"
           :key="row.key"
           class="abilities-row"
+          :class="{ 'ability-active': row.isActive }"
           :style="rowStyle(row.religion)"
         >
           <td v-if="row.showReligionCell" :rowspan="row.rowspan" class="religion-name">
             <span class="color-bullet" :style="{ backgroundColor: row.religion.color }"></span>
             {{ row.religion.name }}
+          </td>
+          <td class="milestone" :class="{ 'text-no-abilities': row.isEmpty }">
+            <template v-if="row.isEmpty"></template>
+            <template v-else>{{ row.milestoneLabel }}</template>
           </td>
           <td class="ability-name">
             <template v-if="row.ability">{{ row.ability.name }}</template>
@@ -45,27 +51,58 @@ const props = defineProps({
 const tableRows = computed(() =>
   props.items.flatMap((religion) => {
     const abilities = Array.isArray(religion.abilities) ? religion.abilities : []
+    const milestoneAbilities = Array.isArray(religion.milestoneAbilities)
+      ? religion.milestoneAbilities
+      : []
 
-    if (abilities.length === 0) {
+    const visibleMilestones = getVisibleMilestoneAbilities(
+      milestoneAbilities,
+      religion.followersPercent,
+    )
+
+    const totalRows = Math.max(abilities.length + visibleMilestones.length, 1)
+
+    const combinedRows = [
+      ...abilities.map((ability, index) => ({
+        key: `${religion.id}-${ability.id || index}`,
+        religion,
+        ability,
+        milestoneLabel: 'Базові',
+        showReligionCell: index === 0,
+        rowspan: totalRows,
+        isEmpty: false,
+        isActive: true,
+      })),
+      ...visibleMilestones.map((item, index) => ({
+        key: `${religion.id}-milestone-${item.key || index}`,
+        religion,
+        ability: item.ability,
+        milestoneLabel: item.milestoneLabel ?? '',
+        showReligionCell: abilities.length === 0 && index === 0,
+        rowspan: totalRows,
+        isEmpty: false,
+        isActive: isMilestoneActive(item, religion.followersPercent),
+      })),
+    ]
+
+    if (combinedRows.length === 0) {
       return [
         {
           key: `${religion.id}-empty`,
           religion,
           ability: null,
+          milestoneLabel: '—',
           showReligionCell: true,
           rowspan: 1,
           isEmpty: true,
+          isActive: false,
         },
       ]
     }
 
-    return abilities.map((ability, index) => ({
-      key: `${religion.id}-${ability.id || index}`,
-      religion,
-      ability,
+    return combinedRows.map((row, index) => ({
+      ...row,
       showReligionCell: index === 0,
-      rowspan: abilities.length,
-      isEmpty: false,
     }))
   })
 )
@@ -74,6 +111,31 @@ function rowStyle(religion) {
   return {
     '--accent-color': religion.color || '#e5e7eb',
   }
+}
+
+function getVisibleMilestoneAbilities(milestoneAbilities, followersPercent = 0) {
+  if (!Array.isArray(milestoneAbilities) || milestoneAbilities.length === 0) return []
+
+  const milestones = Array.from(
+    new Set(
+      milestoneAbilities
+        .map((item) => Number.isFinite(item.milestone) ? item.milestone : null)
+        .filter((value) => value !== null),
+    ),
+  ).sort((a, b) => a - b)
+
+  if (milestones.length === 0) return []
+
+  const nextMilestone = milestones.find((milestone) => milestone > followersPercent)
+  const maxVisible = nextMilestone ?? milestones[milestones.length - 1]
+
+  return milestoneAbilities.filter((item) =>
+    Number.isFinite(item.milestone) ? item.milestone <= maxVisible : false,
+  )
+}
+
+function isMilestoneActive(item, followersPercent = 0) {
+  return Number.isFinite(item.milestone) && item.milestone <= followersPercent
 }
 </script>
 
@@ -142,12 +204,21 @@ function rowStyle(religion) {
   background-color: color-mix(in srgb, rgba(0, 0, 0, 0.08) 20%, transparent);
 }
 
+.ability-active {
+  background-color: color-mix(in srgb, var(--accent-color, #0ea5e9) 14%, transparent);
+}
+
 .religion-name {
   font-weight: 600;
   width: 160px;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.milestone {
+  width: 120px;
+  font-weight: 600;
+  color: var(--accent-color, #0ea5e9);
 }
 .ability-name {
   font-family: cursive;
