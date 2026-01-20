@@ -49,6 +49,16 @@
                :aria-current="isExactActive ? 'page' : null"
             >🪙 Скарбниця</a>
           </RouterLink>
+
+          <!-- Мануфактури -->
+          <RouterLink :to="`/islands/${islandName}/manufactures`" custom v-slot="{ href, navigate, isExactActive }">
+            <a :href="href"
+               @click="navigate"
+               class="tab"
+               :data-active="isExactActive"
+               :aria-current="isExactActive ? 'page' : null"
+            >🏭 Мануфактури</a>
+          </RouterLink>
         </div>
       </nav>
 
