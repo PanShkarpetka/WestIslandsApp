@@ -1,9 +1,12 @@
-import { db } from './firebase';
+import { db } from './firebase.js';
 import { doc, getDoc } from 'firebase/firestore';
 
-export async function verifyAdminPassword(inputPassword) {
-    const docRef = doc(db, 'credentials', 'admin');
-    const docSnap = await getDoc(docRef);
+export async function verifyAdminPassword(
+    inputPassword,
+    { dbRef = db, docFn = doc, getDocFn = getDoc } = {},
+) {
+    const docRef = docFn(dbRef, 'credentials', 'admin');
+    const docSnap = await getDocFn(docRef);
 
     if (!docSnap.exists()) return false;
 
