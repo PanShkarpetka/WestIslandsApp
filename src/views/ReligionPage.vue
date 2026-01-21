@@ -1261,7 +1261,7 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
     : []
 
   const entries = (await loadManufacturesByIds(manufactureIds))
-    .filter((item) => item.income > 0)
+    .filter((item) => item.income !== 0)
 
   if (!entries.length) return
 
@@ -1269,21 +1269,27 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
   const txCol = collection(db, 'treasuryTransactions')
   const cycleLabel = formatCycleLabel(startedAt, finishedAt)
 
+  const totalIncome = entries.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
+  const totalOutcome = entries.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
+
   await runTransaction(db, async (transaction) => {
     const metaSnap = await transaction.get(metaRef)
-    let currentBalance = metaSnap.exists() ? (metaSnap.data().balance || 0) : 0
+    const metaData = metaSnap.exists() ? metaSnap.data() : {}
+    let currentBalance = metaData.balance || 0
 
     entries.forEach((item) => {
       currentBalance += item.income
-      const commentParts = [`Дохід мануфактури "${item.name || 'Без назви'}"`]
+      const label = item.income >= 0 ? 'Дохід' : 'Витрати'
+      const commentParts = [`${label} мануфактури "${item.name || 'Без назви'}"`]
       if (item.description) commentParts.push(item.description)
       commentParts.push(`за цикл ${cycleLabel}.`)
       const comment = commentParts.join(' ')
+      const txType = item.income >= 0 ? 'deposit' : 'withdraw'
 
       const txRef = doc(txCol)
       transaction.set(txRef, {
         amount: item.income,
-        type: 'deposit',
+        type: txType,
         comment: comment.slice(0, 500),
         userId: 'system',
         nickname: 'Система',
@@ -1301,6 +1307,8 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
 
     transaction.set(metaRef, {
       balance: currentBalance,
+      totalIncome,
+      totalOutcome,
       updatedAt: serverTimestamp(),
     }, { merge: true })
   })

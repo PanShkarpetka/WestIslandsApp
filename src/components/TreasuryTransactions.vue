@@ -1,7 +1,9 @@
 <template>
   <div>
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="text-lg font-semibold">Транзакції скарбниці</h2>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+      <div>
+        <h2 class="text-lg font-semibold">Транзакції скарбниці</h2>
+      </div>
       <v-btn size="small" variant="text" @click="reload" :loading="loading">Оновити</v-btn>
     </div>
 
@@ -53,6 +55,8 @@ const treasury = useTreasuryStore();
 const tx = computed(() => treasury.tx);
 const loading = computed(() => treasury.loading);
 const hasMore = computed(() => !!treasury._lastDoc);
+const totalIncome = computed(() => treasury.totalIncome);
+const totalOutcome = computed(() => treasury.totalOutcome);
 
 function formatDate(v) {
   if (!v) return "—";
