@@ -4,6 +4,7 @@ import IslandInfoPage from '@/views/IslandInfoPage.vue';
 import PopulationPage from '@/views/PopulationPage.vue'
 import TreasuryPage from '@/views/TreasuryPage.vue'
 import BuildingsPage from '@/views/BuildingsPage.vue'
+import ManufacturesPage from '@/views/ManufacturesPage.vue'
 import LoginView from '@/views/LoginView.vue';
 import AdminView from '@/views/AdminView.vue';
 import ShipsView from '@/views/ShipsView.vue';
@@ -25,6 +26,7 @@ const routes = [
             { path: 'buildings', name: 'buildings', component: BuildingsPage },
             { path: 'population', name: 'population', component: PopulationPage },
             { path: 'treasury', name: 'treasury', component: TreasuryPage },
+            { path: 'manufactures', name: 'manufactures', component: ManufacturesPage },
         ]
     },
     { path: '/ships', component: ShipsView, meta: { requiresAuth: false } },

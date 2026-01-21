@@ -245,7 +245,22 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { addDoc, collection, doc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where, writeBatch, runTransaction } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  doc,
+  documentId,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
+  runTransaction,
+} from 'firebase/firestore'
 import { BUILDING_LEVEL_BONUSES, DEFAULT_VALUES, useReligionStore } from '@/store/religionStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
@@ -1202,6 +1217,103 @@ function getBuildingFaithIncome(level) {
   return BUILDING_LEVEL_BONUSES[level]?.passiveFaith || 0
 }
 
+function formatCycleLabel(startedAt, finishedAt) {
+  if (startedAt && finishedAt) return `${startedAt} — ${finishedAt}`
+  if (startedAt) return `з ${startedAt}`
+  return 'без дат'
+}
+
+async function loadManufacturesByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return []
+
+  const chunks = []
+  for (let i = 0; i < ids.length; i += 10) {
+    chunks.push(ids.slice(i, i + 10))
+  }
+
+  const results = []
+  for (const chunk of chunks) {
+    const q = query(collection(db, 'manufactures'), where(documentId(), 'in', chunk))
+    const snapshot = await getDocs(q)
+    snapshot.docs.forEach((docSnap) => {
+      const data = docSnap.data() || {}
+      results.push({
+        id: docSnap.id,
+        name: (data.name || '').trim(),
+        description: (data.description || '').trim(),
+        income: Math.trunc(Number(data.income || 0)),
+      })
+    })
+  }
+
+  const order = new Map(ids.map((id, index) => [id, index]))
+  results.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+  return results
+}
+
+async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
+  const islandId = islandStore.currentId || 'island_rock'
+  const islandSnap = await getDoc(doc(db, 'islands', islandId))
+  if (!islandSnap.exists()) return
+
+  const manufactureIds = Array.isArray(islandSnap.data()?.manufactures)
+    ? islandSnap.data().manufactures
+    : []
+
+  const entries = (await loadManufacturesByIds(manufactureIds))
+    .filter((item) => item.income !== 0)
+
+  if (!entries.length) return
+
+  const metaRef = doc(db, 'treasury/meta')
+  const txCol = collection(db, 'treasuryTransactions')
+  const cycleLabel = formatCycleLabel(startedAt, finishedAt)
+
+  const totalIncome = entries.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
+  const totalOutcome = entries.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
+
+  await runTransaction(db, async (transaction) => {
+    const metaSnap = await transaction.get(metaRef)
+    const metaData = metaSnap.exists() ? metaSnap.data() : {}
+    let currentBalance = metaData.balance || 0
+
+    entries.forEach((item) => {
+      currentBalance += item.income
+      const label = item.income >= 0 ? 'Дохід' : 'Витрати'
+      const commentParts = [`${label} мануфактури "${item.name || 'Без назви'}"`]
+      if (item.description) commentParts.push(item.description)
+      commentParts.push(`за цикл ${cycleLabel}.`)
+      const comment = commentParts.join(' ')
+      const txType = item.income >= 0 ? 'deposit' : 'withdraw'
+
+      const txRef = doc(txCol)
+      transaction.set(txRef, {
+        amount: item.income,
+        type: txType,
+        comment: comment.slice(0, 500),
+        userId: 'system',
+        nickname: 'Система',
+        createdAt: serverTimestamp(),
+        balanceAfter: currentBalance,
+        cycleId,
+        cycleStartedAt: startedAt,
+        cycleFinishedAt: finishedAt || null,
+        manufactureId: item.id || null,
+        manufactureName: item.name || null,
+        manufactureDescription: item.description || null,
+        manufactureIncome: item.income,
+      })
+    })
+
+    transaction.set(metaRef, {
+      balance: currentBalance,
+      totalIncome,
+      totalOutcome,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  })
+}
+
 async function distributeBuildingFaithIncome(cycleId) {
   const religionsSnapshot = await getDocs(collection(db, 'religions'))
   const religionsWithIncome = religionsSnapshot.docs
@@ -1333,6 +1445,7 @@ async function createCycle() {
     await resetReligionsSvTemp()
     await createCycleStartAction(cycleDoc.id, cycleForm.notes)
     await distributeBuildingFaithIncome(cycleDoc.id)
+    await distributeManufactureIncome(cycleDoc.id, startedAt, finishedAt)
     await loadLatestCycle()
     closeNewCycleDialog()
   } catch (e) {

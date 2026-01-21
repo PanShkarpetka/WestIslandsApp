@@ -1,17 +1,27 @@
-import { db } from './firebase';
+import { db } from './firebase.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useUserStore } from '../store/userStore';
+import { useUserStore } from '../store/userStore.js';
 
-export async function logEvent(action) {
+export async function logEvent(
+    action,
+    {
+        userStore = useUserStore,
+        addDocFn = addDoc,
+        collectionFn = collection,
+        serverTimestampFn = serverTimestamp,
+        dbRef = db,
+        logger = console,
+    } = {},
+) {
     try {
-        const userStore = useUserStore();
-        await addDoc(collection(db, 'logs'), {
+        const store = userStore();
+        await addDocFn(collectionFn(dbRef, 'logs'), {
             action,
-            user: userStore.nickname || 'невідомо',
-            timestamp: serverTimestamp(),
+            user: store.nickname || 'невідомо',
+            timestamp: serverTimestampFn(),
         });
     } catch (error) {
-        console.error('Не вдалося записати лог:', error);
+        logger.error('Не вдалося записати лог:', error);
     }
 }
 

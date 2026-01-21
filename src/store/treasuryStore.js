@@ -7,6 +7,8 @@ import {
 export const useTreasuryStore = defineStore("treasury", {
     state: () => ({
         balance: 0,
+        totalIncome: 0,
+        totalOutcome: 0,
         tx: [],
         _lastDoc: null,
         _pageSize: 20,
@@ -21,8 +23,16 @@ export const useTreasuryStore = defineStore("treasury", {
             const db = getFirestore();
             const metaRef = doc(db, "treasury/meta");
             this._unsubMeta = onSnapshot(metaRef, (snap) => {
-                if (snap.exists()) this.balance = snap.data().balance || 0;
-                else this.balance = 0;
+                if (snap.exists()) {
+                    const data = snap.data();
+                    this.balance = data.balance || 0;
+                    this.totalIncome = data.totalIncome || 0;
+                    this.totalOutcome = data.totalOutcome || 0;
+                } else {
+                    this.balance = 0;
+                    this.totalIncome = 0;
+                    this.totalOutcome = 0;
+                }
             });
         },
         unsubscribeBalance() {
@@ -75,13 +85,13 @@ export const useTreasuryStore = defineStore("treasury", {
             await runTransaction(db, async (t) => {
                 // 1) читаємо поточний баланс
                 const metaSnap = await t.get(metaRef);
-                const current = metaSnap.exists() ? (metaSnap.data().balance || 0) : 0;
+                const metaData = metaSnap.exists() ? metaSnap.data() : {};
+                const current = metaData.balance || 0;
 
                 const newBalance = current + delta;
                 if (newBalance < 0) {
                     throw new Error("Недостатньо золота у скарбниці.");
                 }
-
                 // 2) створюємо запис транзакції
                 const txRef = doc(txCol); // авто-ID
                 t.set(txRef, {
