@@ -91,6 +91,7 @@
             type="number"
             variant="outlined"
             density="comfortable"
+            step="0.01"
           />
           <div v-if="formError" class="text-error text-body-2 mt-2">{{ formError }}</div>
         </v-card-text>
@@ -156,7 +157,7 @@ async function loadManufactures(ids) {
           key: docSnap.id,
           name: data.name || '',
           description: data.description || '',
-          income: Math.trunc(Number(data.income || 0)),
+          income: normalizeAmount(data.income || 0),
         })
       })
     }
@@ -201,7 +202,7 @@ async function saveManufacture() {
   formError.value = ''
   const name = form.value.name?.trim()
   const description = form.value.description?.trim() || ''
-  const income = Math.trunc(Number(form.value.income || 0))
+  const income = normalizeAmount(form.value.income || 0)
 
   if (!name) {
     formError.value = 'Вкажіть назву мануфактури.'
@@ -236,6 +237,12 @@ async function saveManufacture() {
   } finally {
     saving.value = false
   }
+}
+
+function normalizeAmount(value) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.round(parsed * 100) / 100
 }
 
 onMounted(() => {

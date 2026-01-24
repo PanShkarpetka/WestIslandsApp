@@ -114,16 +114,22 @@ export const useTreasuryStore = defineStore("treasury", {
 
         // Публічні методи
         async deposit({ amount, comment, user }) {
-            const delta = Math.trunc(Number(amount || 0));
+            const delta = roundAmount(amount);
             if (!delta || delta <= 0) throw new Error("Сума має бути більшою за 0.");
             await this._applyTx({ delta, type: "deposit", comment, user });
         },
 
         async withdraw({ amount, comment, user }) {
-            const deltaAbs = Math.trunc(Number(amount || 0));
+            const deltaAbs = roundAmount(amount);
             if (!deltaAbs || deltaAbs <= 0) throw new Error("Сума має бути більшою за 0.");
             const delta = -deltaAbs; // зняття — від’ємне
             await this._applyTx({ delta, type: "withdraw", comment, user });
         },
     }
 });
+
+function roundAmount(value) {
+    const parsed = Number(value || 0);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.round(parsed * 100) / 100;
+}

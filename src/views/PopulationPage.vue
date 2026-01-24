@@ -30,6 +30,9 @@
                     <div class="mt-auto text-right group-details">
                       <div class="text-xl font-bold drop-shadow-sm">{{ g.percentRounded }}%</div>
                       <div class="text-xs opacity-90 drop-shadow">{{ g.count }} осіб<!-- • {{ g.votesRounded }} голосів--></div>
+                      <div class="text-xs opacity-90 drop-shadow">
+                        З особи: {{ formatAmount(g.incomePerPerson) }} 🪙
+                      </div>
                     </div>
                     <div v-if="isAdmin" class="edit-hint">Натисніть, щоб редагувати</div>
                   </div>
@@ -42,7 +45,8 @@
       <!-- Pie -->
       <div class="lg:col-span-3 bg-white rounded-xl border p-4 chart-wrap">
         <div class="text-sm text-gray-500 pie-title">
-          Разом: <b>{{ totalPopulation }}</b> осіб<!-- • Голосів загалом: <b>10</b>-->
+          <div>Разом: <b>{{ totalPopulation }}</b> осіб</div>
+          <div>Дохід від населення: <b>{{ formatAmount(populationIncomeTotal) }}</b> 🪙</div>
         </div>
         <Pie :data="chartData" :options="chartOptions" />
       </div>
@@ -138,7 +142,15 @@ watch(() => islandStore.currentId, (id) => {
 })
 
 const totalPopulation = computed(() => store.totalPopulation)
+const populationIncomeTotal = computed(() => store.populationIncomeTotal || 0)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
+
+function formatAmount(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '0'
+  const rounded = Math.round(number * 100) / 100
+  return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(2)
+}
 
 const palette = {
   'Селяни': '#22c55e',
@@ -175,8 +187,7 @@ const chartOptions = {
       callbacks: {
         label: (ctx) => {
           const g = viewRows.value[ctx.dataIndex]
-          // return `${g.name}: ${g.percentRounded}% (${g.count} осіб, ${g.votesRounded} голосів)`
-          return `${g.name}: ${g.percentRounded}% (${g.count} осіб`
+          return `${g.name}: ${g.percentRounded}% (${g.count} осіб, ${g.incomePerPerson * g.count} дохід)`
         }
       }
     }

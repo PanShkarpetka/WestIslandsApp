@@ -1223,6 +1223,12 @@ function formatCycleLabel(startedAt, finishedAt) {
   return 'без дат'
 }
 
+function normalizeAmount(value) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.round(parsed * 100) / 100
+}
+
 async function loadManufacturesByIds(ids) {
   if (!Array.isArray(ids) || ids.length === 0) return []
 
@@ -1241,7 +1247,7 @@ async function loadManufacturesByIds(ids) {
         id: docSnap.id,
         name: (data.name || '').trim(),
         description: (data.description || '').trim(),
-        income: Math.trunc(Number(data.income || 0)),
+        income: normalizeAmount(data.income || 0),
       })
     })
   }
@@ -1263,25 +1269,59 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
   const entries = (await loadManufacturesByIds(manufactureIds))
     .filter((item) => item.income !== 0)
 
-  if (!entries.length) return
+  const populationEntries = (populationStore.items || [])
+    .map((group) => {
+      const count = Number(group.count ?? group.amount ?? 0)
+      const incomePerPerson = normalizeAmount(
+        group.incomePerPerson ?? group.income ?? group.incomePer ?? 0,
+      )
+      const incomeTotal = normalizeAmount(incomePerPerson * count)
+      return {
+        id: group.id,
+        name: group.name || 'Невідома група',
+        description: group.description || '',
+        income: incomeTotal,
+        incomePerPerson,
+        count,
+        type: 'population',
+      }
+    })
+    .filter((item) => item.income !== 0)
+
+  const combinedEntries = [
+    ...entries.map((item) => ({ ...item, type: 'manufacture' })),
+    ...populationEntries,
+  ]
+
+  if (!combinedEntries.length) return
 
   const metaRef = doc(db, 'treasury/meta')
   const txCol = collection(db, 'treasuryTransactions')
   const cycleLabel = formatCycleLabel(startedAt, finishedAt)
 
-  const totalIncome = entries.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
-  const totalOutcome = entries.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
+  const totalIncome = combinedEntries.reduce((sum, item) => (
+    item.income > 0 ? sum + item.income : sum
+  ), 0)
+  const totalOutcome = combinedEntries.reduce((sum, item) => (
+    item.income < 0 ? sum + Math.abs(item.income) : sum
+  ), 0)
 
   await runTransaction(db, async (transaction) => {
     const metaSnap = await transaction.get(metaRef)
     const metaData = metaSnap.exists() ? metaSnap.data() : {}
     let currentBalance = metaData.balance || 0
 
-    entries.forEach((item) => {
+    combinedEntries.forEach((item) => {
       currentBalance += item.income
       const label = item.income >= 0 ? 'Дохід' : 'Витрати'
-      const commentParts = [`${label} мануфактури "${item.name || 'Без назви'}"`]
-      if (item.description) commentParts.push(item.description)
+      const commentParts = []
+      if (item.type === 'population') {
+        commentParts.push(`${label} населення групи "${item.name}"`)
+        commentParts.push(`(${item.count} осіб × ${normalizeAmount(item.incomePerPerson)} 🪙)`)
+      } else {
+        commentParts.push(`${label} мануфактури "${item.name || 'Без назви'}"`)
+        if (item.description) commentParts.push(item.description)
+      }
       commentParts.push(`за цикл ${cycleLabel}.`)
       const comment = commentParts.join(' ')
       const txType = item.income >= 0 ? 'deposit' : 'withdraw'
@@ -1298,17 +1338,22 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
         cycleId,
         cycleStartedAt: startedAt,
         cycleFinishedAt: finishedAt || null,
-        manufactureId: item.id || null,
-        manufactureName: item.name || null,
-        manufactureDescription: item.description || null,
-        manufactureIncome: item.income,
+        manufactureId: item.type === 'manufacture' ? item.id || null : null,
+        manufactureName: item.type === 'manufacture' ? item.name || null : null,
+        manufactureDescription: item.type === 'manufacture' ? item.description || null : null,
+        manufactureIncome: item.type === 'manufacture' ? item.income : null,
+        populationGroupId: item.type === 'population' ? item.id || null : null,
+        populationGroupName: item.type === 'population' ? item.name || null : null,
+        populationIncomePerPerson: item.type === 'population' ? item.incomePerPerson : null,
+        populationCount: item.type === 'population' ? item.count : null,
+        populationIncomeTotal: item.type === 'population' ? item.income : null,
       })
     })
 
     transaction.set(metaRef, {
       balance: currentBalance,
-      totalIncome,
-      totalOutcome,
+      totalIncome: normalizeAmount(totalIncome),
+      totalOutcome: normalizeAmount(totalOutcome),
       updatedAt: serverTimestamp(),
     }, { merge: true })
   })
