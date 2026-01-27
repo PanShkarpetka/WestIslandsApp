@@ -82,10 +82,28 @@ export const usePopulationStore = defineStore('population', () => {
         state.items.reduce((s, g) => s + (g.count || 0), 0)
     )
 
+    const normalizeIncome = (value) => {
+        const parsed = Number(value)
+        if (!Number.isFinite(parsed)) return 0
+        return Math.round(parsed * 100) / 100
+    }
+
+    const groupIncomePerPerson = (group) => normalizeIncome(
+        group?.incomePerPerson ?? group?.income ?? group?.incomePer ?? 0
+    )
+
     // Беремо total з islands; якщо 0 — fallback на суму груп
     const totalPopulation = computed(() =>
         state.totalPopulation > 0 ? state.totalPopulation : totalCountFromGroups.value
     )
+
+    const populationIncomeTotal = computed(() => {
+        const total = state.items.reduce((sum, group) => {
+            const count = Number(group.count || 0)
+            return sum + groupIncomePerPerson(group) * count
+        }, 0)
+        return normalizeIncome(total)
+    })
 
     // Збагачені елементи: percent + votes (із 10)
     const groupsAugmented = computed(() => {
@@ -93,12 +111,16 @@ export const usePopulationStore = defineStore('population', () => {
         return state.items.map(g => {
             const percent = (g.count || 0) / total * 100
             const votes   = (percent / 100) * 10
+            const incomePerPerson = groupIncomePerPerson(g)
+            const incomeTotal = normalizeIncome(incomePerPerson * (g.count || 0))
             return {
                 ...g,
                 percent,                        // напр. 50.0
                 votes,                          // напр. 5.0
                 percentRounded: Math.round(percent * 10) / 10,
                 votesRounded: Math.round(votes * 10) / 10,
+                incomePerPerson,
+                incomeTotal,
             }
         })
     })
@@ -109,6 +131,7 @@ export const usePopulationStore = defineStore('population', () => {
         stopListener,
         totalPopulation,
         totalCountFromGroups,
+        populationIncomeTotal,
         groupsAugmented,
         setGroupCount,
     }
