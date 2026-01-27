@@ -23,8 +23,8 @@
       <v-btn icon to="/religion">
         <v-icon>mdi-cross-celtic</v-icon>
       </v-btn>
-      <v-btn icon to="/courier">
-        <v-icon>mdi-bird</v-icon>
+      <v-btn icon to="/travel">
+        <v-icon>mdi-map-marker-distance</v-icon>
       </v-btn>
       <v-btn v-if="userStore.isAdmin" icon to="/admin">
         <v-icon>mdi-shield-account</v-icon>
@@ -81,9 +81,9 @@
           <v-list-item-title>Релігія</v-list-item-title>
         </v-list-item>
 
-        <v-list-item tag="router-link" :to="'/courier'" @click="drawer = false">
-          <v-list-item-icon><v-icon>mdi-bird</v-icon></v-list-item-icon>
-          <v-list-item-title>Кур’єр</v-list-item-title>
+        <v-list-item tag="router-link" :to="'/travel'" @click="drawer = false">
+          <v-list-item-icon><v-icon>mdi-map-marker-distance</v-icon></v-list-item-icon>
+          <v-list-item-title>Подорожі</v-list-item-title>
         </v-list-item>
 
         <v-list-item
