@@ -37,11 +37,10 @@
               />
             </v-col>
             <v-col cols="12" md="6">
-              <v-text-field
-                  v-model.number="dangerModifier"
-                  type="number"
-                  label="Модифікатор небезпеки, %"
-                  prepend-icon="mdi-alert"
+              <v-checkbox
+                  v-model="advancedEnabled"
+                  label="Додаткові функції"
+                  prepend-icon="mdi-flask"
               />
             </v-col>
           </v-row>
@@ -74,6 +73,55 @@
               <div class="text-h6">{{ formattedSailingHoursPerDay }}</div>
             </v-col>
           </v-row>
+
+          <v-expand-transition>
+            <div v-if="advancedEnabled">
+              <v-divider class="my-4" />
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                      v-model.number="dangerModifier"
+                      type="number"
+                      label="Модифікатор небезпеки, %"
+                      prepend-icon="mdi-alert"
+                  />
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                      :model-value="weaponSlotsUsed"
+                      type="number"
+                      label="Використані слоти зброї"
+                      prepend-icon="mdi-crosshairs"
+                      readonly
+                  />
+                </v-col>
+                <v-col cols="12">
+                  <v-card class="pa-4" variant="outlined">
+                    <div class="text-subtitle-2 text-grey">Ризик подорожі (Шанс небезпеки)</div>
+                    <div v-if="dangerArea" class="text-body-1 mt-1">
+                      Зона небезпеки: {{ dangerArea.area }} (мін. ШБ {{ formatPercent(dangerArea.min) }})
+                    </div>
+                    <div v-else class="text-body-1 mt-1">—</div>
+                    <v-list class="mt-2" density="compact" v-if="dangerArea">
+                      <v-list-item>
+                        <v-list-item-title>Базовий шанс небезпеки: {{ formatPercent(dangerArea.base) }}</v-list-item-title>
+                      </v-list-item>
+                      <v-list-item>
+                        <v-list-item-title>Модифікатор небезпеки: {{ formatSignedPercent(dangerModifierValue) }}</v-list-item-title>
+                      </v-list-item>
+                      <v-list-item>
+                        <v-list-item-title>Зайві моряки: {{ formatSignedPercent(-sailorReduction) }}</v-list-item-title>
+                      </v-list-item>
+                      <v-list-item>
+                        <v-list-item-title>Озброєння: {{ formatSignedPercent(-weaponReduction) }}</v-list-item-title>
+                      </v-list-item>
+                    </v-list>
+                    <div class="text-h6 mt-3">Фінальний шанс небезпеки: {{ formattedFinalChance }}</div>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </div>
+          </v-expand-transition>
         </v-card-text>
       </v-card>
     </v-col>
@@ -90,6 +138,7 @@ const selectedShipId = ref(null);
 const distance = ref(0);
 const sailors = ref(0);
 const dangerModifier = ref(0);
+const advancedEnabled = ref(false);
 
 onMounted(() => {
   shipStore.subscribeToShips();
@@ -98,6 +147,7 @@ onMounted(() => {
 const visibleShips = computed(() => shipStore.ships.filter(ship => !!ship.visibility))
 const selectedShip = computed(() => visibleShips.value.find(ship => ship.id === selectedShipId.value))
 const sailStations = computed(() => Number(selectedShip.value?.sailStations) || 0)
+const weaponSlotsUsed = computed(() => Number(selectedShip.value?.weaponSlotsUsed) || 0)
 const fullSpeedPerHour = computed(() => Number(selectedShip.value?.speedMax) ? Number(selectedShip.value.speedMax) / 10 : 0)
 
 const speedPerHour = computed(() => {
@@ -168,4 +218,39 @@ const formattedCostRoundTrip = computed(() => {
   const total = (Number(sailors.value) || 0) * roundTripDays.value * 2
   return `${total.toFixed(1)} золота`
 })
+
+const dangerArea = computed(() => {
+  if (oneWayDays.value <= 0) return null
+  if (oneWayDays.value <= 1.5) {
+    return { area: 1, base: 5, min: 5 }
+  }
+  if (oneWayDays.value <= 3.5) {
+    return { area: 2, base: 20, min: 15 }
+  }
+  return { area: 3, base: 60, min: 30 }
+})
+
+const dangerModifierValue = computed(() => Number(dangerModifier.value) || 0)
+const extraSailors = computed(() => Math.max(0, (Number(sailors.value) || 0) - sailStations.value))
+const sailorReduction = computed(() => extraSailors.value)
+const weaponReduction = computed(() => weaponSlotsUsed.value * 5)
+
+const finalChance = computed(() => {
+  if (!dangerArea.value) return null
+  const rawChance = dangerArea.value.base + dangerModifierValue.value - sailorReduction.value - weaponReduction.value
+  return Math.max(dangerArea.value.min, rawChance)
+})
+
+function formatPercent(value) {
+  if (value === null || value === undefined) return '—'
+  return `${value.toFixed(0)}%`
+}
+
+function formatSignedPercent(value) {
+  if (value === null || value === undefined) return '—'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(0)}%`
+}
+
+const formattedFinalChance = computed(() => (finalChance.value === null ? '—' : formatPercent(finalChance.value)))
 </script>
