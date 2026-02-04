@@ -169,9 +169,8 @@ function getTravelHours(travelDistance) {
   const fullDays = Math.floor(travelDistance / distancePerDay.value)
   const remainingDistance = travelDistance - fullDays * distancePerDay.value
   const remainingHours = remainingDistance > 0 ? remainingDistance / speedPerHour.value : 0
-  const baseHours = fullDays * 24 + remainingHours
-  const modifierMultiplier = 1 + (Number(dangerModifier.value) || 0) / 100
-  return baseHours * modifierMultiplier
+
+  return fullDays * 24 + remainingHours;
 }
 
 const oneWayHours = computed(() => getTravelHours(distance.value))
