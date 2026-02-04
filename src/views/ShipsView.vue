@@ -25,6 +25,8 @@
     <ShipEditor
         v-model:dialog="editorDialog"
         :ship="editingShip"
+        :ships="shipStore.ships"
+        :is-admin="userStore.isAdmin"
         @save="saveShip"
     />
   </v-container>
@@ -78,6 +80,19 @@ function openNewShipDialog() {
     passengerCurrent: 0,
     tonnageCurrent: 0,
     weaponSlotsUsed: 0,
+    weaponSlots: [],
+    hullUpgrade: '',
+    ammunition: {
+      cannonballs: 0,
+      chain: 0,
+      grapeshot: 0,
+      smokeBombs: 0,
+      bolt: 0,
+      flamingBolt: 0,
+      catapultStone: 0,
+      salamanderFuel: 0,
+      dragonHeadFuel: 0
+    },
     size: '',
     description: '',
     image: ''
