@@ -56,7 +56,7 @@
                 size="small"
                 variant="flat"
               >
-                {{ item.income >= 0 ? '+' : '' }}{{ item.income }}
+                {{ item.income >= 0 ? '+' : '' }}{{ formatAmount(item.income) }}
               </v-chip>
             </div>
           </v-card-text>
@@ -113,6 +113,7 @@ import { addDoc, arrayUnion, collection, doc, documentId, getDocs, query, update
 import { useIslandStore } from '@/store/islandStore'
 import { useUserStore } from '@/store/userStore'
 import { db } from '@/services/firebase'
+import { formatAmount } from '@/utils/formatters'
 
 const islandStore = useIslandStore()
 const { data: island } = storeToRefs(islandStore)

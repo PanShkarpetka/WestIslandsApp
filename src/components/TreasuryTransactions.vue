@@ -29,11 +29,11 @@
         </td>
         <td class="text-right">
             <span :class="t.amount >= 0 ? 'text-green-600' : 'text-red-600'">
-              {{ t.amount >= 0 ? '+' : '' }}{{ t.amount }}
+              {{ t.amount >= 0 ? '+' : '' }}{{ formatAmount(t.amount) }}
             </span>
         </td>
         <td class="max-w-[360px] truncate" :title="t.comment">{{ t.comment }}</td>
-        <td class="text-right">{{ t.balanceAfter }}</td>
+        <td class="text-right">{{ formatAmount(t.balanceAfter) }}</td>
       </tr>
       </tbody>
     </v-table>
@@ -50,6 +50,7 @@
 import { computed, onMounted } from "vue";
 import { useTreasuryStore } from "@/store/treasuryStore";
 import { Timestamp } from "firebase/firestore";
+import { formatAmount } from "@/utils/formatters";
 
 const treasury = useTreasuryStore();
 const tx = computed(() => treasury.tx);

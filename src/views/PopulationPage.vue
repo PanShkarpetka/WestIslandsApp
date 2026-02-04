@@ -123,6 +123,7 @@ import { useIslandStore } from '@/store/islandStore'
 import { useUserStore } from '@/store/userStore'
 import { Pie } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from 'chart.js'
+import { formatAmount } from '@/utils/formatters'
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
 
@@ -144,13 +145,6 @@ watch(() => islandStore.currentId, (id) => {
 const totalPopulation = computed(() => store.totalPopulation)
 const populationIncomeTotal = computed(() => store.populationIncomeTotal || 0)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
-
-function formatAmount(value) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return '0'
-  const rounded = Math.round(number * 100) / 100
-  return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(2)
-}
 
 const palette = {
   'Селяни': '#22c55e',
@@ -187,7 +181,7 @@ const chartOptions = {
       callbacks: {
         label: (ctx) => {
           const g = viewRows.value[ctx.dataIndex]
-          return `${g.name}: ${g.percentRounded}% (${g.count} осіб, ${g.incomePerPerson * g.count} дохід)`
+          return `${g.name}: ${g.percentRounded}% (${g.count} осіб, ${formatAmount(g.incomePerPerson * g.count)} дохід)`
         }
       }
     }

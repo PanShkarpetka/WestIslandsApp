@@ -4,7 +4,7 @@
       <div>
         <h1 class="text-h5 font-semibold">Скарбниця острова</h1>
         <div class="text-sm text-medium-emphasis">
-          Дохід/Витрати: +{{ totalIncome }} 🪙 / -{{ totalOutcome }} 🪙
+          Дохід/Витрати: +{{ formatAmount(totalIncome) }} 🪙 / -{{ formatAmount(totalOutcome) }} 🪙
         </div>
       </div>
     </div>
@@ -28,6 +28,7 @@ import TreasuryChestCard from "@/components/TreasuryChestCard.vue";
 import { useIslandStore } from '@/store/islandStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { db } from '@/services/firebase'
+import { formatAmount } from '@/utils/formatters'
 
 const islandStore = useIslandStore()
 const populationStore = usePopulationStore()

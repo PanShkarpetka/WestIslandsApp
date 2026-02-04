@@ -273,6 +273,7 @@ import ReligionTable from '@/components/ReligionTable.vue'
 import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
 import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
+import { formatAmount } from '@/utils/formatters'
 
 const iconCache = new Map()
 
@@ -1317,7 +1318,7 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
       const commentParts = []
       if (item.type === 'population') {
         commentParts.push(`${label} населення групи "${item.name}"`)
-        commentParts.push(`(${item.count} осіб × ${normalizeAmount(item.incomePerPerson)} 🪙)`)
+        commentParts.push(`(${item.count} осіб × ${formatAmount(item.incomePerPerson)} 🪙)`)
       } else {
         commentParts.push(`${label} мануфактури "${item.name || 'Без назви'}"`)
         if (item.description) commentParts.push(item.description)

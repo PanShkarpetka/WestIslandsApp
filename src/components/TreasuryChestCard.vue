@@ -18,7 +18,7 @@
         <div class="treasury-overlay" aria-hidden="true"></div>  <!-- НОВЕ -->
 
         <v-row class="treasury-balance">
-          {{ balance }} 🪙
+          {{ formattedBalance }} 🪙
         </v-row>
         <div class="treasury-hint">Натисніть, щоб {{ isAdmin ? 'внести або зняти' : 'внести' }}</div>
       </div>
@@ -38,7 +38,7 @@
           </div>
           <v-spacer />
           <v-chip size="small" color="primary" variant="elevated" class="opacity-90">
-            {{ balance }} 🪙
+            {{ formattedBalance }} 🪙
           </v-chip>
         </v-sheet>
 
@@ -138,6 +138,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useTreasuryStore } from '@/store/treasuryStore';
 import { useUserStore } from '@/store/userStore';
+import { formatAmount } from '@/utils/formatters';
 
 const treasury = useTreasuryStore();
 const user = useUserStore();
@@ -152,6 +153,7 @@ const error = ref('');
 const isAdmin = computed(() => !!user.isAdmin);
 const isLoggedIn = computed(() => user.nickname !== '');
 const balance = computed(() => treasury.balance);
+const formattedBalance = computed(() => formatAmount(balance.value));
 
 function open() {
   mode.value = 'deposit';
