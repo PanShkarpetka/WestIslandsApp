@@ -220,11 +220,11 @@ const formattedCostRoundTrip = computed(() => {
 
 const dangerArea = computed(() => {
   if (oneWayDays.value <= 0) return null
-  if (oneWayDays.value <= 1.5) {
-    return { area: 1, base: 5, min: 5 }
+  if (oneWayDays.value <= 1) {
+    return { area: 1, base: 10, min: 5 }
   }
-  if (oneWayDays.value <= 3.5) {
-    return { area: 2, base: 20, min: 15 }
+  if (oneWayDays.value <= 3) {
+    return { area: 2, base: 25, min: 15 }
   }
   return { area: 3, base: 60, min: 30 }
 })
