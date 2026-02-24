@@ -12,33 +12,6 @@ import {
   setDoc,
 } from 'firebase/firestore';
 
-const DEFAULT_GUILDS = [
-  {
-    id: 'AdventureGuild',
-    assets: {
-      name: 'Adventure Guild',
-      shortName: 'AG',
-      leader: 'Valerian',
-      treasure: 0,
-      visibleToAll: true,
-      withdrawUsername: 'adventureGuild',
-      withdrawPassword: 'easyMoney',
-    },
-  },
-  {
-    id: 'MerchantsGuild',
-    assets: {
-      name: 'Merchants Guild',
-      shortName: 'MG',
-      leader: 'Mirabel',
-      treasure: 0,
-      visibleToAll: true,
-      withdrawUsername: 'merchantGuild',
-      withdrawPassword: 'tradeCoin',
-    },
-  },
-];
-
 export const useGuildStore = defineStore('guilds', {
   state: () => ({
     guilds: [],
@@ -47,30 +20,13 @@ export const useGuildStore = defineStore('guilds', {
     _unsub: null,
   }),
   actions: {
-    async ensureDefaults() {
-      const db = getFirestore();
-      await Promise.all(
-        DEFAULT_GUILDS.map(async (guild) => {
-          const guildRef = doc(db, 'guilds', guild.id);
-          const snap = await getDoc(guildRef);
-          if (snap.exists()) return;
-
-          await setDoc(guildRef, {
-            assets: guild.assets,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-        }),
-      );
-    },
-
     subscribeGuilds() {
       if (this._unsub) return;
       const db = getFirestore();
       this.loading = true;
       this.error = null;
 
-      const guildsQuery = query(collection(db, 'guilds'), orderBy('assets.name'));
+      const guildsQuery = query(collection(db, 'guilds'), orderBy('name'));
       this._unsub = onSnapshot(
         guildsQuery,
         (snap) => {
@@ -98,7 +54,7 @@ export const useGuildStore = defineStore('guilds', {
       const guildRef = doc(db, 'guilds', guildId);
 
       await setDoc(guildRef, {
-        assets: sanitizeGuildAssets(payload),
+        ...sanitizeGuild(payload),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -111,7 +67,7 @@ export const useGuildStore = defineStore('guilds', {
       await setDoc(
         guildRef,
         {
-          assets: sanitizeGuildAssets(payload),
+          ...sanitizeGuild(payload),
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -138,8 +94,7 @@ export const useGuildStore = defineStore('guilds', {
         }
 
         const guildData = guildSnap.data() || {};
-        const assets = guildData.assets || {};
-        const currentTreasure = Number(assets.treasure || 0);
+        const currentTreasure = Number(guildData.treasure || 0);
         const nextTreasure = roundAmount(currentTreasure + amount);
 
         if (nextTreasure < 0) {
@@ -149,10 +104,7 @@ export const useGuildStore = defineStore('guilds', {
         t.set(
           guildRef,
           {
-            assets: {
-              ...assets,
-              treasure: nextTreasure,
-            },
+            treasure: nextTreasure,
             updatedAt: serverTimestamp(),
           },
           { merge: true },
@@ -172,8 +124,9 @@ export const useGuildStore = defineStore('guilds', {
   },
 });
 
-function sanitizeGuildAssets(payload) {
+function sanitizeGuild(payload) {
   return {
+    assets: {},
     name: (payload?.name || '').trim(),
     shortName: (payload?.shortName || '').trim(),
     leader: (payload?.leader || '').trim(),
