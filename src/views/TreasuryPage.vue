@@ -74,6 +74,9 @@ async function loadManufactureTotals(ids) {
     const snap = await getDocs(q)
     snap.docs.forEach((docSnap) => {
       const data = docSnap.data() || {}
+      const destination = data.incomeDestination || 'treasury'
+      if (destination !== 'treasury') return
+
       const income = roundAmount(Number(data.income || 0))
       if (income > 0) {
         incomeSum += income

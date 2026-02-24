@@ -1249,6 +1249,7 @@ async function loadManufacturesByIds(ids) {
         name: (data.name || '').trim(),
         description: (data.description || '').trim(),
         income: normalizeAmount(data.income || 0),
+        incomeDestination: normalizeIncomeDestination(data.incomeDestination),
       })
     })
   }
@@ -1300,10 +1301,14 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
   const txCol = collection(db, 'treasuryTransactions')
   const cycleLabel = formatCycleLabel(startedAt, finishedAt)
 
-  const totalIncome = combinedEntries.reduce((sum, item) => (
+  const treasuryEntries = combinedEntries.filter((item) => (
+    item.type !== 'manufacture' || !item.incomeDestination?.startsWith('guild:')
+  ))
+
+  const totalIncome = treasuryEntries.reduce((sum, item) => (
     item.income > 0 ? sum + item.income : sum
   ), 0)
-  const totalOutcome = combinedEntries.reduce((sum, item) => (
+  const totalOutcome = treasuryEntries.reduce((sum, item) => (
     item.income < 0 ? sum + Math.abs(item.income) : sum
   ), 0)
 
@@ -1311,8 +1316,42 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
     const metaSnap = await transaction.get(metaRef)
     const metaData = metaSnap.exists() ? metaSnap.data() : {}
     let currentBalance = metaData.balance || 0
+    const guildBalances = new Map()
 
-    combinedEntries.forEach((item) => {
+    for (const item of combinedEntries) {
+      const isGuildDestination = item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:')
+      const guildId = isGuildDestination ? item.incomeDestination.slice('guild:'.length) : null
+
+      if (isGuildDestination && guildId) {
+        const guildRef = doc(db, 'guilds', guildId)
+        const guildLogsRef = collection(db, 'guilds', guildId, 'logs')
+
+        let guildCurrent = guildBalances.get(guildId)
+        if (guildCurrent == null) {
+          const guildSnap = await transaction.get(guildRef)
+          guildCurrent = Number(guildSnap.exists() ? guildSnap.data()?.treasure || 0 : 0)
+        }
+
+        const guildNext = normalizeAmount(guildCurrent + item.income)
+        guildBalances.set(guildId, guildNext)
+
+        transaction.set(guildRef, {
+          treasure: guildNext,
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+
+        const guildLogRef = doc(guildLogsRef)
+        transaction.set(guildLogRef, {
+          amount: item.income,
+          type: item.income >= 0 ? 'deposit' : 'withdraw',
+          comment: `Автооперація з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`.slice(0, 500),
+          userNickname: 'Система',
+          createdAt: serverTimestamp(),
+          treasureAfter: guildNext,
+        })
+        continue
+      }
+
       currentBalance += item.income
       const label = item.income >= 0 ? 'Дохід' : 'Витрати'
       const commentParts = []
@@ -1343,13 +1382,14 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
         manufactureName: item.type === 'manufacture' ? item.name || null : null,
         manufactureDescription: item.type === 'manufacture' ? item.description || null : null,
         manufactureIncome: item.type === 'manufacture' ? item.income : null,
+        manufactureIncomeDestination: item.type === 'manufacture' ? item.incomeDestination || 'treasury' : null,
         populationGroupId: item.type === 'population' ? item.id || null : null,
         populationGroupName: item.type === 'population' ? item.name || null : null,
         populationIncomePerPerson: item.type === 'population' ? item.incomePerPerson : null,
         populationCount: item.type === 'population' ? item.count : null,
         populationIncomeTotal: item.type === 'population' ? item.income : null,
       })
-    })
+    }
 
     transaction.set(metaRef, {
       balance: currentBalance,
@@ -1358,6 +1398,13 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
       updatedAt: serverTimestamp(),
     }, { merge: true })
   })
+}
+
+function normalizeIncomeDestination(value) {
+  if (typeof value !== 'string') return 'treasury'
+  if (value === 'treasury') return 'treasury'
+  if (value.startsWith('guild:') && value.length > 'guild:'.length) return value
+  return 'treasury'
 }
 
 async function distributeBuildingFaithIncome(cycleId) {
