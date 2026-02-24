@@ -13,7 +13,12 @@
 
     <v-row>
       <v-col v-for="guild in visibleGuilds" :key="guild.id" cols="12" md="6">
-        <v-card elevation="2" rounded="xl">
+        <v-card
+          elevation="2"
+          rounded="xl"
+          :class="{ 'guild-card-clickable': canViewGuildLogs(guild) }"
+          @click="openGuildLogs(guild)"
+        >
           <v-card-title class="d-flex justify-space-between align-start ga-2">
             <div>
               <div class="text-h6">{{ guild.name || guild.id }}</div>
@@ -25,13 +30,16 @@
           <v-card-text>
             <div class="text-body-2 mb-2"><b>Коротка назва:</b> {{ guild.shortName || '-' }}</div>
             <div class="text-body-2"><b>Має доступ:</b> {{ guild.withdrawUsername || '-' }}</div>
+            <div v-if="canViewGuildLogs(guild)" class="text-caption text-medium-emphasis mt-3">
+              Натисніть на картку, щоб переглянути журнал операцій.
+            </div>
           </v-card-text>
 
           <v-card-actions class="px-4 pb-4">
-            <v-btn color="success" variant="flat" prepend-icon="mdi-cash-plus" @click="openTransaction(guild, 'deposit')">Внести кошти</v-btn>
-            <v-btn color="warning" variant="flat" prepend-icon="mdi-cash-minus" @click="openTransaction(guild, 'withdraw')">Зняти кошти</v-btn>
+            <v-btn color="success" variant="flat" prepend-icon="mdi-cash-plus" @click.stop="openTransaction(guild, 'deposit')">Внести кошти</v-btn>
+            <v-btn color="warning" variant="flat" prepend-icon="mdi-cash-minus" @click.stop="openTransaction(guild, 'withdraw')">Зняти кошти</v-btn>
             <v-spacer />
-            <v-btn v-if="user.isAdmin" variant="text" prepend-icon="mdi-pencil" @click="openEditDialog(guild)"></v-btn>
+            <v-btn v-if="user.isAdmin" variant="text" prepend-icon="mdi-pencil" @click.stop="openEditDialog(guild)"></v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
@@ -78,11 +86,61 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="showLogsDialog" max-width="860">
+      <v-card rounded="xl">
+        <v-card-title class="d-flex align-center justify-space-between ga-3">
+          <div>Журнал операцій · {{ logsGuild?.name || logsGuild?.id }}</div>
+          <v-btn variant="text" prepend-icon="mdi-refresh" :loading="logsLoading" @click="reloadGuildLogs">Оновити</v-btn>
+        </v-card-title>
+        <v-card-text>
+          <v-alert v-if="logsError" type="error" density="comfortable" class="mb-3">{{ logsError }}</v-alert>
+
+          <v-table v-if="guildLogs.length" density="comfortable">
+            <thead>
+              <tr>
+                <th>Коли</th>
+                <th>Хто</th>
+                <th>Тип</th>
+                <th class="text-right">Сума</th>
+                <th>Коментар</th>
+                <th class="text-right">Баланс після</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="log in guildLogs" :key="log.id">
+                <td>{{ formatDate(log.createdAt) }}</td>
+                <td>{{ log.userNickname || 'Невідомий' }}</td>
+                <td>
+                  <v-chip :color="log.type === 'deposit' ? 'green' : 'red'" size="small" variant="flat">
+                    {{ log.type === 'deposit' ? 'Внесок' : 'Зняття' }}
+                  </v-chip>
+                </td>
+                <td class="text-right">
+                  <span :class="log.amount >= 0 ? 'text-green-600' : 'text-red-600'">
+                    {{ log.amount >= 0 ? '+' : '' }}{{ formatAmount(log.amount || 0) }}
+                  </span>
+                </td>
+                <td class="text-truncate" style="max-width: 280px" :title="log.comment">{{ log.comment || '—' }}</td>
+                <td class="text-right">{{ formatAmount(log.treasureAfter || 0) }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+
+          <div v-else-if="!logsLoading" class="text-medium-emphasis">Журнал поки що порожній.</div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showLogsDialog = false">Закрити</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Timestamp } from 'firebase/firestore';
 import { useGuildStore } from '@/store/guildStore';
 import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
@@ -92,6 +150,7 @@ const user = useUserStore();
 
 const showGuildDialog = ref(false);
 const showTxDialog = ref(false);
+const showLogsDialog = ref(false);
 const editMode = ref(false);
 const editingGuildId = ref('');
 const formError = ref('');
@@ -106,13 +165,48 @@ const txPassword = ref('');
 const txError = ref('');
 const txLoading = ref(false);
 
+const logsGuild = ref(null);
+const guildLogs = ref([]);
+const logsLoading = ref(false);
+const logsError = ref('');
+
 const visibleGuilds = computed(() =>
   store.guilds.filter((guild) => {
     if (user.isAdmin) return true;
     if (guild.visibleToAll) return true;
-    return guild.withdrawUsername === user.nickname;
+    return user.canAccessGuild(guild.id);
   }),
 );
+
+function canViewGuildLogs(guild) {
+  if (!guild) return false;
+  if (user.isAdmin) return true;
+  return user.canAccessGuild(guild.id);
+}
+
+async function openGuildLogs(guild) {
+  if (!canViewGuildLogs(guild)) return;
+
+  logsGuild.value = guild;
+  guildLogs.value = [];
+  logsError.value = '';
+  showLogsDialog.value = true;
+  await reloadGuildLogs();
+}
+
+async function reloadGuildLogs() {
+  if (!logsGuild.value?.id) return;
+
+  logsLoading.value = true;
+  logsError.value = '';
+  try {
+    guildLogs.value = await store.getGuildLogs(logsGuild.value.id);
+  } catch (error) {
+    logsError.value = error?.message || String(error);
+  } finally {
+    logsLoading.value = false;
+  }
+}
 
 function openCreateDialog() {
   editMode.value = false;
@@ -230,6 +324,12 @@ function defaultGuildForm() {
   };
 }
 
+function formatDate(value) {
+  if (!value) return '—';
+  const date = value instanceof Timestamp ? value.toDate() : value;
+  return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+}
+
 onMounted(async () => {
   store.subscribeGuilds();
 });
@@ -238,8 +338,15 @@ onBeforeUnmount(() => {
   store.unsubscribeGuilds();
 });
 </script>
-<style scoped>
-.actions {
 
+<style scoped>
+.guild-card-clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guild-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
 }
 </style>

@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia';
 import {
+  getDocs,
+  limit,
   getFirestore,
   collection,
   doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -80,6 +81,21 @@ export const useGuildStore = defineStore('guilds', {
 
     async withdraw({ guildId, amount, comment, actor }) {
       await this._applyTransaction({ guildId, amount: -Math.abs(amount), comment, actor, type: 'withdraw' });
+    },
+
+    async getGuildLogs(guildId, maxItems = 30) {
+      const db = getFirestore();
+      const logsQuery = query(
+        collection(db, 'guilds', guildId, 'logs'),
+        orderBy('createdAt', 'desc'),
+        limit(maxItems),
+      );
+
+      const logsSnap = await getDocs(logsQuery);
+      return logsSnap.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() || {}),
+      }));
     },
 
     async _applyTransaction({ guildId, amount, comment, actor, type }) {
