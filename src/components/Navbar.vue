@@ -26,6 +26,9 @@
       <v-btn icon to="/travel">
         <v-icon>mdi-map-marker-distance</v-icon>
       </v-btn>
+      <v-btn icon to="/guilds">
+        <v-icon>mdi-account-group</v-icon>
+      </v-btn>
       <v-btn v-if="userStore.isAdmin" icon to="/admin">
         <v-icon>mdi-shield-account</v-icon>
       </v-btn>
@@ -84,6 +87,11 @@
         <v-list-item tag="router-link" :to="'/travel'" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-map-marker-distance</v-icon></v-list-item-icon>
           <v-list-item-title>Подорожі</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item tag="router-link" :to="'/guilds'" @click="drawer = false">
+          <v-list-item-icon><v-icon>mdi-account-group</v-icon></v-list-item-icon>
+          <v-list-item-title>Гільдії</v-list-item-title>
         </v-list-item>
 
         <v-list-item
