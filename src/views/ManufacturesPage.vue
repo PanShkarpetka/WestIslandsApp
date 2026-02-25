@@ -59,6 +59,12 @@
                 {{ item.income >= 0 ? '+' : '' }}{{ formatAmount(item.income) }}
               </v-chip>
             </div>
+            <div class="text-sm mt-2">
+              <span class="font-semibold">Надходження до:</span>
+              <v-chip class="ml-2" size="small" variant="outlined">
+                {{ getIncomeDestinationLabel(item.incomeDestination) }}
+              </v-chip>
+            </div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -93,6 +99,15 @@
             density="comfortable"
             step="0.01"
           />
+          <v-select
+            v-model="form.incomeDestination"
+            :items="incomeDestinationOptions"
+            item-title="title"
+            item-value="value"
+            label="Куди зараховувати дохід"
+            variant="outlined"
+            density="comfortable"
+          />
           <div v-if="formError" class="text-error text-body-2 mt-2">{{ formError }}</div>
         </v-card-text>
         <v-card-actions class="px-4 pb-4">
@@ -112,12 +127,14 @@ import { storeToRefs } from 'pinia'
 import { addDoc, arrayUnion, collection, doc, documentId, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { useIslandStore } from '@/store/islandStore'
 import { useUserStore } from '@/store/userStore'
+import { useGuildStore } from '@/store/guildStore'
 import { db } from '@/services/firebase'
 import { formatAmount } from '@/utils/formatters'
 
 const islandStore = useIslandStore()
 const { data: island } = storeToRefs(islandStore)
 const userStore = useUserStore()
+const guildStore = useGuildStore()
 const isAdmin = computed(() => !!userStore.isAdmin)
 
 const manufactures = ref([])
@@ -132,7 +149,16 @@ const form = ref({
   name: '',
   description: '',
   income: 0,
+  incomeDestination: 'treasury',
 })
+
+const incomeDestinationOptions = computed(() => ([
+  { title: 'Скарбниця острова', value: 'treasury' },
+  ...guildStore.guilds.map((guild) => ({
+    title: `Гільдія: ${guild.name || guild.id}`,
+    value: `guild:${guild.id}`,
+  })),
+]))
 
 async function loadManufactures(ids) {
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -159,6 +185,7 @@ async function loadManufactures(ids) {
           name: data.name || '',
           description: data.description || '',
           income: normalizeAmount(data.income || 0),
+          incomeDestination: normalizeIncomeDestination(data.incomeDestination),
         })
       })
     }
@@ -182,6 +209,7 @@ function openAddDialog() {
     name: '',
     description: '',
     income: 0,
+    incomeDestination: 'treasury',
   }
   formError.value = ''
   dialogOpen.value = true
@@ -194,6 +222,7 @@ function openEditDialog(item) {
     name: item.name || '',
     description: item.description || '',
     income: item.income || 0,
+    incomeDestination: normalizeIncomeDestination(item.incomeDestination),
   }
   formError.value = ''
   dialogOpen.value = true
@@ -212,7 +241,8 @@ async function saveManufacture() {
 
   saving.value = true
   try {
-    const payload = { name, description, income }
+    const incomeDestination = normalizeIncomeDestination(form.value.incomeDestination)
+    const payload = { name, description, income, incomeDestination }
     if (dialogMode.value === 'add') {
       if (!island.value?.id) {
         throw new Error('Острів не вибрано.')
@@ -247,6 +277,7 @@ function normalizeAmount(value) {
 }
 
 onMounted(() => {
+  guildStore.subscribeGuilds()
   loadManufactures(island.value?.manufactures)
 })
 
@@ -257,6 +288,21 @@ watch(
   },
   { deep: true },
 )
+
+function normalizeIncomeDestination(value) {
+  if (typeof value !== 'string') return 'treasury'
+  if (value === 'treasury') return 'treasury'
+  if (value.startsWith('guild:') && value.length > 'guild:'.length) return value
+  return 'treasury'
+}
+
+function getIncomeDestinationLabel(destination) {
+  if (!destination || destination === 'treasury') return 'Скарбниця острова'
+  if (!destination.startsWith('guild:')) return 'Скарбниця острова'
+  const guildId = destination.slice('guild:'.length)
+  const guild = guildStore.guilds.find((entry) => entry.id === guildId)
+  return guild?.name ? `Гільдія: ${guild.name}` : `Гільдія: ${guildId}`
+}
 
 </script>
 
