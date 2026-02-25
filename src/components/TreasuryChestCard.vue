@@ -72,6 +72,15 @@
               hide-details="auto"
           />
 
+          <v-checkbox
+              v-if="mode === 'deposit'"
+              v-model="splitWithAdventurerGuild"
+              label="Половину в гільдію Авантюристів, половину в скарбницю"
+              density="comfortable"
+              hide-details
+              class="mt-2"
+          />
+
           <!-- Швидкі суми як у донатах -->
           <div class="mt-2 mb-4 d-flex flex-wrap gap-2">
             <v-chip
@@ -138,9 +147,11 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useTreasuryStore } from '@/store/treasuryStore';
 import { useUserStore } from '@/store/userStore';
+import { useGuildStore } from '@/store/guildStore';
 import { formatAmount } from '@/utils/formatters';
 
 const treasury = useTreasuryStore();
+const guildStore = useGuildStore();
 const user = useUserStore();
 
 const isOpen = ref(false);
@@ -149,6 +160,7 @@ const amount = ref(null);
 const comment = ref('');
 const loading = ref(false);
 const error = ref('');
+const splitWithAdventurerGuild = ref(false);
 
 const isAdmin = computed(() => !!user.isAdmin);
 const isLoggedIn = computed(() => user.nickname !== '');
@@ -160,6 +172,7 @@ function open() {
   amount.value = null;
   comment.value = '';
   error.value = '';
+  splitWithAdventurerGuild.value = false;
   isOpen.value = true;
 }
 
@@ -171,13 +184,33 @@ async function submit() {
   }
   loading.value = true;
   try {
+    const enteredAmount = Number(amount.value);
     const payload = {
-      amount: Number(amount.value),
+      amount: enteredAmount,
       comment: comment.value,
       user: { uid: user.uid, nickname: user.nickname || 'Гравець' }
     };
     if (mode.value === 'withdraw') {
       await treasury.withdraw(payload);
+    } else if (splitWithAdventurerGuild.value) {
+      const guildPart = Math.round((enteredAmount / 2) * 100) / 100;
+      const treasuryPart = Math.round((enteredAmount - guildPart) * 100) / 100;
+
+      if (treasuryPart > 0) {
+        await treasury.deposit({
+          ...payload,
+          amount: treasuryPart,
+          comment: `${comment.value} (50% до скарбниці)`.trim(),
+        });
+      }
+      if (guildPart > 0) {
+        await guildStore.deposit({
+          guildId: 'AdventureGuild',
+          amount: guildPart,
+          comment: `${comment.value} (50% до ГАК)`.trim(),
+          actor: { nickname: user.nickname || 'Гравець' },
+        });
+      }
     } else {
       await treasury.deposit(payload);
     }
