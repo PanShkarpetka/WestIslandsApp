@@ -2012,7 +2012,7 @@ async function applySpreadReligion() {
     await Promise.all([
       addDoc(collection(clergyRef, 'logs'), {
         delta: -invested,
-        message: `Поширення релігії: інвестиція ${invested} ОВ, кидок ${roll}, DM Mod ${dmMod}, DC ${dc}, результат ${result}. Конвертовано ${converted}. ${
+        message: `Поширення релігії, конвертовано ${converted}. Деталі: інвестиція ${invested} ОВ, кидок ${roll}, DM Mod ${dmMod}, DC ${dc}, результат ${result}. ${
           notes || 'Без нотаток'
         }`,
         user: userStore.nickname || 'Адміністратор',

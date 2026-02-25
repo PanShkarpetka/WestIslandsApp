@@ -29,15 +29,15 @@ export const BUILDING_LEVEL_BONUSES = {
   },
   chapel: {
     svBonus: 1,
-    passiveFaith: 10,
+    passiveFaith: 20,
   },
   temple:  {
     svBonus: 2,
-    passiveFaith: 20,
+    passiveFaith: 40,
   },
   cathedral: {
     svBonus: 3,
-    passiveFaith: 30,
+    passiveFaith: 60,
   },
 }
 
