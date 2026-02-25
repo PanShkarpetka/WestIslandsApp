@@ -1317,6 +1317,18 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
     const metaData = metaSnap.exists() ? metaSnap.data() : {}
     let currentBalance = metaData.balance || 0
     const guildBalances = new Map()
+    const guildIds = [...new Set(
+      combinedEntries
+        .filter((item) => item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:'))
+        .map((item) => item.incomeDestination.slice('guild:'.length))
+        .filter(Boolean),
+    )]
+
+    await Promise.all(guildIds.map(async (guildId) => {
+      const guildRef = doc(db, 'guilds', guildId)
+      const guildSnap = await transaction.get(guildRef)
+      guildBalances.set(guildId, Number(guildSnap.exists() ? guildSnap.data()?.treasure || 0 : 0))
+    }))
 
     for (const item of combinedEntries) {
       const isGuildDestination = item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:')
@@ -1325,12 +1337,7 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
       if (isGuildDestination && guildId) {
         const guildRef = doc(db, 'guilds', guildId)
         const guildLogsRef = collection(db, 'guilds', guildId, 'logs')
-
-        let guildCurrent = guildBalances.get(guildId)
-        if (guildCurrent == null) {
-          const guildSnap = await transaction.get(guildRef)
-          guildCurrent = Number(guildSnap.exists() ? guildSnap.data()?.treasure || 0 : 0)
-        }
+        const guildCurrent = Number(guildBalances.get(guildId) || 0)
 
         const guildNext = normalizeAmount(guildCurrent + item.income)
         guildBalances.set(guildId, guildNext)
