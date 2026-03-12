@@ -39,12 +39,16 @@ function applyShipBonus({ useShip, rng }) {
   return rollDie(4, rng);
 }
 
-function getRollCap({ baitType, useShip }) {
+function getRollCap({ baitType, useShip, hasCriticalSuccess = false }) {
   if (useShip) {
     return Number.POSITIVE_INFINITY;
   }
 
-  if (baitType === 'basic') {
+  const effectiveBaitType = hasCriticalSuccess && baitType === 'basic'
+    ? 'advanced'
+    : baitType;
+
+  if (effectiveBaitType === 'basic') {
     return 53;
   }
 
@@ -117,7 +121,12 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
     + (baitBonusRoll || 0)
     + (shipBonusRoll || 0);
 
-  const cap = getRollCap({ baitType: normalizedInput.baitType, useShip: normalizedInput.useShip });
+  const hasCriticalSuccess = rawRolls.some((roll) => roll === 20);
+  const cap = getRollCap({
+    baitType: normalizedInput.baitType,
+    useShip: normalizedInput.useShip,
+    hasCriticalSuccess
+  });
   const cappedSum = Math.min(computedSum, cap);
 
   const sortedFishes = [...fishes].sort((a, b) => getFishCodeRange(a).min - getFishCodeRange(b).min);
@@ -137,6 +146,7 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
     failedRollIndexes,
     passedEachRollDc,
     computedSum,
+    hasCriticalSuccess,
     finalSum: cappedSum,
     selectedFish: catchData.fish,
     rolledFish: passedEachRollDc ? findFishByRoll(sortedFishes, cappedSum) : null,

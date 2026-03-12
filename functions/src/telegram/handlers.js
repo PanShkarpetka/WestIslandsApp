@@ -14,6 +14,7 @@ import { formatFishingResult, helpMessage } from './replyHelpers.js';
 
 function parseSingleLineFishCommand(text, config) {
   const parts = text.split(/\s+/);
+  console.log(`parts: ${JSON.stringify({parts})}`);
   if (parts.length !== 6 && parts.length !== 7) {
     return null;
   }
@@ -200,6 +201,8 @@ export async function handleTelegramMessage({ db, payload }) {
   if (text.startsWith(COMMANDS.FISH)) {
     try {
       const singleLine = parseSingleLineFishCommand(text, config);
+      console.log(`singleLine: ${JSON.stringify({singleLine})}`);
+
       if (singleLine) {
         const { result, resolvedCatches, pendingAdditionalRoll } = await processFishing({
           db,

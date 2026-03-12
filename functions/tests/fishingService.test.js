@@ -105,3 +105,51 @@ test('caps sum by bait availability when ship is not used', () => {
   assert.equal(result.finalSum, 67);
   assert.equal(result.selectedFish.fishName, 'CapFish');
 });
+
+
+test('treats basic bait cap as advanced when any raw d20 roll is a crit', () => {
+  const fishes = [
+    { id: 'f1', fishName: 'HighCapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 60, max: 67 } }
+  ];
+
+  const rng = makeRng([0.99, 0.2, 0.2]);
+  const result = resolveFishingAttempt({
+    normalizedInput: { modifiers: [20, 20, 20], useGuidance: false, baitType: 'basic', useShip: false },
+    config: baseConfig,
+    fishes,
+    rng
+  });
+
+  assert.equal(result.hasCriticalSuccess, true);
+  assert.equal(result.computedSum > 53, true);
+  assert.equal(result.finalSum, 67);
+  assert.equal(result.selectedFish.fishName, 'HighCapFish');
+});
+
+test('critical success does not bypass ship requirement for uncapped sum', () => {
+  const fishes = [
+    { id: 'f1', fishName: 'ShipOnlyFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 70, max: 100 } }
+  ];
+
+  const rng = makeRng([0.99, 0.99, 0.99]);
+  const noShip = resolveFishingAttempt({
+    normalizedInput: { modifiers: [20, 20, 20], useGuidance: false, baitType: 'basic', useShip: false },
+    config: baseConfig,
+    fishes,
+    rng
+  });
+
+  assert.equal(noShip.hasCriticalSuccess, true);
+  assert.equal(noShip.finalSum, 67);
+  assert.equal(noShip.selectedFish, null);
+
+  const withShip = resolveFishingAttempt({
+    normalizedInput: { modifiers: [20, 20, 20], useGuidance: false, baitType: 'basic', useShip: true },
+    config: baseConfig,
+    fishes,
+    rng: makeRng([0.99, 0.99, 0.99, 0.2])
+  });
+
+  assert.equal(withShip.finalSum > 67, true);
+  assert.equal(withShip.selectedFish.fishName, 'ShipOnlyFish');
+});

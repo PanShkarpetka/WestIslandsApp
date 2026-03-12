@@ -17,6 +17,7 @@ export function parseIntegerInput(value, { min, max }) {
 }
 
 export function parseGuidanceInput(value) {
+  console.log(`value: ${value}`)
   const normalized = String(value).trim().toLowerCase();
   if (GUIDANCE_TRUE.has(normalized)) {
     return true;

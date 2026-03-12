@@ -21,9 +21,9 @@ export const telegramWebhook = onRequest(async (req, res) => {
     res.status(500).send('Server misconfigured');
     return;
   }
-
+  let payload;
   try {
-    const payload = validateTelegramUpdate(req.body);
+    payload = validateTelegramUpdate(req.body);
 
     const firstProcess = await markUpdateProcessed(db, payload.updateId, {
       messageId: payload.messageId,
@@ -45,6 +45,11 @@ export const telegramWebhook = onRequest(async (req, res) => {
     res.status(200).send('OK');
   } catch (error) {
     console.error('Webhook processing failed', error);
+    await sendTelegramMessage({
+      token: TELEGRAM_BOT_TOKEN,
+      chatId: payload?.chatId,
+      text: `Error. Something went wrong.`
+    });
     res.status(200).send('Ignored');
   }
 });
