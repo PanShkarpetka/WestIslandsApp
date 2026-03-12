@@ -1,32 +1,25 @@
 import { rollDie, rollDice } from '../utils/dice.js';
 
-function evaluateQuantity(finalSum, quantityRules = []) {
-  const sorted = [...quantityRules].sort((a, b) => b.minSum - a.minSum);
-  for (const rule of sorted) {
-    if (finalSum >= rule.minSum) {
-      return rule.quantity;
-    }
-  }
-
-  return 0;
-}
-
 function applyGuidance({ useGuidance, config, modifiedRolls, rng }) {
   if (!useGuidance || !config.guidance?.enabled) {
-    return { guidanceRoll: null, adjustedRolls: [...modifiedRolls], appliedTo: null };
+    return {
+      guidanceRolls: [],
+      adjustedRolls: [...modifiedRolls],
+      totalGuidanceBonus: 0,
+      appliedTo: null
+    };
   }
 
-  const guidanceRoll = rollDie(config.guidance.diceSides || 4, rng);
-  const adjustedRolls = [...modifiedRolls];
-  let appliedTo = config.guidance.applyTo || 'all_rolls';
+  const diceSides = config.guidance.diceSides || 4;
+  const guidanceRolls = modifiedRolls.map(() => rollDie(diceSides, rng));
+  const adjustedRolls = modifiedRolls.map((roll, idx) => roll + guidanceRolls[idx]);
 
-  if (appliedTo === 'final_sum') {
-    return { guidanceRoll, adjustedRolls, appliedTo };
-  }
-
-  adjustedRolls.forEach((adjustedRoll) => adjustedRoll += rollDie(config.guidance.diceSides || 4, rng))
-
-  return { guidanceRoll, adjustedRolls, appliedTo };
+  return {
+    guidanceRolls,
+    adjustedRolls,
+    totalGuidanceBonus: guidanceRolls.reduce((sum, value) => sum + value, 0),
+    appliedTo: 'all_rolls'
+  };
 }
 
 function applyBaitBonus({ baitType, config, rng }) {
@@ -38,16 +31,65 @@ function applyBaitBonus({ baitType, config, rng }) {
   return rollDie(baitConfig.bonusDieSides, rng);
 }
 
-function checkAdditionalRolls({ fish, config, rng }) {
-  const required = Number(fish.fishAdditionalRollsRequiredForSuccessfulCatch || 0);
-  if (required <= 0) {
-    return { passed: true, rolls: [], dc: null };
+function applyShipBonus({ useShip, rng }) {
+  if (!useShip) {
+    return null;
   }
 
-  const dc = Number(config.dc.additionalCheckDc || 10);
-  const rolls = rollDice({ count: required, sides: 20, rng });
-  const passed = rolls.every((roll) => roll >= dc);
-  return { passed, rolls, dc };
+  return rollDie(4, rng);
+}
+
+function getRollCap({ baitType, useShip }) {
+  if (useShip) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (baitType === 'basic') {
+    return 53;
+  }
+
+  return 67;
+}
+
+function getFishCodeRange(fish) {
+  const code = fish?.fishCodeNumber;
+
+  if (typeof code === 'number') {
+    return { min: Number(code), max: Number(code) };
+  }
+
+  return {
+    min: Number(code?.min ?? Number.NaN),
+    max: Number(code?.max ?? Number.NaN)
+  };
+}
+
+function findFishByRoll(fishes, roll) {
+  return fishes.find((fish) => {
+    const range = getFishCodeRange(fish);
+    return Number.isFinite(range.min) && Number.isFinite(range.max) && range.min <= roll && roll <= range.max;
+  }) || null;
+}
+
+function findCatchableFish({ fishes, roll }) {
+  let currentRoll = roll;
+
+  while (currentRoll >= 1) {
+    const matchedFish = findFishByRoll(fishes, currentRoll);
+    if (!matchedFish) {
+      currentRoll -= 1;
+      continue;
+    }
+
+    if (Number(matchedFish.fishAmountAvailableNow || 0) > 0) {
+      return { fish: matchedFish, effectiveRoll: currentRoll, originalMatchedFish: matchedFish };
+    }
+
+    const range = getFishCodeRange(matchedFish);
+    currentRoll = Number.isFinite(range.min) ? range.min - 1 : currentRoll - 1;
+  }
+
+  return { fish: null, effectiveRoll: null, originalMatchedFish: null };
 }
 
 export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = Math.random }) {
@@ -62,73 +104,53 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
   });
 
   const baitBonusRoll = applyBaitBonus({ baitType: normalizedInput.baitType, config, rng });
-  const rollsForSum = guidance.adjustedRolls;
-  const guidanceSumBonus = guidance.appliedTo === 'final_sum' ? (guidance.guidanceRoll || 0) : 0;
+  const shipBonusRoll = applyShipBonus({ useShip: normalizedInput.useShip, rng });
+  const finalRolls = guidance.adjustedRolls;
 
-  const finalSum = rollsForSum.reduce((sum, value) => sum + value, 0)
-    + guidanceSumBonus
-    + (baitBonusRoll || 0);
+  const eachRollDc = Number(config.dc?.eachRollDc || 10);
+  const failedRollIndexes = finalRolls
+    .map((value, idx) => (value >= eachRollDc ? null : idx))
+    .filter((idx) => idx !== null);
+  const passedEachRollDc = failedRollIndexes.length === 0;
 
-  const mainDc = Number(config.dc.mainCatch || 45);
-  const isMainSuccess = finalSum >= mainDc;
+  const computedSum = finalRolls.reduce((sum, value) => sum + value, 0)
+    + (baitBonusRoll || 0)
+    + (shipBonusRoll || 0);
 
-  if (!isMainSuccess) {
-    return {
-      normalizedInput,
-      rawRolls,
-      modifiedRolls,
-      finalRolls: rollsForSum,
-      guidance,
-      baitBonusRoll,
-      finalSum,
-      dcChecks: [{ type: 'main', dc: mainDc, passed: false }],
-      quantityTarget: 0,
-      candidateCatches: [],
-      additionalCheckResults: [],
-      success: false
-    };
-  }
+  const cap = getRollCap({ baitType: normalizedInput.baitType, useShip: normalizedInput.useShip });
+  const cappedSum = Math.min(computedSum, cap);
 
-  const quantityTarget = evaluateQuantity(finalSum, config.quantityRules);
-  const available = fishes.filter((fish) => Number(fish.fishAmountAvailableNow || 0) > 0);
-  const candidateCatches = [];
-  const additionalCheckResults = [];
-
-  while (candidateCatches.length < quantityTarget && available.length > 0) {
-    const index = Math.floor(rng() * available.length);
-    const fish = available[index];
-
-    const check = checkAdditionalRolls({ fish, config, rng });
-    additionalCheckResults.push({ fishId: fish.id, fishName: fish.fishName, ...check });
-
-    if (check.passed) {
-      candidateCatches.push(fish);
-    }
-
-    if (!config.fishSelection?.allowDuplicates) {
-      available.splice(index, 1);
-    }
-  }
+  const sortedFishes = [...fishes].sort((a, b) => getFishCodeRange(a).min - getFishCodeRange(b).min);
+  const catchData = passedEachRollDc
+    ? findCatchableFish({ fishes: sortedFishes, roll: cappedSum })
+    : { fish: null, effectiveRoll: null };
 
   return {
     normalizedInput,
     rawRolls,
     modifiedRolls,
-    finalRolls: rollsForSum,
+    finalRolls,
     guidance,
     baitBonusRoll,
-    finalSum,
-    dcChecks: [{ type: 'main', dc: mainDc, passed: true }],
-    quantityTarget,
-    candidateCatches,
-    additionalCheckResults,
-    success: candidateCatches.length > 0
+    shipBonusRoll,
+    eachRollDc,
+    failedRollIndexes,
+    passedEachRollDc,
+    computedSum,
+    finalSum: cappedSum,
+    selectedFish: catchData.fish,
+    rolledFish: passedEachRollDc ? findFishByRoll(sortedFishes, cappedSum) : null,
+    effectiveRollUsed: catchData.effectiveRoll,
+    success: Boolean(catchData.fish)
   };
 }
 
 export const __testables = {
   applyBaitBonus,
   applyGuidance,
-  checkAdditionalRolls,
-  evaluateQuantity
+  applyShipBonus,
+  getRollCap,
+  getFishCodeRange,
+  findFishByRoll,
+  findCatchableFish
 };

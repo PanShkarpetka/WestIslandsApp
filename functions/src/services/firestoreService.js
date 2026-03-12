@@ -33,10 +33,7 @@ export async function getBotConfig(db) {
 }
 
 export async function getAvailableFishes(db) {
-  const snapshot = await db.collection(COLLECTIONS.FISHES)
-    .where('fishAmountAvailableNow', '>', 0)
-    .get();
-
+  const snapshot = await db.collection(COLLECTIONS.FISHES).get();
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 

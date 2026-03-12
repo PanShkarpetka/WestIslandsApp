@@ -26,7 +26,8 @@ export const SESSION_STEPS = {
   MODIFIER_2: 'modifier_2',
   MODIFIER_3: 'modifier_3',
   GUIDANCE: 'guidance',
-  BAIT: 'bait'
+  BAIT: 'bait',
+  ADDITIONAL_ROLL_CONFIRM: 'additional_roll_confirm'
 };
 
 export const DEFAULT_CONFIG = {
@@ -36,7 +37,8 @@ export const DEFAULT_CONFIG = {
   },
   dc: {
     mainCatch: 45,
-    additionalCheckDc: 10
+    additionalCheckDc: 10,
+    eachRollDc: 10
   },
   quantityRules: [
     { minSum: 65, quantity: 3 },
