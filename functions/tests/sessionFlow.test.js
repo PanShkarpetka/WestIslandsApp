@@ -36,9 +36,10 @@ function createMockDb(seed = {}) {
   };
 }
 
-test('supports public cancel and reset commands', () => {
+test('supports public cancel/reset/help commands', () => {
   assert.equal(COMMANDS.CANCEL, '/cancel');
   assert.equal(COMMANDS.RESET, '/reset');
+  assert.equal(COMMANDS.HELP, '/help');
 });
 
 test('expires stale fishing session after 30 seconds', async () => {

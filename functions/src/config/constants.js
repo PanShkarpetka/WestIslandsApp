@@ -12,6 +12,7 @@ export const COMMANDS = {
   FISH: '/fish',
   CANCEL: '/cancel',
   RESET: '/reset',
+  HELP: '/help',
   RESET_FISH_AVAILABILITY: '/admin_fish_reset_availability',
   LIST_AVAILABLE_FISHES_TODAY: '/admin_fish_available_today',
   GET_FISH_PRICE: '/admin_fish_price',

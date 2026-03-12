@@ -324,6 +324,7 @@ export async function handleTelegramMessage({ db, payload }) {
     COMMANDS.FISH,
     COMMANDS.CANCEL,
     COMMANDS.RESET,
+    COMMANDS.HELP,
   ].some((command) => normalizedText.startsWith(command))) {
     return 'Fishing flow auto-canceled due to 30 seconds of inactivity. Use /fish to start again.';
   }
@@ -395,6 +396,10 @@ export async function handleTelegramMessage({ db, payload }) {
   if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(normalizedText)) {
     await clearUserSession(db, telegramUserId);
     return 'Fishing flow canceled. Use /fish to start again.';
+  }
+
+  if (normalizedText === COMMANDS.HELP) {
+    return helpMessage();
   }
 
   if (session.step === SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM) {
