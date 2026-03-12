@@ -46,7 +46,7 @@ export const DEFAULT_CONFIG = {
   guidance: {
     enabled: true,
     diceSides: 4,
-    applyTo: 'lowest_roll'
+    applyTo: 'all_rolls'
   },
   bait: {
     basic: { enabled: true, bonusDieSides: 0 },

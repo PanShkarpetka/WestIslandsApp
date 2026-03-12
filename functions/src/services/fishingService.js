@@ -18,15 +18,13 @@ function applyGuidance({ useGuidance, config, modifiedRolls, rng }) {
 
   const guidanceRoll = rollDie(config.guidance.diceSides || 4, rng);
   const adjustedRolls = [...modifiedRolls];
-  let appliedTo = config.guidance.applyTo || 'lowest_roll';
+  let appliedTo = config.guidance.applyTo || 'all_rolls';
 
   if (appliedTo === 'final_sum') {
     return { guidanceRoll, adjustedRolls, appliedTo };
   }
 
-  const lowestIndex = adjustedRolls.indexOf(Math.min(...adjustedRolls));
-  adjustedRolls[lowestIndex] += guidanceRoll;
-  appliedTo = 'lowest_roll';
+  adjustedRolls.forEach((adjustedRoll) => adjustedRoll += rollDie(config.guidance.diceSides || 4, rng))
 
   return { guidanceRoll, adjustedRolls, appliedTo };
 }
