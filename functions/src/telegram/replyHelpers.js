@@ -78,7 +78,11 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
   }
 
   if (resolvedCatches.length === 0) {
-    lines.push('🐟 Улов: цього разу без риби.');
+    if (options.pendingAdditionalRoll) {
+      lines.push('🐟 Улов: потрібно пройти перевірку.');
+    } else {
+      lines.push('🐟 Улов: цього разу без риби.');
+    }
   } else {
     const fish = resolvedCatches[0];
     lines.push(`🐟 Улов: <b>${escapeHtml(fish.fishName)}</b> (#${fishCodeLabel(fish)})`);
