@@ -101,7 +101,7 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
   }
 
   if (options.additionalRollCaughtDespiteFailure === true) {
-    lines.push('⚠️ Додатковий кидок: <b>ПРОВАЛ ❌</b>, але риба все одно спіймана через правило fishAdditionalRollsRequiredForSuccessfulCatch.catchEvenIfFailed.');
+    lines.push('⚠️ Додатковий кидок: <b>ПРОВАЛ ❌</b>. Але за особливим правилом цієї риби невдалий кидок усе одно дозволяє її спіймати.');
   }
 
   return lines.join('\n');
@@ -109,9 +109,9 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
 
 export function helpMessage() {
   return [
-    'Use /fish to start fishing.',
-    'Flow: 3 modifiers -> guidance yes/no -> bait type (+ optional ship).',
-    'Inline format: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; &lt;yes/no&gt; &lt;basic|simple|advanced&gt; [ship]',
-    'Use /cancel or /reset to cancel current fishing input.'
+    'Використовуйте лише команду в один рядок.',
+    'Формат: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; [yes/no] [basic|simple|advanced] [ship]',
+    'Значення за замовчуванням: guidance = no, bait = basic, ship = false.',
+    'Приклад: /fish 1 2 3'
   ].join('\n');
 }

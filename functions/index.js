@@ -52,7 +52,7 @@ export const telegramWebhook = onRequest(async (req, res) => {
         token: TELEGRAM_BOT_TOKEN,
         chatId: payload.chatId,
         messageThreadId: payload.messageThreadId,
-        text: 'Error. Something went wrong.'
+        text: 'Упс. Помилка. Щось пішло не так'
       });
     }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatFishingResult } from '../src/telegram/replyHelpers.js';
+import { formatFishingResult, helpMessage } from '../src/telegram/replyHelpers.js';
 
 test('formats fishing result in Ukrainian with HTML formatting', () => {
   const result = {
@@ -87,7 +87,7 @@ test('shows catch-on-failed-additional-roll message', () => {
     fishDescription: 'desc'
   }], { additionalRollCaughtDespiteFailure: true });
 
-  assert.match(reply, /але риба все одно спіймана/);
+  assert.match(reply, /за особливим правилом цієї риби/);
 });
 
 test('shows catch-on-failed-additional-roll message', () => {
@@ -114,5 +114,13 @@ test('shows catch-on-failed-additional-roll message', () => {
     fishDescription: 'desc'
   }], { additionalRollCaughtDespiteFailure: true });
 
-  assert.match(reply, /але риба все одно спіймана/);
+  assert.match(reply, /за особливим правилом цієї риби/);
+});
+
+
+test('help message describes one-line fish command with defaults', () => {
+  const reply = helpMessage();
+  assert.match(reply, /лише команду в один рядок/);
+  assert.match(reply, /Значення за замовчуванням: guidance = no, bait = basic, ship = false/);
+  assert.match(reply, /Приклад: \/fish 1 2 3/);
 });

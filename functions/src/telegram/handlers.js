@@ -24,14 +24,48 @@ function normalizeShipToken(value) {
 
 function parseSingleLineFishCommand(text, config) {
   const parts = text.split(/\s+/);
-  if (parts.length !== 6 && parts.length !== 7) {
-    return null;
+  if (parts.length < 4 || parts.length > 7) {
+    throw new Error('Використайте один рядок: /fish <mod1> <mod2> <mod3> [yes/no] [basic|simple|advanced] [ship].');
   }
 
-  const shipToken = normalizeShipToken(parts[6]);
-  const useShip = parts.length === 7 && shipToken === 'ship';
-  if (parts.length === 7 && shipToken && shipToken !== 'ship') {
-    throw new Error('Optional final argument must be "ship".');
+  const extraArgs = parts.slice(4);
+  let useGuidance = false;
+  let baitType = 'basic';
+  let useShip = false;
+  let guidanceProvided = false;
+  let baitProvided = false;
+
+  for (const arg of extraArgs) {
+    const shipToken = normalizeShipToken(arg);
+    if (shipToken === 'ship') {
+      if (useShip) {
+        throw new Error('Прапорець ship можна вказати лише один раз.');
+      }
+      useShip = true;
+      continue;
+    }
+
+    if (!guidanceProvided) {
+      try {
+        useGuidance = parseGuidanceInput(arg);
+        guidanceProvided = true;
+        continue;
+      } catch {
+        // no-op: token is not guidance
+      }
+    }
+
+    if (!baitProvided) {
+      try {
+        baitType = parseBaitInput(arg);
+        baitProvided = true;
+        continue;
+      } catch {
+        // no-op: token is not bait
+      }
+    }
+
+    throw new Error(`Невідомий аргумент: ${arg}. Формат: /fish <mod1> <mod2> <mod3> [yes/no] [basic|simple|advanced] [ship].`);
   }
 
   return {
@@ -40,26 +74,9 @@ function parseSingleLineFishCommand(text, config) {
       parseIntegerInput(parts[2], config.modifierLimits),
       parseIntegerInput(parts[3], config.modifierLimits)
     ],
-    useGuidance: parseGuidanceInput(parts[4]),
-    baitType: parseBaitInput(parts[5]),
+    useGuidance,
+    baitType,
     useShip
-  };
-}
-
-function parseBaitAndShipInput(text) {
-  const parts = String(text).trim().toLowerCase().split(/\s+/);
-  if (parts.length === 0 || parts.length > 2) {
-    throw new Error('Enter bait as: basic|simple|advanced, optionally followed by "ship".');
-  }
-
-  const shipToken = normalizeShipToken(parts[1]);
-  if (parts.length === 2 && shipToken && shipToken !== 'ship') {
-    throw new Error('Optional second value must be "ship".');
-  }
-
-  return {
-    baitType: parseBaitInput(parts[0]),
-    useShip: parts.length === 2 && shipToken === 'ship'
   };
 }
 
@@ -168,25 +185,6 @@ function extractSuccessfulCatchRows(logs) {
   return rows;
 }
 
-function nextPrompt(step) {
-  switch (step) {
-    case SESSION_STEPS.MODIFIER_1:
-      return 'Enter modifier for roll 1 (integer).';
-    case SESSION_STEPS.MODIFIER_2:
-      return 'Enter modifier for roll 2 (integer).';
-    case SESSION_STEPS.MODIFIER_3:
-      return 'Enter modifier for roll 3 (integer).';
-    case SESSION_STEPS.GUIDANCE:
-      return 'Use guidance? (yes/no)';
-    case SESSION_STEPS.BAIT:
-      return 'Choose bait: basic, simple, advanced. Optionally append "ship" (example: simple ship).';
-    case SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM:
-      return 'Pass additional roll? (yes/no)';
-    default:
-      return helpMessage();
-  }
-}
-
 async function processFishing({ db, telegramUserId, telegramUsername, normalizedInput, commandUsed, rawEnteredParams }) {
   const [config, fishes] = await Promise.all([
     getBotConfig(db),
@@ -267,7 +265,7 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
   const pending = session.payload?.pendingAdditionalRoll;
   if (!pending?.selectedFish) {
     await clearUserSession(db, telegramUserId);
-    return 'No pending additional roll. Use /fish to start again.';
+    return 'No pending additional roll. Use /fish ... to start again.';
   }
 
   if (!passed) {
@@ -300,7 +298,7 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
     });
 
     await clearUserSession(db, telegramUserId);
-    return `Additional roll failed. ${pending.fishName} escaped.`;
+    return `Перевірку провалено. ${pending.fishName} втекла.`;
   }
 
   const txResult = await updateFishAvailabilityTransaction(db, {
@@ -404,97 +402,20 @@ export async function handleTelegramMessage({ db, payload }) {
       const passed = parseGuidanceInput(text);
       return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
     } catch (error) {
-      return `Input error: ${error.message}`;
+      return `Не правильні дані. Помилка: ${error.message}`;
     }
   }
 
   if (normalizedText.startsWith(COMMANDS.FISH)) {
     try {
       const singleLine = parseSingleLineFishCommand(text, config);
-      if (singleLine) {
-        const { result, resolvedCatches, pendingAdditionalRoll } = await processFishing({
-          db,
-          telegramUserId,
-          telegramUsername: usernameFromPayload(payload),
-          normalizedInput: singleLine,
-          commandUsed: '/fish inline',
-          rawEnteredParams: text
-        });
-
-        if (pendingAdditionalRoll) {
-          await upsertUserSession(db, telegramUserId, {
-            step: SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM,
-            payload: { pendingAdditionalRoll, result }
-          });
-          return formatFishingResult(result, [], { pendingAdditionalRoll });
-        }
-
-        await clearUserSession(db, telegramUserId);
-        return formatFishingResult(result, resolvedCatches);
-      }
-    } catch (error) {
-      return `Input error: ${error.message}`;
-    }
-
-    await upsertUserSession(db, telegramUserId, {
-      step: SESSION_STEPS.MODIFIER_1,
-      payload: {}
-    });
-    return [
-      'Fishing started. You can also send: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; &lt;yes/no&gt; &lt;basic|simple|advanced&gt; [ship]',
-      nextPrompt(SESSION_STEPS.MODIFIER_1)
-    ].join('\n');
-  }
-
-  if (session.step === SESSION_STEPS.IDLE) {
-    return helpMessage();
-  }
-
-  try {
-    const nextPayload = { ...(session.payload || {}) };
-
-    if (session.step === SESSION_STEPS.MODIFIER_1) {
-      nextPayload.modifiers = [parseIntegerInput(text, config.modifierLimits)];
-      await upsertUserSession(db, telegramUserId, { step: SESSION_STEPS.MODIFIER_2, payload: nextPayload });
-      return nextPrompt(SESSION_STEPS.MODIFIER_2);
-    }
-
-    if (session.step === SESSION_STEPS.MODIFIER_2) {
-      nextPayload.modifiers.push(parseIntegerInput(text, config.modifierLimits));
-      await upsertUserSession(db, telegramUserId, { step: SESSION_STEPS.MODIFIER_3, payload: nextPayload });
-      return nextPrompt(SESSION_STEPS.MODIFIER_3);
-    }
-
-    if (session.step === SESSION_STEPS.MODIFIER_3) {
-      nextPayload.modifiers.push(parseIntegerInput(text, config.modifierLimits));
-      await upsertUserSession(db, telegramUserId, { step: SESSION_STEPS.GUIDANCE, payload: nextPayload });
-      return nextPrompt(SESSION_STEPS.GUIDANCE);
-    }
-
-    if (session.step === SESSION_STEPS.GUIDANCE) {
-      nextPayload.useGuidance = parseGuidanceInput(text);
-      await upsertUserSession(db, telegramUserId, { step: SESSION_STEPS.BAIT, payload: nextPayload });
-      return nextPrompt(SESSION_STEPS.BAIT);
-    }
-
-    if (session.step === SESSION_STEPS.BAIT) {
-      const baitInput = parseBaitAndShipInput(text);
-      nextPayload.baitType = baitInput.baitType;
-      nextPayload.useShip = baitInput.useShip;
-
-      const normalizedInput = {
-        modifiers: nextPayload.modifiers,
-        useGuidance: nextPayload.useGuidance,
-        baitType: nextPayload.baitType,
-        useShip: nextPayload.useShip
-      };
       const { result, resolvedCatches, pendingAdditionalRoll } = await processFishing({
         db,
         telegramUserId,
         telegramUsername: usernameFromPayload(payload),
-        normalizedInput,
-        commandUsed: '/fish',
-        rawEnteredParams: nextPayload
+        normalizedInput: singleLine,
+        commandUsed: '/fish inline',
+        rawEnteredParams: text
       });
 
       if (pendingAdditionalRoll) {
@@ -507,11 +428,15 @@ export async function handleTelegramMessage({ db, payload }) {
 
       await clearUserSession(db, telegramUserId);
       return formatFishingResult(result, resolvedCatches);
+    } catch (error) {
+      return `Помилка введення : ${error.message}`;
     }
-
-    await clearUserSession(db, telegramUserId);
-    return helpMessage();
-  } catch (error) {
-    return `Input error: ${error.message}`;
   }
+
+  if (session.step === SESSION_STEPS.IDLE) {
+    return helpMessage();
+  }
+
+  await clearUserSession(db, telegramUserId);
+  return helpMessage();
 }
