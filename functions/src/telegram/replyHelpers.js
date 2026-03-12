@@ -112,6 +112,6 @@ export function helpMessage() {
     'Use /fish to start fishing.',
     'Flow: 3 modifiers -> guidance yes/no -> bait type (+ optional ship).',
     'Inline format: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; &lt;yes/no&gt; &lt;basic|simple|advanced&gt; [ship]',
-    'Use /cancel to cancel current fishing input.'
+    'Use /cancel or /reset to cancel current fishing input.'
   ].join('\n');
 }

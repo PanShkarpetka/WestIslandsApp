@@ -317,15 +317,27 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
 
 export async function handleTelegramMessage({ db, payload }) {
   const { text, telegramUserId } = payload;
+  const normalizedText = text.toLowerCase();
   const session = await getOrCreateUserSession(db, telegramUserId);
   const config = await getBotConfig(db);
 
-  if (text.toLowerCase() === COMMANDS.RESET_FISH_AVAILABILITY) {
+  const isAdminCommand = normalizedText.startsWith('/admin_');
+  if (session.staleSessionCleared && !isAdminCommand && ![
+    COMMANDS.FISH,
+    COMMANDS.CANCEL,
+    COMMANDS.RESET,
+    COMMANDS.LEGACY_CANCEL,
+    COMMANDS.LEGACY_RESET
+  ].some((command) => normalizedText.startsWith(command))) {
+    return 'Fishing flow auto-canceled due to 30 seconds of inactivity. Use /fish to start again.';
+  }
+
+  if (normalizedText === COMMANDS.RESET_FISH_AVAILABILITY) {
     const resetCount = await resetFishAvailabilityToDaily(db);
     return `Reset availability to daily defaults for ${resetCount} fishes.`;
   }
 
-  if (text.toLowerCase() === COMMANDS.LIST_AVAILABLE_FISHES_TODAY) {
+  if (normalizedText === COMMANDS.LIST_AVAILABLE_FISHES_TODAY) {
     const fishes = await getAvailableFishes(db);
     const available = fishes
       .filter((fish) => Number(fish.fishAmountAvailableNow || 0) > 0)
@@ -345,13 +357,13 @@ export async function handleTelegramMessage({ db, payload }) {
     ].join('\n');
   }
 
-  if (text.toLowerCase().startsWith(COMMANDS.GET_FISH_PRICE)) {
+  if (normalizedText.startsWith(COMMANDS.GET_FISH_PRICE)) {
     const fishes = await getAvailableFishes(db);
     const codes = parseFishCodesInput(text, COMMANDS.GET_FISH_PRICE);
     return buildFishPriceReport(fishes, codes);
   }
 
-  if (text.toLowerCase() === COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY) {
+  if (normalizedText === COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY) {
     const logs = await getFishingLogsForDate(db);
     const catches = extractSuccessfulCatchRows(logs);
     if (catches.length === 0) {
@@ -364,7 +376,7 @@ export async function handleTelegramMessage({ db, payload }) {
     ].join('\n');
   }
 
-  if (text.toLowerCase() === COMMANDS.SUM_SUCCESSFUL_CATCHES_BY_USER_ALL_TIME) {
+  if (normalizedText === COMMANDS.SUM_SUCCESSFUL_CATCHES_BY_USER_ALL_TIME) {
     const logs = await getAllFishingLogs(db);
     const catches = extractSuccessfulCatchRows(logs);
     if (catches.length === 0) {
@@ -384,7 +396,7 @@ export async function handleTelegramMessage({ db, payload }) {
     ].join('\n');
   }
 
-  if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(text.toLowerCase())) {
+  if ([COMMANDS.CANCEL, COMMANDS.RESET, COMMANDS.LEGACY_CANCEL, COMMANDS.LEGACY_RESET].includes(normalizedText)) {
     await clearUserSession(db, telegramUserId);
     return 'Fishing flow canceled. Use /fish to start again.';
   }
@@ -398,7 +410,7 @@ export async function handleTelegramMessage({ db, payload }) {
     }
   }
 
-  if (text.startsWith(COMMANDS.FISH)) {
+  if (normalizedText.startsWith(COMMANDS.FISH)) {
     try {
       const singleLine = parseSingleLineFishCommand(text, config);
       if (singleLine) {

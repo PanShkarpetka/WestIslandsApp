@@ -1,4 +1,4 @@
-import { BOT_CONFIG_DOC, COLLECTIONS, DEFAULT_CONFIG, SESSION_STEPS, SESSION_TTL_MS } from '../config/constants.js';
+import { ACTIVE_SESSION_TIMEOUT_MS, BOT_CONFIG_DOC, COLLECTIONS, DEFAULT_CONFIG, SESSION_STEPS } from '../config/constants.js';
 
 function mergeDeep(target, source) {
   const output = { ...target };
@@ -92,16 +92,18 @@ export async function getOrCreateUserSession(db, telegramUserId) {
 
   const session = snapshot.data();
   const updatedAtMs = new Date(session.updatedAt || 0).getTime();
-  if (Date.now() - updatedAtMs > SESSION_TTL_MS) {
+  if (Date.now() - updatedAtMs > ACTIVE_SESSION_TIMEOUT_MS) {
     const resetSession = {
       telegramUserId,
       step: SESSION_STEPS.IDLE,
       payload: {},
-      updatedAt: new Date().toISOString(),
-      staleSessionCleared: true
+      updatedAt: new Date().toISOString()
     };
     await sessionRef.set(resetSession);
-    return resetSession;
+    return {
+      ...resetSession,
+      staleSessionCleared: true
+    };
   }
 
   return session;

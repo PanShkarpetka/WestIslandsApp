@@ -10,8 +10,8 @@ export const BOT_CONFIG_DOC = 'fishing';
 
 export const COMMANDS = {
   FISH: '/fish',
-  CANCEL: '/fish_cancel',
-  RESET: '/fish_reset',
+  CANCEL: '/cancel',
+  RESET: '/reset',
   RESET_FISH_AVAILABILITY: '/admin_fish_reset_availability',
   LIST_AVAILABLE_FISHES_TODAY: '/admin_fish_available_today',
   GET_FISH_PRICE: '/admin_fish_price',
@@ -67,4 +67,4 @@ export const DEFAULT_CONFIG = {
   }
 };
 
-export const SESSION_TTL_MS = 15 * 60 * 1000;
+export const ACTIVE_SESSION_TIMEOUT_MS = 30 * 1000;
