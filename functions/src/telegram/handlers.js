@@ -12,15 +12,22 @@ import {
 import { parseBaitInput, parseGuidanceInput, parseIntegerInput } from '../utils/validation.js';
 import { formatFishingResult, helpMessage } from './replyHelpers.js';
 
+function normalizeShipToken(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+}
+
 function parseSingleLineFishCommand(text, config) {
   const parts = text.split(/\s+/);
-  console.log(`parts: ${JSON.stringify({parts})}`);
   if (parts.length !== 6 && parts.length !== 7) {
     return null;
   }
 
-  const shipToken = (parts[6] || '').trim().toLowerCase();
-  if (parts.length === 7 && shipToken !== 'ship') {
+  const shipToken = normalizeShipToken(parts[6]);
+  const useShip = parts.length === 7 && shipToken === 'ship';
+  if (parts.length === 7 && shipToken && shipToken !== 'ship') {
     throw new Error('Optional final argument must be "ship".');
   }
 
@@ -32,7 +39,7 @@ function parseSingleLineFishCommand(text, config) {
     ],
     useGuidance: parseGuidanceInput(parts[4]),
     baitType: parseBaitInput(parts[5]),
-    useShip: parts.length === 7
+    useShip
   };
 }
 
@@ -42,13 +49,14 @@ function parseBaitAndShipInput(text) {
     throw new Error('Enter bait as: basic|simple|advanced, optionally followed by "ship".');
   }
 
-  if (parts.length === 2 && parts[1] !== 'ship') {
+  const shipToken = normalizeShipToken(parts[1]);
+  if (parts.length === 2 && shipToken && shipToken !== 'ship') {
     throw new Error('Optional second value must be "ship".');
   }
 
   return {
     baitType: parseBaitInput(parts[0]),
-    useShip: parts.length === 2
+    useShip: parts.length === 2 && shipToken === 'ship'
   };
 }
 
@@ -201,8 +209,6 @@ export async function handleTelegramMessage({ db, payload }) {
   if (text.startsWith(COMMANDS.FISH)) {
     try {
       const singleLine = parseSingleLineFishCommand(text, config);
-      console.log(`singleLine: ${JSON.stringify({singleLine})}`);
-
       if (singleLine) {
         const { result, resolvedCatches, pendingAdditionalRoll } = await processFishing({
           db,
@@ -232,7 +238,7 @@ export async function handleTelegramMessage({ db, payload }) {
       payload: {}
     });
     return [
-      'Fishing started. You can also send: /fish <mod1> <mod2> <mod3> <yes/no> <basic|simple|advanced> [ship]',
+      'Fishing started. You can also send: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; &lt;yes/no&gt; &lt;basic|simple|advanced&gt; [ship]',
       nextPrompt(SESSION_STEPS.MODIFIER_1)
     ].join('\n');
   }

@@ -3,6 +3,13 @@ import { BAIT_TYPES } from '../config/constants.js';
 const GUIDANCE_TRUE = new Set(['yes', 'y', 'true', '1']);
 const GUIDANCE_FALSE = new Set(['no', 'n', 'false', '0']);
 
+function normalizeToken(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+}
+
 export function parseIntegerInput(value, { min, max }) {
   const parsed = Number.parseInt(String(value), 10);
   if (!Number.isInteger(parsed)) {
@@ -17,8 +24,7 @@ export function parseIntegerInput(value, { min, max }) {
 }
 
 export function parseGuidanceInput(value) {
-  console.log(`value: ${value}`)
-  const normalized = String(value).trim().toLowerCase();
+  const normalized = normalizeToken(value);
   if (GUIDANCE_TRUE.has(normalized)) {
     return true;
   }
@@ -31,7 +37,7 @@ export function parseGuidanceInput(value) {
 }
 
 export function parseBaitInput(value) {
-  const normalized = String(value).trim().toLowerCase();
+  const normalized = normalizeToken(value);
   if (!Object.values(BAIT_TYPES).includes(normalized)) {
     throw new Error('Bait must be one of: basic, simple, advanced.');
   }

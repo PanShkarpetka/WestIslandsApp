@@ -36,5 +36,29 @@ test('formats fishing result in Ukrainian with HTML formatting', () => {
   assert.match(reply, /📊 Сума для пошуку риби: <b><u>53<\/u><\/b>/);
   assert.match(reply, /🐟 Улов: <b>Групер кам’яний<\/b>/);
   assert.match(reply, /<blockquote>Ховається у підводних печерах\./);
-  assert.match(reply, /🎉 Додатковий кидок: <b>PASS ✅<\/b>/);
+  assert.match(reply, /🎉 Додатковий кидок: <b>УСПІХ ✅<\/b>/);
+});
+
+
+test('formats scalar bonus rolls without crashing', () => {
+  const result = {
+    normalizedInput: { modifiers: [1, 2, 3], baitType: 'simple', useShip: true },
+    rawRolls: [1, 2, 3],
+    modifiedRolls: [2, 4, 6],
+    finalRolls: [2, 4, 6],
+    guidance: { guidanceRolls: [], totalGuidanceBonus: 0 },
+    baitBonusRoll: 2,
+    shipBonusRoll: 3,
+    computedSum: 17,
+    finalSum: 17,
+    eachRollDc: 1,
+    passedEachRollDc: true,
+    failedRollIndexes: [],
+    rolledFish: null,
+    effectiveRollUsed: 17
+  };
+
+  const reply = formatFishingResult(result, []);
+  assert.match(reply, /🪱 Бонус наживки: \(\+2\)/);
+  assert.match(reply, /🚢 Бонус корабля: \(\+3\)/);
 });

@@ -23,7 +23,9 @@ function escapeHtml(value) {
 }
 
 function formatList(values, { withParens = false, withSign = false } = {}) {
-  return values
+  const list = Array.isArray(values) ? values : [values];
+
+  return list
     .map((value) => {
       const normalized = Number(value);
       const display = Number.isNaN(normalized) ? String(value) : String(normalized);
@@ -36,7 +38,7 @@ function formatList(values, { withParens = false, withSign = false } = {}) {
 export function formatFishingResult(result, resolvedCatches, options = {}) {
   const lines = [];
   lines.push('🎣 <b>Результат риболовлі</b>\n');
-  lines.push(`🧮 Модифікатори: ${formatList(result.normalizedInput.modifiers)}`);
+  lines.push(`🧮 Модифікатори: ${formatList(result.normalizedInput.modifiers, { withParens: true, withSign: true })}`);
   lines.push(`🎲 Сирі кидки d20: ${formatList(result.rawRolls, { withParens: true})}`);
   lines.push(`📌 Після модифікаторів: <b>${formatList(result.modifiedRolls)}</b>`);
 
@@ -50,13 +52,13 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
   lines.push(`🪱 Наживка: <b>${escapeHtml(result.normalizedInput.baitType)}</b>`);
 
   if (result.baitBonusRoll) {
-    lines.push(`🪱 Бонус наживки: (${formatList(result.baitBonusRoll, { withParens: true, withSign: true })})`);
+    lines.push(`🪱 Бонус наживки: ${formatList(result.baitBonusRoll, { withParens: true, withSign: true })}`);
   }
 
   lines.push(`🚢 Корабель використано: <b>${result.normalizedInput.useShip ? 'так' : 'ні'}</b>`);
 
   if (result.shipBonusRoll) {
-    lines.push(`🚢 Бонус корабля: (${formatList(result.shipBonusRoll, { withParens: true, withSign: true })})`);
+    lines.push(`🚢 Бонус корабля: ${formatList(result.shipBonusRoll, { withParens: true, withSign: true })}`);
   }
 
   if (result.computedSum !== result.finalSum) {
@@ -72,7 +74,7 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
   }
 
   if (result.rolledFish && result.effectiveRollUsed !== result.finalSum) {
-    lines.push(`⚠️ Випала недоступна риба (${escapeHtml(result.rolledFish.fishName)}. Хтось її уже піймав, але натомість піймалася ось ця: ${result.effectiveRollUsed}`);
+    lines.push(`⚠️ Випала недоступна риба (${escapeHtml(result.rolledFish.fishName)}). Хтось її уже піймав, але натомість піймалася ось ця: ${result.effectiveRollUsed}`);
   }
 
   if (resolvedCatches.length === 0) {
