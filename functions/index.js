@@ -39,6 +39,7 @@ export const telegramWebhook = onRequest(async (req, res) => {
     await sendTelegramMessage({
       token: TELEGRAM_BOT_TOKEN,
       chatId: payload.chatId,
+      messageThreadId: payload.messageThreadId,
       text: reply
     });
 
@@ -50,6 +51,7 @@ export const telegramWebhook = onRequest(async (req, res) => {
       await sendTelegramMessage({
         token: TELEGRAM_BOT_TOKEN,
         chatId: payload.chatId,
+        messageThreadId: payload.messageThreadId,
         text: 'Error. Something went wrong.'
       });
     }

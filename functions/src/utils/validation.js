@@ -70,6 +70,7 @@ export function validateTelegramUpdate(update) {
     updateId: update.update_id,
     messageId: message.message_id,
     chatId: message.chat.id,
+    messageThreadId: Number.isInteger(message.message_thread_id) ? message.message_thread_id : null,
     telegramUserId: actor.id,
     telegramUsername: actor.username || null,
     telegramFirstName: actor.first_name || null,

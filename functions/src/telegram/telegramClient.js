@@ -1,9 +1,19 @@
-export async function sendTelegramMessage({ token, chatId, text }) {
+export async function sendTelegramMessage({ token, chatId, text, messageThreadId }) {
   const endpoint = `https://api.telegram.org/bot${token}/sendMessage`;
+  const body = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML'
+  };
+
+  if (Number.isInteger(messageThreadId)) {
+    body.message_thread_id = messageThreadId;
+  }
+
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
+    body: JSON.stringify(body)
   });
 
   if (!response.ok) {

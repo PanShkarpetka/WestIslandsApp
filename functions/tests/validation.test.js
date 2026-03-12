@@ -50,3 +50,20 @@ test('validateTelegramUpdate supports callback query payloads', () => {
   assert.equal(update.telegramFirstName, 'Line');
   assert.equal(update.text, '/fish');
 });
+
+test('validateTelegramUpdate returns message thread id for forum topics', () => {
+  const update = validateTelegramUpdate({
+    update_id: 30,
+    message: {
+      message_id: 31,
+      message_thread_id: 32,
+      text: '/fish',
+      chat: { id: 33 },
+      from: { id: 34 }
+    }
+  });
+
+  assert.equal(update.chatId, 33);
+  assert.equal(update.messageThreadId, 32);
+});
+
