@@ -52,7 +52,7 @@ function getRollCap({ baitType, useShip, hasCriticalSuccess = false }) {
     return 53;
   }
 
-  return 67;
+  return 65;
 }
 
 function getFishCodeRange(fish) {

@@ -70,7 +70,7 @@ test('fails fishing when any roll is below eachRollDc', () => {
 
 test('uses previous fish by code range when rolled fish is unavailable', () => {
   const fishes = [
-    { id: 'f1', fishName: 'Trout', fishAmountAvailableNow: 1, fishCodeNumber: { min: 61, max: 67 } },
+    { id: 'f1', fishName: 'Trout', fishAmountAvailableNow: 1, fishCodeNumber: { min: 61, max: 65 } },
     { id: 'f2', fishName: 'Wizard Eel', fishAmountAvailableNow: 0, fishCodeNumber: { min: 68, max: 68 } }
   ];
 
@@ -84,13 +84,13 @@ test('uses previous fish by code range when rolled fish is unavailable', () => {
 
   assert.equal(result.finalSum, 69);
   assert.equal(result.rolledFish, null);
-  assert.equal(result.effectiveRollUsed, 67);
+  assert.equal(result.effectiveRollUsed, 65);
   assert.equal(result.selectedFish.fishName, 'Trout');
 });
 
 test('caps sum by bait availability when ship is not used', () => {
   const fishes = [
-    { id: 'f1', fishName: 'CapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 67, max: 67 } }
+    { id: 'f1', fishName: 'CapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 67, max: 65 } }
   ];
   const rng = makeRng([0.95, 0.95, 0.95, 0.95]);
 
@@ -101,15 +101,15 @@ test('caps sum by bait availability when ship is not used', () => {
     rng
   });
 
-  assert.equal(result.computedSum > 67, true);
-  assert.equal(result.finalSum, 67);
+  assert.equal(result.computedSum > 65, true);
+  assert.equal(result.finalSum, 65);
   assert.equal(result.selectedFish.fishName, 'CapFish');
 });
 
 
 test('treats basic bait cap as advanced when any raw d20 roll is a crit', () => {
   const fishes = [
-    { id: 'f1', fishName: 'HighCapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 60, max: 67 } }
+    { id: 'f1', fishName: 'HighCapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 60, max: 65 } }
   ];
 
   const rng = makeRng([0.99, 0.2, 0.2]);
@@ -122,7 +122,7 @@ test('treats basic bait cap as advanced when any raw d20 roll is a crit', () => 
 
   assert.equal(result.hasCriticalSuccess, true);
   assert.equal(result.computedSum > 53, true);
-  assert.equal(result.finalSum, 67);
+  assert.equal(result.finalSum, 65);
   assert.equal(result.selectedFish.fishName, 'HighCapFish');
 });
 
@@ -140,7 +140,7 @@ test('critical success does not bypass ship requirement for uncapped sum', () =>
   });
 
   assert.equal(noShip.hasCriticalSuccess, true);
-  assert.equal(noShip.finalSum, 67);
+  assert.equal(noShip.finalSum, 65);
   assert.equal(noShip.selectedFish, null);
 
   const withShip = resolveFishingAttempt({
@@ -150,6 +150,6 @@ test('critical success does not bypass ship requirement for uncapped sum', () =>
     rng: makeRng([0.99, 0.99, 0.99, 0.2])
   });
 
-  assert.equal(withShip.finalSum > 67, true);
+  assert.equal(withShip.finalSum > 65, true);
   assert.equal(withShip.selectedFish.fishName, 'ShipOnlyFish');
 });

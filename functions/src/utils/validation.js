@@ -33,7 +33,7 @@ export function parseGuidanceInput(value) {
     return false;
   }
 
-  throw new Error('Guidance must be yes or no.');
+  throw new Error('Input param must be yes or no.');
 }
 
 export function parseBaitInput(value) {
