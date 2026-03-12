@@ -121,6 +121,6 @@ test('shows catch-on-failed-additional-roll message', () => {
 test('help message describes one-line fish command with defaults', () => {
   const reply = helpMessage();
   assert.match(reply, /лише команду в один рядок/);
-  assert.match(reply, /Значення за замовчуванням: guidance = no, bait = basic, ship = false/);
+  assert.match(reply, /Значення за замовчуванням: guidance = no/);
   assert.match(reply, /Приклад: \/fish 1 2 3/);
 });

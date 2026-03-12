@@ -111,8 +111,8 @@ Bot: Enter modifier for roll 2 (integer).
 User: -1
 Bot: Enter modifier for roll 3 (integer).
 User: 4
-Bot: Use guidance? (yes/no)
-User: yes
+Bot: Optional: add `guidance` token to enable guidance.
+User: guidance
 Bot: Choose bait: basic, simple, advanced.
 User: advanced
 Bot: 🎣 Fishing result
@@ -131,11 +131,11 @@ Bot: 🎣 Fishing result
 ### 6) Command shortcuts
 Inline one-message format is supported:
 ```
-/fish <mod1> <mod2> <mod3> <yes|no> <basic|simple|advanced>
+/fish <mod1> <mod2> <mod3> [guidance] [basic|simple|advanced] [ship]
 ```
 Example:
 ```
-/fish 2 -1 4 yes simple
+/fish 2 -1 4 guidance simple
 ```
 
 ### 7) Daily reset readiness

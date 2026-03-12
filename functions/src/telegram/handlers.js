@@ -12,7 +12,7 @@ import {
   upsertUserSession,
   updateFishAvailabilityTransaction
 } from '../services/firestoreService.js';
-import { parseBaitInput, parseGuidanceInput, parseIntegerInput } from '../utils/validation.js';
+import { parseBaitInput, parseGuidanceInput, parseIntegerInput, parseYesNoInput } from '../utils/validation.js';
 import { formatFishingResult, helpMessage } from './replyHelpers.js';
 
 function normalizeShipToken(value) {
@@ -25,7 +25,7 @@ function normalizeShipToken(value) {
 function parseSingleLineFishCommand(text, config) {
   const parts = text.split(/\s+/);
   if (parts.length < 4 || parts.length > 7) {
-    throw new Error('Використайте один рядок: /fish <mod1> <mod2> <mod3> [yes/no] [basic|simple|advanced] [ship].');
+    throw new Error('Використайте один рядок: /fish <mod1> <mod2> <mod3> [guidance] [basic|simple|advanced] [ship].');
   }
 
   const extraArgs = parts.slice(4);
@@ -65,7 +65,7 @@ function parseSingleLineFishCommand(text, config) {
       }
     }
 
-    throw new Error(`Невідомий аргумент: ${arg}. Формат: /fish <mod1> <mod2> <mod3> [yes/no] [basic|simple|advanced] [ship].`);
+    throw new Error(`Невідомий аргумент: ${arg}. Формат: /fish <mod1> <mod2> <mod3> [guidance] [basic|simple|advanced] [ship].`);
   }
 
   return {
@@ -404,7 +404,7 @@ export async function handleTelegramMessage({ db, payload }) {
 
   if (session.step === SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM) {
     try {
-      const passed = parseGuidanceInput(text);
+      const passed = parseYesNoInput(text);
       return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
     } catch (error) {
       return `Не правильні дані. Помилка: ${error.message}`;

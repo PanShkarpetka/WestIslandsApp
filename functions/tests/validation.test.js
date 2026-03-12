@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseBaitInput, parseGuidanceInput, validateTelegramUpdate } from '../src/utils/validation.js';
+import { parseBaitInput, parseGuidanceInput, parseYesNoInput, validateTelegramUpdate } from '../src/utils/validation.js';
 
-test('parseGuidanceInput accepts punctuation-wrapped no', () => {
-  assert.equal(parseGuidanceInput('no.'), false);
-  assert.equal(parseGuidanceInput('(yes)'), true);
+test('parseGuidanceInput accepts punctuation-wrapped guidance token', () => {
+  assert.equal(parseGuidanceInput('(guidance)'), true);
+  assert.throws(() => parseGuidanceInput('no.'), /guidance/);
+});
+
+
+test('parseYesNoInput accepts punctuation-wrapped yes/no tokens', () => {
+  assert.equal(parseYesNoInput('yes!'), true);
+  assert.equal(parseYesNoInput('(no)'), false);
+  assert.throws(() => parseYesNoInput('guidance'), /yes or no/);
 });
 
 test('parseBaitInput accepts punctuation-wrapped bait type', () => {

@@ -1,7 +1,9 @@
 import { BAIT_TYPES } from '../config/constants.js';
 
-const GUIDANCE_TRUE = new Set(['yes', 'y', 'true', '1']);
-const GUIDANCE_FALSE = new Set(['no', 'n', 'false', '0']);
+const GUIDANCE_TRUE = new Set(['guidance']);
+
+const YES_NO_TRUE = new Set(['yes', 'y', 'true', '1']);
+const YES_NO_FALSE = new Set(['no', 'n', 'false', '0']);
 
 function normalizeToken(value) {
   return String(value)
@@ -29,7 +31,16 @@ export function parseGuidanceInput(value) {
     return true;
   }
 
-  if (GUIDANCE_FALSE.has(normalized)) {
+  throw new Error('Input param must be guidance.');
+}
+
+export function parseYesNoInput(value) {
+  const normalized = normalizeToken(value);
+  if (YES_NO_TRUE.has(normalized)) {
+    return true;
+  }
+
+  if (YES_NO_FALSE.has(normalized)) {
     return false;
   }
 

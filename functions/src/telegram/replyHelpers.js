@@ -110,8 +110,8 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
 export function helpMessage() {
   return [
     'Використовуйте лише команду в один рядок.',
-    'Формат: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; [yes/no] [basic|simple|advanced] [ship]',
-    'Значення за замовчуванням: guidance = no, bait = basic, ship = false.',
+    'Формат: /fish &lt;mod1&gt; &lt;mod2&gt; &lt;mod3&gt; [guidance] [basic|simple|advanced] [ship]',
+    'Значення за замовчуванням: guidance = no (увімкнеться лише якщо вказано guidance), bait = basic, ship = false.',
     'Приклад: /fish 1 2 3'
   ].join('\n');
 }
