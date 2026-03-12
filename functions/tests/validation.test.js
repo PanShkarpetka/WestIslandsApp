@@ -26,3 +26,27 @@ test('validateTelegramUpdate returns username and first name metadata', () => {
   assert.equal(update.telegramUsername, 'angler');
   assert.equal(update.telegramFirstName, 'River');
 });
+
+
+test('validateTelegramUpdate supports callback query payloads', () => {
+  const update = validateTelegramUpdate({
+    update_id: 20,
+    callback_query: {
+      id: 'abc123',
+      data: '/fish',
+      from: { id: 33, username: 'hook', first_name: 'Line' },
+      message: {
+        message_id: 21,
+        chat: { id: 22 }
+      }
+    }
+  });
+
+  assert.equal(update.updateId, 20);
+  assert.equal(update.messageId, 21);
+  assert.equal(update.chatId, 22);
+  assert.equal(update.telegramUserId, 33);
+  assert.equal(update.telegramUsername, 'hook');
+  assert.equal(update.telegramFirstName, 'Line');
+  assert.equal(update.text, '/fish');
+});

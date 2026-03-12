@@ -54,8 +54,15 @@ export function validateTelegramUpdate(update) {
     throw new Error('Missing Telegram update_id.');
   }
 
-  const message = update.message;
-  if (!message || !message.chat || !message.from) {
+  const message =
+    update.message ||
+    update.edited_message ||
+    update.channel_post ||
+    update.callback_query?.message;
+
+  const actor = message?.from || update.callback_query?.from;
+
+  if (!message || !message.chat || !actor) {
     throw new Error('Missing required Telegram message fields.');
   }
 
@@ -63,9 +70,9 @@ export function validateTelegramUpdate(update) {
     updateId: update.update_id,
     messageId: message.message_id,
     chatId: message.chat.id,
-    telegramUserId: message.from.id,
-    telegramUsername: message.from.username || null,
-    telegramFirstName: message.from.first_name || null,
-    text: String(message.text || '').trim()
+    telegramUserId: actor.id,
+    telegramUsername: actor.username || null,
+    telegramFirstName: actor.first_name || null,
+    text: String(message.text || update.callback_query?.data || '').trim()
   };
 }

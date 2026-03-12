@@ -45,11 +45,15 @@ export const telegramWebhook = onRequest(async (req, res) => {
     res.status(200).send('OK');
   } catch (error) {
     console.error('Webhook processing failed', error);
-    await sendTelegramMessage({
-      token: TELEGRAM_BOT_TOKEN,
-      chatId: payload?.chatId,
-      text: `Error. Something went wrong.`
-    });
+
+    if (payload?.chatId) {
+      await sendTelegramMessage({
+        token: TELEGRAM_BOT_TOKEN,
+        chatId: payload.chatId,
+        text: 'Error. Something went wrong.'
+      });
+    }
+
     res.status(200).send('Ignored');
   }
 });
