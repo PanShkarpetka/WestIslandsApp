@@ -10,8 +10,13 @@ export const BOT_CONFIG_DOC = 'fishing';
 
 export const COMMANDS = {
   FISH: '/fish',
-  CANCEL: '/cancel',
-  RESET: '/reset'
+  CANCEL: '/fish_cancel',
+  RESET: '/fish_reset',
+  RESET_FISH_AVAILABILITY: '/admin_fish_reset_availability',
+  LIST_AVAILABLE_FISHES_TODAY: '/admin_fish_available_today',
+  GET_FISH_PRICE: '/admin_fish_price',
+  LIST_SUCCESSFUL_CATCHES_TODAY: '/admin_fish_catches_today',
+  SUM_SUCCESSFUL_CATCHES_BY_USER_ALL_TIME: '/admin_fish_catches_total'
 };
 
 export const BAIT_TYPES = {

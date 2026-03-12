@@ -64,6 +64,8 @@ export function validateTelegramUpdate(update) {
     messageId: message.message_id,
     chatId: message.chat.id,
     telegramUserId: message.from.id,
+    telegramUsername: message.from.username || null,
+    telegramFirstName: message.from.first_name || null,
     text: String(message.text || '').trim()
   };
 }

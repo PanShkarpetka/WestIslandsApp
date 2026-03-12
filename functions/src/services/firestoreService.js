@@ -37,6 +37,44 @@ export async function getAvailableFishes(db) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+
+export async function resetFishAvailabilityToDaily(db) {
+  const snapshot = await db.collection(COLLECTIONS.FISHES).get();
+  const batch = db.batch();
+
+  snapshot.docs.forEach((doc) => {
+    const data = doc.data();
+    const dailyAmount = Math.max(0, Number(data.fishAmountDaily ?? data.fishAmountAvailableNow ?? 0));
+    batch.update(doc.ref, { fishAmountAvailableNow: dailyAmount });
+  });
+
+  await batch.commit();
+  return snapshot.size;
+}
+
+export async function getFishingLogsForDate(db, date = new Date()) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+
+  const snapshot = await db.collection(COLLECTIONS.FISHING_LOGS)
+    .where('timestamp', '>=', start.toISOString())
+    .where('timestamp', '<', end.toISOString())
+    .orderBy('timestamp', 'asc')
+    .get();
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function getAllFishingLogs(db) {
+  const snapshot = await db.collection(COLLECTIONS.FISHING_LOGS)
+    .orderBy('timestamp', 'asc')
+    .get();
+
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
 export async function getOrCreateUserSession(db, telegramUserId) {
   const sessionRef = db.collection(COLLECTIONS.USER_SESSIONS).doc(String(telegramUserId));
   const snapshot = await sessionRef.get();

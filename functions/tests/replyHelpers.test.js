@@ -62,3 +62,57 @@ test('formats scalar bonus rolls without crashing', () => {
   assert.match(reply, /🪱 Бонус наживки: \(\+2\)/);
   assert.match(reply, /🚢 Бонус корабля: \(\+3\)/);
 });
+
+test('shows catch-on-failed-additional-roll message', () => {
+  const result = {
+    normalizedInput: { modifiers: [1, 2, 3], baitType: 'simple', useShip: false },
+    rawRolls: [10, 10, 10],
+    modifiedRolls: [11, 12, 13],
+    finalRolls: [11, 12, 13],
+    guidance: { guidanceRolls: [], totalGuidanceBonus: 0 },
+    baitBonusRoll: null,
+    shipBonusRoll: null,
+    computedSum: 36,
+    finalSum: 36,
+    eachRollDc: 10,
+    passedEachRollDc: true,
+    failedRollIndexes: [],
+    rolledFish: null,
+    effectiveRollUsed: 36
+  };
+
+  const reply = formatFishingResult(result, [{
+    fishName: 'Test Fish',
+    fishCodeNumber: { min: 36, max: 36 },
+    fishDescription: 'desc'
+  }], { additionalRollCaughtDespiteFailure: true });
+
+  assert.match(reply, /але риба все одно спіймана/);
+});
+
+test('shows catch-on-failed-additional-roll message', () => {
+  const result = {
+    normalizedInput: { modifiers: [1, 2, 3], baitType: 'simple', useShip: false },
+    rawRolls: [10, 10, 10],
+    modifiedRolls: [11, 12, 13],
+    finalRolls: [11, 12, 13],
+    guidance: { guidanceRolls: [], totalGuidanceBonus: 0 },
+    baitBonusRoll: null,
+    shipBonusRoll: null,
+    computedSum: 36,
+    finalSum: 36,
+    eachRollDc: 10,
+    passedEachRollDc: true,
+    failedRollIndexes: [],
+    rolledFish: null,
+    effectiveRollUsed: 36
+  };
+
+  const reply = formatFishingResult(result, [{
+    fishName: 'Test Fish',
+    fishCodeNumber: { min: 36, max: 36 },
+    fishDescription: 'desc'
+  }], { additionalRollCaughtDespiteFailure: true });
+
+  assert.match(reply, /але риба все одно спіймана/);
+});

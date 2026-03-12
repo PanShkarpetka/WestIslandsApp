@@ -100,6 +100,10 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
     lines.push('🎉 Додатковий кидок: <b>УСПІХ ✅</b>');
   }
 
+  if (options.additionalRollCaughtDespiteFailure === true) {
+    lines.push('⚠️ Додатковий кидок: <b>ПРОВАЛ ❌</b>, але риба все одно спіймана через правило fishAdditionalRollsRequiredForSuccessfulCatch.catchEvenIfFailed.');
+  }
+
   return lines.join('\n');
 }
 
