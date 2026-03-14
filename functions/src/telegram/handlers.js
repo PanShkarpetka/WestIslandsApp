@@ -140,22 +140,35 @@ function usernameFromPayload(payload) {
 }
 
 function getCommandToken(text) {
-  return String(text || '').trim().split(/\s+/, 1)[0].toLowerCase();
+  return String(text || '')
+    .trim()
+    .split(/\s+/, 1)[0]
+    .toLowerCase()
+    .replace(/@[\p{L}\p{N}_]+$/u, '');
 }
 
-function isYesNoReply(text) {
-  try {
-    parseYesNoInput(text);
+function getYesNoReply(text) {
+  const commandToken = getCommandToken(text);
+
+  if (['/yes', '/y', 'yes', 'y'].includes(commandToken)) {
     return true;
-  } catch {
+  }
+
+  if (['/no', '/n', 'no', 'n'].includes(commandToken)) {
     return false;
+  }
+
+  try {
+    return parseYesNoInput(text);
+  } catch {
+    return null;
   }
 }
 
 function isRecognizedCommand(text) {
   const commandToken = getCommandToken(text);
 
-  if (isYesNoReply(commandToken)) {
+  if (getYesNoReply(commandToken) !== null) {
     return true;
   }
 
@@ -364,12 +377,10 @@ export async function handleTelegramMessage({ db, payload }) {
     return null;
   }
 
-  if (isAdditionalRollReply && isYesNoReply(text)) {
-    try {
-      const passed = parseYesNoInput(text);
+  if (isAdditionalRollReply) {
+    const passed = getYesNoReply(text);
+    if (passed !== null) {
       return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
-    } catch (error) {
-      return `Не правильні дані. Помилка: ${error.message}`;
     }
   }
 
@@ -377,12 +388,12 @@ export async function handleTelegramMessage({ db, payload }) {
     return null;
   }
 
-  if (normalizedText === COMMANDS.RESET_FISH_AVAILABILITY) {
+  if (commandToken === COMMANDS.RESET_FISH_AVAILABILITY) {
     const resetCount = await resetFishAvailabilityToDaily(db);
     return `Reset availability to daily defaults for ${resetCount} fishes.`;
   }
 
-  if (normalizedText === COMMANDS.LIST_AVAILABLE_FISHES_TODAY) {
+  if (commandToken === COMMANDS.LIST_AVAILABLE_FISHES_TODAY) {
     const fishes = await getAvailableFishes(db);
     const available = fishes
       .filter((fish) => Number(fish.fishAmountAvailableNow || 0) > 0)
@@ -408,7 +419,7 @@ export async function handleTelegramMessage({ db, payload }) {
     return buildFishPriceReport(fishes, codes);
   }
 
-  if (normalizedText === COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY) {
+  if (commandToken === COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY) {
     const logs = await getFishingLogsForDate(db);
     const catches = extractSuccessfulCatchRows(logs);
     if (catches.length === 0) {
@@ -421,7 +432,7 @@ export async function handleTelegramMessage({ db, payload }) {
     ].join('\n');
   }
 
-  if (normalizedText === COMMANDS.SUM_SUCCESSFUL_CATCHES_BY_USER_ALL_TIME) {
+  if (commandToken === COMMANDS.SUM_SUCCESSFUL_CATCHES_BY_USER_ALL_TIME) {
     const logs = await getAllFishingLogs(db);
     const catches = extractSuccessfulCatchRows(logs);
     if (catches.length === 0) {

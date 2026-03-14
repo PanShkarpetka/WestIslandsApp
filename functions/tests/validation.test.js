@@ -13,6 +13,8 @@ test('parseYesNoInput accepts punctuation-wrapped yes/no tokens', () => {
   assert.equal(parseYesNoInput('(no)'), false);
   assert.equal(parseYesNoInput('/yes'), true);
   assert.equal(parseYesNoInput('/n'), false);
+  assert.equal(parseYesNoInput('/yes@FishingBot'), true);
+  assert.equal(parseYesNoInput('/n@FishingBot'), false);
   assert.throws(() => parseYesNoInput('guidance'), /yes or no/);
 });
 
