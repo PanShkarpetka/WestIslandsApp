@@ -364,6 +364,10 @@ export async function handleTelegramMessage({ db, payload }) {
   const isAdditionalRollReply = session.step === SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM;
 
   const isAdminCommand = normalizedText.startsWith('/admin_');
+  if (!isRecognizedCommand(text)) {
+    return null;
+  }
+
   if (session.staleSessionCleared && !isAdminCommand && ![
     COMMANDS.FISH,
     COMMANDS.CANCEL,
@@ -371,10 +375,6 @@ export async function handleTelegramMessage({ db, payload }) {
     COMMANDS.HELP,
   ].some((command) => normalizedText.startsWith(command))) {
     return 'Fishing flow auto-canceled due to 2 minutes of inactivity. Use /fish to start again.';
-  }
-
-  if (!isRecognizedCommand(text)) {
-    return null;
   }
 
   if (isAdditionalRollReply) {

@@ -251,6 +251,34 @@ test('ignores plain chat messages while idle', async () => {
   assert.equal(reply, null);
 });
 
+test('ignores plain chat messages after a stale session is auto-cleared', async () => {
+  const telegramUserId = '5051';
+  const db = createMockDb({
+    [COLLECTIONS.USER_SESSIONS]: {
+      [telegramUserId]: {
+        telegramUserId,
+        step: SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM,
+        payload: {
+          pendingAdditionalRoll: {
+            fishName: 'Test Fish'
+          }
+        },
+        updatedAt: new Date(Date.now() - (2 * 60 * 1000 + 1_000)).toISOString()
+      }
+    },
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: 'random group message', telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.equal(reply, null);
+});
+
 test('accepts /y with bot mention while waiting for an additional roll confirmation', async () => {
   const telegramUserId = '506';
   const db = createMockDb({
