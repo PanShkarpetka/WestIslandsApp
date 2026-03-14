@@ -11,6 +11,8 @@ test('parseGuidanceInput accepts punctuation-wrapped guidance token', () => {
 test('parseYesNoInput accepts punctuation-wrapped yes/no tokens', () => {
   assert.equal(parseYesNoInput('yes!'), true);
   assert.equal(parseYesNoInput('(no)'), false);
+  assert.equal(parseYesNoInput('/yes'), true);
+  assert.equal(parseYesNoInput('/n'), false);
   assert.throws(() => parseYesNoInput('guidance'), /yes or no/);
 });
 
@@ -73,4 +75,3 @@ test('validateTelegramUpdate returns message thread id for forum topics', () => 
   assert.equal(update.chatId, 33);
   assert.equal(update.messageThreadId, 32);
 });
-

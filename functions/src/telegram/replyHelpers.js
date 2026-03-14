@@ -93,7 +93,7 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
   if (options.pendingAdditionalRoll) {
     const firstRequirement = options.pendingAdditionalRoll.requirements[0];
     lines.push(`🎲 Потрібен додатковий кидок: <b>${escapeHtml(firstRequirement.name)}</b>`);
-    lines.push('Напишіть /yes або /no, щоб підтвердити, пройшли чи провалили цей кидок.');
+    lines.push('Напишіть /yes, /no, /y або /n, щоб підтвердити, пройшли чи провалили цей кидок.');
   }
 
   if (options.additionalRollPassed === true) {

@@ -36,12 +36,14 @@ export const telegramWebhook = onRequest(async (req, res) => {
     }
 
     const reply = await handleTelegramMessage({ db, payload });
-    await sendTelegramMessage({
-      token: TELEGRAM_BOT_TOKEN,
-      chatId: payload.chatId,
-      messageThreadId: payload.messageThreadId,
-      text: reply
-    });
+    if (reply) {
+      await sendTelegramMessage({
+        token: TELEGRAM_BOT_TOKEN,
+        chatId: payload.chatId,
+        messageThreadId: payload.messageThreadId,
+        text: reply
+      });
+    }
 
     res.status(200).send('OK');
   } catch (error) {

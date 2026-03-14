@@ -39,10 +39,10 @@ function createMockDb(seed = {}) {
 test('supports public cancel/reset/help commands', () => {
   assert.equal(COMMANDS.CANCEL, '/cancel');
   assert.equal(COMMANDS.RESET, '/reset');
-  assert.equal(COMMANDS.HELP, '/help');
+  assert.equal(COMMANDS.HELP, '/fishing_help');
 });
 
-test('expires stale fishing session after 30 seconds', async () => {
+test('expires stale fishing session after 2 minutes', async () => {
   const telegramUserId = '1001';
   const staleUpdatedAt = new Date(Date.now() - ACTIVE_SESSION_TIMEOUT_MS - 1_000).toISOString();
   const db = createMockDb({

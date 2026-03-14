@@ -68,4 +68,4 @@ export const DEFAULT_CONFIG = {
   }
 };
 
-export const ACTIVE_SESSION_TIMEOUT_MS = 30 * 1000;
+export const ACTIVE_SESSION_TIMEOUT_MS = 2 * 60 * 1000;

@@ -318,6 +318,9 @@ export async function handleTelegramMessage({ db, payload }) {
   const normalizedText = text.toLowerCase();
   const session = await getOrCreateUserSession(db, telegramUserId);
   const config = await getBotConfig(db);
+  const isSlashCommand = normalizedText.startsWith('/');
+  const isFishCommand = normalizedText.includes('fish');
+  const isAdditionalRollReply = session.step === SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM;
 
   const isAdminCommand = normalizedText.startsWith('/admin_');
   if (session.staleSessionCleared && !isAdminCommand && ![
@@ -326,7 +329,20 @@ export async function handleTelegramMessage({ db, payload }) {
     COMMANDS.RESET,
     COMMANDS.HELP,
   ].some((command) => normalizedText.startsWith(command))) {
-    return 'Fishing flow auto-canceled due to 30 seconds of inactivity. Use /fish to start again.';
+    return 'Fishing flow auto-canceled due to 2 minutes of inactivity. Use /fish to start again.';
+  }
+
+  if (isAdditionalRollReply) {
+    try {
+      const passed = parseYesNoInput(text);
+      return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
+    } catch (error) {
+      return `Не правильні дані. Помилка: ${error.message}`;
+    }
+  }
+
+  if (isSlashCommand && !isFishCommand) {
+    return null;
   }
 
   if (normalizedText === COMMANDS.RESET_FISH_AVAILABILITY) {
@@ -400,15 +416,6 @@ export async function handleTelegramMessage({ db, payload }) {
 
   if (normalizedText === COMMANDS.HELP) {
     return helpMessage();
-  }
-
-  if (session.step === SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM) {
-    try {
-      const passed = parseYesNoInput(text);
-      return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
-    } catch (error) {
-      return `Не правильні дані. Помилка: ${error.message}`;
-    }
   }
 
   if (normalizedText.startsWith(COMMANDS.FISH)) {

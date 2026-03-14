@@ -90,7 +90,7 @@ test('uses previous fish by code range when rolled fish is unavailable', () => {
 
 test('caps sum by bait availability when ship is not used', () => {
   const fishes = [
-    { id: 'f1', fishName: 'CapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 67, max: 65 } }
+    { id: 'f1', fishName: 'CapFish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 65, max: 65 } }
   ];
   const rng = makeRng([0.95, 0.95, 0.95, 0.95]);
 
