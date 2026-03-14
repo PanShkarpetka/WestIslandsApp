@@ -139,6 +139,33 @@ function usernameFromPayload(payload) {
   return payload.telegramUsername || payload.telegramFirstName || String(payload.telegramUserId);
 }
 
+function getCommandToken(text) {
+  return String(text || '').trim().split(/\s+/, 1)[0].toLowerCase();
+}
+
+function isYesNoReply(text) {
+  try {
+    parseYesNoInput(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isRecognizedCommand(text) {
+  const commandToken = getCommandToken(text);
+
+  if (isYesNoReply(commandToken)) {
+    return true;
+  }
+
+  if (commandToken === COMMANDS.GET_FISH_PRICE) {
+    return true;
+  }
+
+  return Object.values(COMMANDS).includes(commandToken);
+}
+
 function buildFishPriceReport(fishes, codes) {
   const lines = ['💰 <b>Fish prices</b>'];
   let total = 0;
@@ -316,10 +343,11 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
 export async function handleTelegramMessage({ db, payload }) {
   const { text, telegramUserId } = payload;
   const normalizedText = text.toLowerCase();
+  const commandToken = getCommandToken(text);
   const session = await getOrCreateUserSession(db, telegramUserId);
   const config = await getBotConfig(db);
-  const isSlashCommand = normalizedText.startsWith('/');
-  const isFishCommand = normalizedText.includes('fish');
+  const isSlashCommand = commandToken.startsWith('/');
+  const isFishCommand = commandToken === COMMANDS.FISH;
   const isAdditionalRollReply = session.step === SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM;
 
   const isAdminCommand = normalizedText.startsWith('/admin_');
@@ -332,7 +360,11 @@ export async function handleTelegramMessage({ db, payload }) {
     return 'Fishing flow auto-canceled due to 2 minutes of inactivity. Use /fish to start again.';
   }
 
-  if (isAdditionalRollReply) {
+  if (!isRecognizedCommand(text)) {
+    return null;
+  }
+
+  if (isAdditionalRollReply && isYesNoReply(text)) {
     try {
       const passed = parseYesNoInput(text);
       return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
@@ -341,7 +373,7 @@ export async function handleTelegramMessage({ db, payload }) {
     }
   }
 
-  if (isSlashCommand && !isFishCommand) {
+  if (isSlashCommand && !isRecognizedCommand(text)) {
     return null;
   }
 
@@ -370,7 +402,7 @@ export async function handleTelegramMessage({ db, payload }) {
     ].join('\n');
   }
 
-  if (normalizedText.startsWith(COMMANDS.GET_FISH_PRICE)) {
+  if (commandToken === COMMANDS.GET_FISH_PRICE) {
     const fishes = await getAvailableFishes(db);
     const codes = parseFishCodesInput(text, COMMANDS.GET_FISH_PRICE);
     return buildFishPriceReport(fishes, codes);
@@ -409,16 +441,16 @@ export async function handleTelegramMessage({ db, payload }) {
     ].join('\n');
   }
 
-  if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(normalizedText)) {
+  if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(commandToken)) {
     await clearUserSession(db, telegramUserId);
     return 'Fishing flow canceled. Use /fish to start again.';
   }
 
-  if (normalizedText === COMMANDS.HELP) {
+  if (commandToken === COMMANDS.HELP) {
     return helpMessage();
   }
 
-  if (normalizedText.startsWith(COMMANDS.FISH)) {
+  if (isFishCommand) {
     try {
       const singleLine = parseSingleLineFishCommand(text, config);
       const { result, resolvedCatches, pendingAdditionalRoll } = await processFishing({
@@ -445,10 +477,5 @@ export async function handleTelegramMessage({ db, payload }) {
     }
   }
 
-  if (session.step === SESSION_STEPS.IDLE) {
-    return helpMessage();
-  }
-
-  await clearUserSession(db, telegramUserId);
-  return helpMessage();
+  return null;
 }

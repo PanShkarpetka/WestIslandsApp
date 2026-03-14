@@ -181,4 +181,54 @@ test('ignores slash commands that do not contain fish', async () => {
   });
 
   assert.equal(reply, null);
+});
+
+test('ignores unrelated bot commands while waiting for an additional roll confirmation', async () => {
+  const telegramUserId = '504';
+  const db = createMockDb({
+    [COLLECTIONS.USER_SESSIONS]: {
+      [telegramUserId]: {
+        telegramUserId,
+        step: SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM,
+        payload: {
+          pendingAdditionalRoll: {
+            fishName: 'Test Fish',
+            baseLog: {},
+            selectedFish: {
+              id: 'fish-1',
+              fishName: 'Test Fish'
+            },
+            requirements: [{ name: 'Dexterity save' }]
+          }
+        },
+        updatedAt: new Date().toISOString()
+      }
+    },
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: '/roll d20+d4-1', telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.equal(reply, null);
+});
+
+test('ignores plain chat messages while idle', async () => {
+  const telegramUserId = '505';
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: 'hello there', telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.equal(reply, null);
 }); 
