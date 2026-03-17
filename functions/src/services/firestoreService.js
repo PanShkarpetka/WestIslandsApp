@@ -52,9 +52,14 @@ export async function resetFishAvailabilityToDaily(db) {
   return snapshot.size;
 }
 
-export async function getFishingLogsForDate(db, date = new Date()) {
+function startOfDay(date) {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+export async function getFishingLogsForDate(db, date = new Date()) {
+  const start = startOfDay(date);
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
 
@@ -65,6 +70,12 @@ export async function getFishingLogsForDate(db, date = new Date()) {
     .get();
 
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+export async function getFishingLogsForYesterday(db, today = new Date()) {
+  const start = startOfDay(today);
+  start.setDate(start.getDate() - 1);
+  return getFishingLogsForDate(db, start);
 }
 
 export async function getAllFishingLogs(db) {

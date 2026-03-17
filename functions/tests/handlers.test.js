@@ -40,24 +40,58 @@ function createMockDb(seed = {}) {
     },
     collection(name) {
       const docs = getCollection(name);
+
+      const toSnapshot = (entries) => ({
+        docs: entries.map(([id, value]) => ({
+          id,
+          data: () => value,
+          ref: {
+            set: async (nextValue, options = {}) => {
+              if (options.merge && docs.has(id)) {
+                docs.set(id, { ...docs.get(id), ...nextValue });
+                return;
+              }
+
+              docs.set(id, nextValue);
+            }
+          }
+        }))
+      });
+
+      const buildQuery = (entries) => ({
+        where(field, op, value) {
+          const filtered = entries.filter(([, doc]) => {
+            const left = doc?.[field];
+            if (op === '>=') return left >= value;
+            if (op === '<') return left < value;
+            throw new Error(`Unsupported where operator: ${op}`);
+          });
+          return buildQuery(filtered);
+        },
+        orderBy(field, direction = 'asc') {
+          const sorted = [...entries].sort((a, b) => {
+            const left = a[1]?.[field];
+            const right = b[1]?.[field];
+            if (left === right) return 0;
+            if (direction === 'desc') return left < right ? 1 : -1;
+            return left > right ? 1 : -1;
+          });
+          return buildQuery(sorted, field);
+        },
+        async get() {
+          return toSnapshot(entries);
+        }
+      });
+
       return {
         async get() {
-          return {
-            docs: [...docs.entries()].map(([id, value]) => ({
-              id,
-              data: () => value,
-              ref: {
-                set: async (nextValue, options = {}) => {
-                  if (options.merge && docs.has(id)) {
-                    docs.set(id, { ...docs.get(id), ...nextValue });
-                    return;
-                  }
-
-                  docs.set(id, nextValue);
-                }
-              }
-            }))
-          };
+          return toSnapshot([...docs.entries()]);
+        },
+        where(field, op, value) {
+          return buildQuery([...docs.entries()]).where(field, op, value);
+        },
+        orderBy(field, direction = 'asc') {
+          return buildQuery([...docs.entries()]).orderBy(field, direction);
         },
         doc(id) {
           const docId = id ?? `generated-${docs.size + 1}`;
@@ -386,3 +420,83 @@ test('accepts admin command with bot mention', async () => {
 
   assert.match(reply, /Available fishes today/);
 }); 
+
+test('lists only successful catches from current day for /admin_fish_catches_today', async () => {
+  const telegramUserId = '509';
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const yesterday = new Date(startOfToday);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    },
+    [COLLECTIONS.FISHING_LOGS]: {
+      'log-today': {
+        timestamp: new Date(startOfToday.getTime() + 60_000).toISOString(),
+        successFailureResult: true,
+        effectiveRollUsed: 36,
+        telegramUsername: 'today-user',
+        fishSelected: [{ fishName: 'Today Fish', fishCodeNumber: { min: 36, max: 36 }, fishValueSilver: 7 }]
+      },
+      'log-yesterday': {
+        timestamp: new Date(yesterday.getTime() + (12 * 60 * 60 * 1000)).toISOString(),
+        successFailureResult: true,
+        effectiveRollUsed: 36,
+        telegramUsername: 'yesterday-user',
+        fishSelected: [{ fishName: 'Old Fish', fishCodeNumber: { min: 36, max: 36 }, fishValueSilver: 5 }]
+      }
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY, telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.match(reply, /Successful catches today/);
+  assert.match(reply, /today-user: Today Fish/);
+  assert.doesNotMatch(reply, /yesterday-user: Old Fish/);
+});
+
+test('supports /admin_fish_catches_yesterday command', async () => {
+  const telegramUserId = '510';
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const yesterday = new Date(startOfToday);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    },
+    [COLLECTIONS.FISHING_LOGS]: {
+      'log-yesterday': {
+        timestamp: new Date(yesterday.getTime() + (2 * 60 * 60 * 1000)).toISOString(),
+        successFailureResult: true,
+        effectiveRollUsed: 36,
+        telegramUsername: 'yesterday-user',
+        fishSelected: [{ fishName: 'Yesterday Fish', fishCodeNumber: { min: 36, max: 36 }, fishValueSilver: 5 }]
+      },
+      'log-today': {
+        timestamp: new Date(startOfToday.getTime() + 60_000).toISOString(),
+        successFailureResult: true,
+        effectiveRollUsed: 36,
+        telegramUsername: 'today-user',
+        fishSelected: [{ fishName: 'Today Fish', fishCodeNumber: { min: 36, max: 36 }, fishValueSilver: 7 }]
+      }
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: COMMANDS.LIST_SUCCESSFUL_CATCHES_YESTERDAY, telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.match(reply, /Successful catches yesterday/);
+  assert.match(reply, /yesterday-user: Yesterday Fish/);
+  assert.doesNotMatch(reply, /today-user: Today Fish/);
+});

@@ -17,6 +17,7 @@ export const COMMANDS = {
   LIST_AVAILABLE_FISHES_TODAY: '/admin_fish_available_today',
   GET_FISH_PRICE: '/admin_fish_price',
   LIST_SUCCESSFUL_CATCHES_TODAY: '/admin_fish_catches_today',
+  LIST_SUCCESSFUL_CATCHES_YESTERDAY: '/admin_fish_catches_yesterday',
   SUM_SUCCESSFUL_CATCHES_BY_USER_ALL_TIME: '/admin_fish_catches_total'
 };
 

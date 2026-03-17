@@ -7,6 +7,7 @@ import {
   getAvailableFishes,
   getBotConfig,
   getFishingLogsForDate,
+  getFishingLogsForYesterday,
   getOrCreateUserSession,
   resetFishAvailabilityToDaily,
   upsertUserSession,
@@ -428,6 +429,19 @@ export async function handleTelegramMessage({ db, payload }) {
 
     return [
       '📘 <b>Successful catches today</b>',
+      ...catches.map((row) => `• ${htmlEscape(row.user)}: ${htmlEscape(row.fishName)}, code ${row.resultCode}, price ${row.price} silver`)
+    ].join('\n');
+  }
+
+  if (commandToken === COMMANDS.LIST_SUCCESSFUL_CATCHES_YESTERDAY) {
+    const logs = await getFishingLogsForYesterday(db);
+    const catches = extractSuccessfulCatchRows(logs);
+    if (catches.length === 0) {
+      return 'No successful catches yesterday.';
+    }
+
+    return [
+      '📙 <b>Successful catches yesterday</b>',
       ...catches.map((row) => `• ${htmlEscape(row.user)}: ${htmlEscape(row.fishName)}, code ${row.resultCode}, price ${row.price} silver`)
     ].join('\n');
   }
