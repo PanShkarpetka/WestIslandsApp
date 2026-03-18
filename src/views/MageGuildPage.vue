@@ -77,7 +77,7 @@
             <v-card-text class="pt-2">
               <div class="request-metadata">
                 <div><strong>Даунтайм:</strong> {{ request.downtimeDays }} дн.</div>
-                <div><strong>Винагорода:</strong> {{ formatCompensation(request.compensation) }} 🪙</div>
+                <div><strong>Винагорода:</strong> {{ formatCompensation(request.compensation) }} <span class="coin-icon" aria-hidden="true"></span></div>
                 <div>
                   <strong>Статус:</strong>
                   <v-chip :color="request.fulfilled ? 'success' : 'warning'" size="small" class="ml-1" variant="flat">
@@ -413,5 +413,22 @@ onBeforeUnmount(() => {
 .request-metadata {
   display: grid;
   gap: 10px;
+}
+
+.coin-icon {
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  margin-left: 0.2em;
+  border-radius: 50%;
+  vertical-align: -0.08em;
+  background:
+    radial-gradient(circle at 32% 30%, rgba(255, 250, 214, 0.98) 0, rgba(255, 232, 120, 0.98) 24%, rgba(235, 180, 28, 0.98) 55%, rgba(166, 110, 8, 1) 100%);
+  border: 1px solid rgba(161, 107, 11, 0.95);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.72),
+    inset -1px -2px 2px rgba(122, 75, 5, 0.28),
+    0 0 0 1px rgba(255, 215, 87, 0.18),
+    0 1px 2px rgba(122, 75, 5, 0.25);
 }
 </style>

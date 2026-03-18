@@ -5,7 +5,16 @@ function toFiniteNumber(value, fallback = 0) {
 
 export function normalizeSpellLevel(value) {
   if (value === null || value === undefined) return ''
-  return String(value).trim()
+
+  const normalized = String(value).trim()
+  if (!normalized) return ''
+
+  const lowerCased = normalized.toLowerCase()
+  if (['0', '0lvl', '0 lvl', 'level 0', 'lvl 0', 'cantrip', 'cantrips'].includes(lowerCased)) {
+    return '0'
+  }
+
+  return normalized
 }
 
 export function normalizeSpellTier(value) {
@@ -39,6 +48,18 @@ export function getSpellPrice(spell, fallback = 0) {
       ?? spell?.raw?.servicePrice,
     fallback,
   )
+}
+
+export function getSpellMaterialComponentPrice(spell, fallback = 0) {
+  return toFiniteNumber(
+    spell?.consumablePrice
+      ?? spell?.raw?.consumablePrice,
+    fallback,
+  )
+}
+
+export function getSpellCompensation(spell, fallback = 0) {
+  return getSpellPrice(spell, fallback) + getSpellMaterialComponentPrice(spell, 0)
 }
 
 export function clampSpellPrice(value, priceConfig = {}) {
@@ -128,7 +149,7 @@ function buildRequestFromPool(entry, requestIndex, rng) {
     spellLevel: normalizeSpellLevel(entry.spellLevel),
     spellTier: normalizeSpellTier(entry.spellTier),
     downtimeDays: rollInteger(entry.tierConfig?.downtimeMin ?? 1, entry.tierConfig?.downtimeMax ?? 1, rng),
-    compensation: getSpellPrice(spell, compensationFallback),
+    compensation: getSpellCompensation(spell, compensationFallback),
     fulfilled: false,
     fulfilledAt: null,
     fulfilledByHeroId: '',
