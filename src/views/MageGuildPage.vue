@@ -63,12 +63,15 @@
           <v-card class="h-100 request-card" :class="{ 'request-card--fulfilled': request.fulfilled }" rounded="xl">
             <v-card-item>
               <template #prepend>
-                <v-avatar :color="request.fulfilled ? 'success' : 'primary'" variant="flat">
-                  <v-icon>{{ request.fulfilled ? 'mdi-check-bold' : 'mdi-star-four-points-outline' }}</v-icon>
+                <v-avatar
+                  :color="getSpellLevelColor(request.spellLevel)"
+                  variant="flat"
+                >
+                  <v-icon>{{ getSpellTierIcon(request.spellTier) }}</v-icon>
                 </v-avatar>
               </template>
               <v-card-title>{{ request.spellName }}</v-card-title>
-              <v-card-subtitle>Рівень {{ request.spellLevel }} · Тір {{ request.spellTier }}</v-card-subtitle>
+              <v-card-subtitle>Рівень {{ request.spellLevel }}</v-card-subtitle>
             </v-card-item>
 
             <v-card-text class="pt-2">
@@ -203,6 +206,29 @@ import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
 import { formatAmount } from '@/utils/formatters'
+import { normalizeSpellLevel, normalizeSpellTier } from '@/utils/mageGuildRequests'
+
+const SPELL_LEVEL_COLOR_MAP = {
+  0: 'blue-grey',
+  1: 'green',
+  2: 'blue',
+  3: 'deep-purple',
+  4: 'indigo',
+  5: 'teal',
+  6: 'amber',
+  7: 'deep-orange',
+  8: 'red',
+  9: 'brown',
+}
+
+const SPELL_TIER_ICON_MAP = {
+  A: 'mdi-alpha-a-circle',
+  B: 'mdi-alpha-b-circle',
+  C: 'mdi-alpha-c-circle',
+  D: 'mdi-alpha-d-circle',
+  E: 'mdi-alpha-e-circle',
+  F: 'mdi-alpha-f-circle',
+}
 
 const store = useMageGuildStore()
 const userStore = useUserStore()
@@ -253,6 +279,16 @@ function ensureRequestForms(requests, documentId) {
 
 function formatCompensation(value) {
   return formatAmount(value, 0)
+}
+
+function getSpellLevelColor(spellLevel) {
+  const normalizedLevel = normalizeSpellLevel(spellLevel)
+  return SPELL_LEVEL_COLOR_MAP[normalizedLevel] || 'primary'
+}
+
+function getSpellTierIcon(spellTier) {
+  const normalizedTier = normalizeSpellTier(spellTier)
+  return SPELL_TIER_ICON_MAP[normalizedTier] || 'mdi-star-four-points-outline'
 }
 
 function historyTitle(doc) {
