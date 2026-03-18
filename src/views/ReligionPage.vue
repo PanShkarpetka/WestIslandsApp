@@ -272,6 +272,7 @@ import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
 import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
+import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from '@/services/mageGuildService'
 import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
 import { formatAmount } from '@/utils/formatters'
 
@@ -1546,6 +1547,15 @@ async function createCycle() {
     await createCycleStartAction(cycleDoc.id, cycleForm.notes)
     await distributeBuildingFaithIncome(cycleDoc.id)
     await distributeManufactureIncome(cycleDoc.id, startedAt, finishedAt)
+    await settlePreviousSpellRequests()
+    await generateSpellRequestsForCycle({
+      cycleRef: cycleDoc,
+      cycleId: cycleDoc.id,
+      islandId: islandStore.currentId,
+      population: totalPopulation.value,
+      cycleStartedAt: startedAt,
+      cycleFinishedAt: finishedAt || '',
+    })
     await loadLatestCycle()
     closeNewCycleDialog()
   } catch (e) {
