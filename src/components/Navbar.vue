@@ -99,7 +99,7 @@
 
         <v-list-item tag="router-link" :to="'/mage-guild'" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-wizard-hat</v-icon></v-list-item-icon>
-          <v-list-item-title>Гільдія магів</v-list-item-title>
+          <v-list-item-title>Магічні послуги</v-list-item-title>
         </v-list-item>
 
         <v-list-item
