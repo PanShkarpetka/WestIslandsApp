@@ -6,19 +6,11 @@
           Заявки до гільдії магів
         </h1>
       </v-col>
-    </v-row>
-
-    <v-row class="my-4">
-      <v-col cols="12">
-        <CycleSummaryCard
-          :current-start-date="currentCycleStartDate"
-          :previous-cycle-duration="previousCycleDurationLabel"
-        >
-          <template #chips>
-            <v-chip color="warning" variant="flat">Відкрито: {{ store.openCount }}</v-chip>
-            <v-chip color="success" variant="flat">Виконано: {{ store.fulfilledCount }}</v-chip>
-          </template>
-        </CycleSummaryCard>
+      <v-col cols="12" sm="6" class="d-flex justify-sm-end">
+        <div class="mage-cycle-chips">
+          <v-chip color="warning" variant="flat">Відкрито: {{ store.openCount }}</v-chip>
+          <v-chip color="success" variant="flat">Виконано: {{ store.fulfilledCount }}</v-chip>
+        </div>
       </v-col>
     </v-row>
 
@@ -195,16 +187,12 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
 import { useMageGuildStore } from '@/store/mageGuildStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
 import { formatAmount } from '@/utils/formatters'
 import { normalizeSpellLevel, normalizeSpellTier } from '@/utils/mageGuildRequests'
-import CycleSummaryCard from '@/components/CycleSummaryCard.vue'
-import { diffInDays, parseFaerunDate } from 'faerun-date'
-import { db } from '@/services/firebase'
 
 const SPELL_LEVEL_COLOR_MAP = {
   0: 'blue-grey',
@@ -236,17 +224,6 @@ const islandStore = useIslandStore()
 const isAdmin = computed(() => userStore.isAdmin)
 const activeRequestDocument = computed(() => store.latestRequestDocument)
 const historyDocuments = computed(() => store.productionDocuments.slice(1))
-const latestCycle = ref(null)
-const previousCycle = ref(null)
-const currentCycleStartDate = computed(() => (
-  latestCycle.value?.startedAt || activeRequestDocument.value?.cycleStartedAt || 'Цикл ще не розпочато'
-))
-const previousCycleDurationLabel = computed(() => {
-  const startedAt = parseFaerunDate(previousCycle.value?.startedAt)
-  const finishedAt = parseFaerunDate(previousCycle.value?.finishedAt)
-  const diff = startedAt && finishedAt ? diffInDays(startedAt, finishedAt) : null
-  return diff && diff > 0 ? `${diff} днів` : 'невідомо'
-})
 const heroOptions = computed(() => store.heroes.map((hero) => ({ title: hero.name, value: hero.id })))
 const fulfillmentForms = reactive({})
 const submittingKey = ref('')
@@ -357,17 +334,10 @@ async function ensureCurrentCycleRequests() {
   }
 }
 
-async function loadCycleSummary() {
-  const snapshot = await getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc'), limit(2)))
-  latestCycle.value = snapshot.docs[0] ? { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } : null
-  previousCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null
-}
-
 watch(() => store.requestDocuments, (docs) => {
   for (const doc of docs || []) {
     ensureRequestForms(doc.requests || [], doc.id)
   }
-  loadCycleSummary()
 }, { immediate: true })
 
 watch(
@@ -381,7 +351,6 @@ watch(
 
 onMounted(async () => {
   store.startListening()
-  await loadCycleSummary()
 })
 
 onBeforeUnmount(() => {
@@ -398,6 +367,12 @@ onBeforeUnmount(() => {
 .request-card {
   border: 1px solid rgba(148, 163, 184, 0.18);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.mage-cycle-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .request-card:hover {

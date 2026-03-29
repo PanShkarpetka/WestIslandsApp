@@ -1,18 +1,22 @@
 <template>
   <div>
     <Navbar />
-    <main>
-      <slot />
-    </main>
+    <div class="content-shell">
+      <GlobalCycleWidget />
+      <main>
+        <slot />
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
 import Navbar from '../components/Navbar.vue';
+import GlobalCycleWidget from '../components/GlobalCycleWidget.vue';
 </script>
 
 <style scoped>
-main {
+.content-shell {
   padding-top: 64px;
 }
 </style>
