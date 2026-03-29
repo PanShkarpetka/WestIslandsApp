@@ -196,5 +196,16 @@
       "ep": 0,
       "pp": 0
     }
+  },
+  {
+    "characterId": "146514173",
+    "status": "success",
+    "balance": {
+      "cp": 5,
+      "sp": 9,
+      "gp": 245,
+      "ep": 0,
+      "pp": 0
+    }
   }
 ]
