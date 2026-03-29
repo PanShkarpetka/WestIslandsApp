@@ -1416,6 +1416,19 @@ function normalizeIncomeDestination(value) {
 }
 
 async function distributeBuildingFaithIncome(cycleId) {
+  const isPassiveFaithInactiveHero = async (heroRef) => {
+    if (!heroRef?.path) return false
+
+    try {
+      const heroSnap = await getDoc(heroRef)
+      if (!heroSnap.exists()) return false
+      return Boolean(heroSnap.data()?.passiveOVInactive)
+    } catch (error) {
+      console.error('[religion] Failed to resolve hero passiveOVInactive flag', error)
+      return false
+    }
+  }
+
   const religionsSnapshot = await getDocs(collection(db, 'religions'))
   const religionsWithIncome = religionsSnapshot.docs
     .map((docSnap) => {
@@ -1437,12 +1450,23 @@ async function distributeBuildingFaithIncome(cycleId) {
 
     if (clergySnapshot.empty) continue
 
-    const heroCount = clergySnapshot.size
+    const eligibleClergy = []
+    for (const docSnap of clergySnapshot.docs) {
+      const data = docSnap.data() || {}
+      const heroRef = data.hero?.path ? doc(db, data.hero.path) : data.hero
+      const passiveFaithInactive = await isPassiveFaithInactiveHero(heroRef)
+      if (passiveFaithInactive) continue
+      eligibleClergy.push(docSnap)
+    }
+
+    const heroCount = eligibleClergy.length
+    if (!heroCount) continue
+
     const baseShare = Math.floor(religion.passiveFaith / heroCount)
     const remainder = religion.passiveFaith - baseShare * heroCount
     const remainderIndex = remainder > 0 ? Math.floor(Math.random() * heroCount) : -1
 
-    const tasks = clergySnapshot.docs.map(async (docSnap, index) => {
+    const tasks = eligibleClergy.map(async (docSnap, index) => {
       const bonus = baseShare + (index === remainderIndex ? remainder : 0)
       if (!bonus) return
 
