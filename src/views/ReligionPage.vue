@@ -8,38 +8,6 @@
       </v-col>
     </v-row>
 
-    <v-row class="my-4">
-      <v-col cols="12">
-        <v-alert
-          v-if="latestCycleError"
-          type="error"
-          variant="tonal"
-          class="mb-4"
-        >
-          {{ latestCycleError }}
-        </v-alert>
-
-        <v-skeleton-loader
-          v-else-if="latestCycleLoading"
-          type="heading, subtitle"
-          class="pa-4"
-        />
-
-        <v-card v-else class="pa-4" variant="tonal">
-          <div class="current-cycle-header">
-            <v-avatar color="primary" variant="elevated">
-              <v-icon>mdi-timeline-clock</v-icon>
-            </v-avatar>
-            <div class="current-cycle-text">
-              <div class="text-overline text-medium-emphasis mb-1">Поточний цикл</div>
-              <div class="text-subtitle-1 font-semibold">{{ currentCycleHeadline }}</div>
-              <div class="text-body-2 text-medium-emphasis">{{ currentCycleDetails }}</div>
-            </div>
-          </div>
-        </v-card>
-      </v-col>
-    </v-row>
-
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12">
         <v-card class="pa-6 religion-card" elevation="4" width="100%">
@@ -60,14 +28,6 @@
                   <p class="text-caption text-medium-emphasis">Населення острова: {{ totalPopulationLabel }}</p>
                 </div>
                 <div class="distribution-actions">
-                  <v-btn
-                    v-if="isAdmin"
-                    color="primary"
-                    prepend-icon="mdi-play-circle-outline"
-                    @click="openNewCycleDialog"
-                  >
-                    Почати новий цикл
-                  </v-btn>
                   <v-btn-toggle
                     v-model="viewMode"
                     mandatory
@@ -163,8 +123,6 @@
       v-model:selected-religion-id="selectedReligionId"
       v-model:followers-dialog-open="followersDialogOpen"
       v-model:edited-followers="editedFollowers"
-      v-model:new-cycle-dialog="newCycleDialog"
-      v-model:cycle-form="cycleForm"
       :active-clergy="activeClergy"
       :action-error="actionError"
       :has-icon="hasIcon"
@@ -233,12 +191,6 @@
       :followers-over-limit="followersOverLimit"
       :close-followers-dialog="closeFollowersDialog"
       :save-followers-distribution="saveFollowersDistribution"
-      :cycle-error="cycleError"
-      :current-faerun-year="currentFaerunYear"
-      :cycle-duration-label="cycleDurationLabel"
-      :cycle-saving="cycleSaving"
-      :create-cycle="createCycle"
-      :close-new-cycle-dialog="closeNewCycleDialog"
     />
   </v-container>
 </template>
@@ -272,8 +224,6 @@ import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
 import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
-import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from '@/services/mageGuildService'
-import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
 import { formatAmount } from '@/utils/formatters'
 
 const iconCache = new Map()
@@ -286,8 +236,7 @@ const hoveredReligion = ref(null)
 const viewMode = ref('diagram')
 const defaultCardBackground = ''
 const latestCycle = ref(null)
-const latestCycleLoading = ref(false)
-const latestCycleError = ref('')
+const previousCycle = ref(null)
 
 const abilitiesById = computed(() =>
   religionStore.abilities.reduce((acc, ability) => {
@@ -469,57 +418,6 @@ const shieldUpdateLoading = ref(false)
 const shieldUpdateError = ref('')
 const shieldUpdateSuccess = ref(false)
 
-function getCycleDurationDays(cycle) {
-  if (!cycle) return null
-  if (cycle.duration) return Number(cycle.duration)
-
-  const start = parseFaerunDate(cycle.startedAt)
-  const end = parseFaerunDate(cycle.finishedAt)
-  const diff = start && end ? diffInDays(start, end) : null
-  return diff > 0 ? diff : null
-}
-
-const currentCycleHeadline = computed(() => {
-  if (!latestCycle.value) return 'Цикл ще не розпочато'
-
-  const start = latestCycle.value.startedAt || '—'
-  const end = latestCycle.value.finishedAt
-
-  return end ? `${start} — ${end}` : `${start} (триває)`
-})
-
-const currentCycleDetails = computed(() => {
-  if (!latestCycle.value) return 'Додайте перший цикл, щоб відстежувати дії релігії.'
-
-  const durationDays = getCycleDurationDays(latestCycle.value)
-  const durationLabel = durationDays ? `${durationDays} днів` : 'Тривалість не вказана'
-  const status = latestCycle.value.finishedAt ? 'Цикл завершено' : 'Цикл триває'
-  const notes = latestCycle.value.notes?.trim()
-
-  return [durationLabel, status, notes ? `Нотатки: ${notes}` : null].filter(Boolean).join(' • ')
-})
-const newCycleDialog = ref(false)
-const cycleSaving = ref(false)
-const cycleError = ref('')
-const currentFaerunYear = DEFAULT_YEAR
-const cycleForm = reactive({
-  startedDate: null,
-  finishedDate: null,
-  notes: '',
-})
-
-const cycleDurationLabel = computed(() => {
-  const start = normalizeFaerunDate(cycleForm.startedDate)
-  const end = normalizeFaerunDate(cycleForm.finishedDate)
-
-  if (!start || !end) return 'Тривалість буде розрахована автоматично'
-
-  const diff = diffInDays(start, end)
-  if (diff === null) return 'Тривалість буде розрахована автоматично'
-  if (diff <= 0) return 'Дата завершення має бути пізнішою за початок'
-
-  return `${diff} днів`
-})
 
 const heroCountsByReligion = computed(() => {
   const result = new Map()
@@ -1153,440 +1051,21 @@ const religionChangeFine = computed(() => calculateReligionChangeFine(activeCler
 const religionChangeFinePercent = computed(() => Math.round(calculateReligionChangeFine(activeClergy.value).rate * 100))
 
 async function loadLatestCycle() {
-  latestCycleLoading.value = true
-  latestCycleError.value = ''
-
   try {
     const cyclesRef = collection(db, 'cycles')
-    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1))
+    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(2))
     const snapshot = await getDocs(latestCycleQuery)
 
     if (snapshot.docs.length) {
       const docSnap = snapshot.docs[0]
       latestCycle.value = { id: docSnap.id, ...docSnap.data() }
+      previousCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null
     } else {
       latestCycle.value = null
+      previousCycle.value = null
     }
   } catch (e) {
     console.error('[religion] Failed to load latest cycle', e)
-    latestCycleError.value = 'Не вдалося завантажити дані про цикл.'
-  } finally {
-    latestCycleLoading.value = false
-  }
-}
-
-function openNewCycleDialog() {
-  cycleForm.startedDate = null
-  cycleForm.finishedDate = null
-  cycleForm.notes = ''
-  cycleError.value = ''
-  newCycleDialog.value = true
-}
-
-function closeNewCycleDialog() {
-  newCycleDialog.value = false
-}
-
-function openClergy(record) {
-  selectedClergyId.value = record.id
-  faithChange.value = null
-  logMessage.value = ''
-  actionError.value = ''
-  activeFaithFarmForm.roll = null
-  activeFaithFarmForm.dmMod = 0
-  activeFaithFarmForm.notes = ''
-  activeFaithFarmError.value = ''
-  resetDowntimeState()
-  resetClergyDefenseState()
-  resetSpreadReligionState()
-  cancelReligionChange()
-  dialogOpen.value = true
-  religionStore.listenLogs(record.id)
-}
-
-async function resetReligionsSvTemp() {
-  const religionsSnapshot = await getDocs(collection(db, 'religions'))
-  const batch = writeBatch(db)
-
-  religionsSnapshot.forEach((docSnap) => {
-    batch.update(docSnap.ref, { svTemp: 0 })
-  })
-
-  await batch.commit()
-}
-
-function getBuildingFaithIncome(level) {
-  return BUILDING_LEVEL_BONUSES[level]?.passiveFaith || 0
-}
-
-function formatCycleLabel(startedAt, finishedAt) {
-  if (startedAt && finishedAt) return `${startedAt} — ${finishedAt}`
-  if (startedAt) return `з ${startedAt}`
-  return 'без дат'
-}
-
-function normalizeAmount(value) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 0
-  return Math.round(parsed * 100) / 100
-}
-
-async function loadManufacturesByIds(ids) {
-  if (!Array.isArray(ids) || ids.length === 0) return []
-
-  const chunks = []
-  for (let i = 0; i < ids.length; i += 10) {
-    chunks.push(ids.slice(i, i + 10))
-  }
-
-  const results = []
-  for (const chunk of chunks) {
-    const q = query(collection(db, 'manufactures'), where(documentId(), 'in', chunk))
-    const snapshot = await getDocs(q)
-    snapshot.docs.forEach((docSnap) => {
-      const data = docSnap.data() || {}
-      results.push({
-        id: docSnap.id,
-        name: (data.name || '').trim(),
-        description: (data.description || '').trim(),
-        income: normalizeAmount(data.income || 0),
-        incomeDestination: normalizeIncomeDestination(data.incomeDestination),
-      })
-    })
-  }
-
-  const order = new Map(ids.map((id, index) => [id, index]))
-  results.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
-  return results
-}
-
-async function distributeManufactureIncome(cycleId, startedAt, finishedAt) {
-  const islandId = islandStore.currentId || 'island_rock'
-  const islandSnap = await getDoc(doc(db, 'islands', islandId))
-  if (!islandSnap.exists()) return
-
-  const manufactureIds = Array.isArray(islandSnap.data()?.manufactures)
-    ? islandSnap.data().manufactures
-    : []
-
-  const entries = (await loadManufacturesByIds(manufactureIds))
-    .filter((item) => item.income !== 0)
-
-  const populationEntries = (populationStore.items || [])
-    .map((group) => {
-      const count = Number(group.count ?? group.amount ?? 0)
-      const incomePerPerson = normalizeAmount(
-        group.incomePerPerson ?? group.income ?? group.incomePer ?? 0,
-      )
-      const incomeTotal = normalizeAmount(incomePerPerson * count)
-      return {
-        id: group.id,
-        name: group.name || 'Невідома група',
-        description: group.description || '',
-        income: incomeTotal,
-        incomePerPerson,
-        count,
-        type: 'population',
-      }
-    })
-    .filter((item) => item.income !== 0)
-
-  const combinedEntries = [
-    ...entries.map((item) => ({ ...item, type: 'manufacture' })),
-    ...populationEntries,
-  ]
-
-  if (!combinedEntries.length) return
-
-  const metaRef = doc(db, 'treasury/meta')
-  const txCol = collection(db, 'treasuryTransactions')
-  const cycleLabel = formatCycleLabel(startedAt, finishedAt)
-
-  const treasuryEntries = combinedEntries.filter((item) => (
-    item.type !== 'manufacture' || !item.incomeDestination?.startsWith('guild:')
-  ))
-
-  const totalIncome = treasuryEntries.reduce((sum, item) => (
-    item.income > 0 ? sum + item.income : sum
-  ), 0)
-  const totalOutcome = treasuryEntries.reduce((sum, item) => (
-    item.income < 0 ? sum + Math.abs(item.income) : sum
-  ), 0)
-
-  await runTransaction(db, async (transaction) => {
-    const metaSnap = await transaction.get(metaRef)
-    const metaData = metaSnap.exists() ? metaSnap.data() : {}
-    let currentBalance = metaData.balance || 0
-    const guildBalances = new Map()
-    const guildIds = [...new Set(
-      combinedEntries
-        .filter((item) => item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:'))
-        .map((item) => item.incomeDestination.slice('guild:'.length))
-        .filter(Boolean),
-    )]
-
-    await Promise.all(guildIds.map(async (guildId) => {
-      const guildRef = doc(db, 'guilds', guildId)
-      const guildSnap = await transaction.get(guildRef)
-      guildBalances.set(guildId, Number(guildSnap.exists() ? guildSnap.data()?.treasure || 0 : 0))
-    }))
-
-    for (const item of combinedEntries) {
-      const isGuildDestination = item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:')
-      const guildId = isGuildDestination ? item.incomeDestination.slice('guild:'.length) : null
-
-      if (isGuildDestination && guildId) {
-        const guildRef = doc(db, 'guilds', guildId)
-        const guildLogsRef = collection(db, 'guilds', guildId, 'logs')
-        const guildCurrent = Number(guildBalances.get(guildId) || 0)
-
-        const guildNext = normalizeAmount(guildCurrent + item.income)
-        guildBalances.set(guildId, guildNext)
-
-        transaction.set(guildRef, {
-          treasure: guildNext,
-          updatedAt: serverTimestamp(),
-        }, { merge: true })
-
-        const guildLogRef = doc(guildLogsRef)
-        transaction.set(guildLogRef, {
-          amount: item.income,
-          type: item.income >= 0 ? 'deposit' : 'withdraw',
-          comment: `Автооперація з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`.slice(0, 500),
-          userNickname: 'Система',
-          createdAt: serverTimestamp(),
-          treasureAfter: guildNext,
-        })
-        continue
-      }
-
-      currentBalance += item.income
-      const label = item.income >= 0 ? 'Дохід' : 'Витрати'
-      const commentParts = []
-      if (item.type === 'population') {
-        commentParts.push(`${label} населення групи "${item.name}"`)
-        commentParts.push(`(${item.count} осіб × ${formatAmount(item.incomePerPerson)} 🪙)`)
-      } else {
-        commentParts.push(`${label} мануфактури "${item.name || 'Без назви'}"`)
-        if (item.description) commentParts.push(item.description)
-      }
-      commentParts.push(`за цикл ${cycleLabel}.`)
-      const comment = commentParts.join(' ')
-      const txType = item.income >= 0 ? 'deposit' : 'withdraw'
-
-      const txRef = doc(txCol)
-      transaction.set(txRef, {
-        amount: item.income,
-        type: txType,
-        comment: comment.slice(0, 500),
-        userId: 'system',
-        nickname: 'Система',
-        createdAt: serverTimestamp(),
-        balanceAfter: currentBalance,
-        cycleId,
-        cycleStartedAt: startedAt,
-        cycleFinishedAt: finishedAt || null,
-        manufactureId: item.type === 'manufacture' ? item.id || null : null,
-        manufactureName: item.type === 'manufacture' ? item.name || null : null,
-        manufactureDescription: item.type === 'manufacture' ? item.description || null : null,
-        manufactureIncome: item.type === 'manufacture' ? item.income : null,
-        manufactureIncomeDestination: item.type === 'manufacture' ? item.incomeDestination || 'treasury' : null,
-        populationGroupId: item.type === 'population' ? item.id || null : null,
-        populationGroupName: item.type === 'population' ? item.name || null : null,
-        populationIncomePerPerson: item.type === 'population' ? item.incomePerPerson : null,
-        populationCount: item.type === 'population' ? item.count : null,
-        populationIncomeTotal: item.type === 'population' ? item.income : null,
-      })
-    }
-
-    transaction.set(metaRef, {
-      balance: currentBalance,
-      totalIncome: normalizeAmount(totalIncome),
-      totalOutcome: normalizeAmount(totalOutcome),
-      updatedAt: serverTimestamp(),
-    }, { merge: true })
-  })
-}
-
-function normalizeIncomeDestination(value) {
-  if (typeof value !== 'string') return 'treasury'
-  if (value === 'treasury') return 'treasury'
-  if (value.startsWith('guild:') && value.length > 'guild:'.length) return value
-  return 'treasury'
-}
-
-async function distributeBuildingFaithIncome(cycleId) {
-  const isPassiveFaithInactiveHero = async (heroRef) => {
-    if (!heroRef?.path) return false
-
-    try {
-      const heroSnap = await getDoc(heroRef)
-      if (!heroSnap.exists()) return false
-      return Boolean(heroSnap.data()?.passiveOVInactive)
-    } catch (error) {
-      console.error('[religion] Failed to resolve hero passiveOVInactive flag', error)
-      return false
-    }
-  }
-
-  const religionsSnapshot = await getDocs(collection(db, 'religions'))
-  const religionsWithIncome = religionsSnapshot.docs
-    .map((docSnap) => {
-      const data = docSnap.data() || {}
-      const buildingLevel = data.buildingLevel || 'none'
-      return {
-        id: docSnap.id,
-        name: data.name || 'Невідома релігія',
-        ref: docSnap.ref,
-        buildingLevel,
-        passiveFaith: getBuildingFaithIncome(buildingLevel),
-      }
-    })
-    .filter((religion) => religion.passiveFaith > 0)
-
-  for (const religion of religionsWithIncome) {
-    const clergyQuery = query(collection(db, 'clergy'), where('religion', '==', religion.ref))
-    const clergySnapshot = await getDocs(clergyQuery)
-
-    if (clergySnapshot.empty) continue
-
-    const eligibleClergy = []
-    for (const docSnap of clergySnapshot.docs) {
-      const data = docSnap.data() || {}
-      const heroRef = data.hero?.path ? doc(db, data.hero.path) : data.hero
-      const passiveFaithInactive = await isPassiveFaithInactiveHero(heroRef)
-      if (passiveFaithInactive) continue
-      eligibleClergy.push(docSnap)
-    }
-
-    const heroCount = eligibleClergy.length
-    if (!heroCount) continue
-
-    const baseShare = Math.floor(religion.passiveFaith / heroCount)
-    const remainder = religion.passiveFaith - baseShare * heroCount
-    const remainderIndex = remainder > 0 ? Math.floor(Math.random() * heroCount) : -1
-
-    const tasks = eligibleClergy.map(async (docSnap, index) => {
-      const bonus = baseShare + (index === remainderIndex ? remainder : 0)
-      if (!bonus) return
-
-      const data = docSnap.data() || {}
-      const currentFaith = Number(data.faith ?? 0)
-      const newFaith = currentFaith + bonus
-      const updates = { faith: newFaith }
-
-      const currentFaithMax = Number(data.faithMax ?? 0)
-      if (currentFaithMax < newFaith) {
-        updates.faithMax = newFaith
-      }
-
-      await updateDoc(docSnap.ref, updates)
-      await addDoc(collection(docSnap.ref, 'logs'), {
-        delta: bonus,
-        message: `Пасивний дохід від споруди (${religion.buildingLevel}) за цикл ${cycleId}.`,
-        user: 'Система',
-        cycleId,
-        religionId: religion.id,
-        religionName: religion.name,
-        buildingLevel: religion.buildingLevel,
-        buildingFaithIncome: religion.passiveFaith,
-        remainderBonus: index === remainderIndex && remainder > 0,
-        createdAt: serverTimestamp(),
-      })
-    })
-
-    await Promise.all(tasks)
-  }
-}
-
-async function createCycleStartAction(cycleId, notes) {
-  const actionsRef = collection(db, 'religionActions')
-  const actionTypeRef = doc(db, 'religionActionTypes', 'cycleStart')
-
-  await addDoc(actionsRef, {
-    actionType: actionTypeRef,
-    cycleId,
-    notes: notes?.trim() || '',
-    createdAt: serverTimestamp(),
-    convertedFollowers: 0,
-    result: 0,
-  })
-}
-
-async function createCycle() {
-  cycleError.value = ''
-
-  const startedDate = normalizeFaerunDate(cycleForm.startedDate)
-  const finishedDate = normalizeFaerunDate(cycleForm.finishedDate)
-
-  if (!startedDate) {
-    cycleError.value = 'Вкажіть початок циклу.'
-    return
-  }
-
-  if (finishedDate) {
-    const diff = diffInDays(startedDate, finishedDate)
-    if (!diff || diff <= 0) {
-      cycleError.value = 'Дата завершення має бути пізнішою за початок.'
-      return
-    }
-  }
-
-  cycleSaving.value = true
-  try {
-    const cyclesRef = collection(db, 'cycles')
-    const lastCycleSnapshot = await getDocs(query(cyclesRef, orderBy('createdAt', 'desc'), limit(1)))
-    const lastCycleDoc = lastCycleSnapshot.docs[0]
-
-    const startedAt = formatFaerunDate(startedDate)
-    const finishedAt = finishedDate ? formatFaerunDate(finishedDate) : null
-    const calculatedDuration = finishedDate ? diffInDays(startedDate, finishedDate) : null
-
-    const newCycleData = {
-      startedAt,
-      duration: calculatedDuration,
-      createdAt: serverTimestamp(),
-    }
-
-    if (finishedAt) {
-      newCycleData.finishedAt = finishedAt
-    }
-
-    const cycleDoc = await addDoc(cyclesRef, newCycleData)
-
-    if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
-      const previousCycle = lastCycleDoc.data()
-      const parsedPreviousStart = parseFaerunDate(previousCycle.startedAt)
-      const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, startedDate) : null
-
-      const previousUpdate = { finishedAt: startedAt }
-      if (previousDuration && previousDuration > 0) {
-        previousUpdate.duration = previousDuration
-      }
-
-      await updateDoc(lastCycleDoc.ref, previousUpdate)
-    }
-
-    await resetReligionsSvTemp()
-    await createCycleStartAction(cycleDoc.id, cycleForm.notes)
-    await distributeBuildingFaithIncome(cycleDoc.id)
-    await distributeManufactureIncome(cycleDoc.id, startedAt, finishedAt)
-    await settlePreviousSpellRequests()
-    await generateSpellRequestsForCycle({
-      cycleRef: cycleDoc,
-      cycleId: cycleDoc.id,
-      islandId: islandStore.currentId,
-      population: totalPopulation.value,
-      cycleStartedAt: startedAt,
-      cycleFinishedAt: finishedAt || '',
-    })
-    await loadLatestCycle()
-    closeNewCycleDialog()
-  } catch (e) {
-    console.error('[religion] Failed to create cycle', e)
-    cycleError.value = 'Не вдалося створити новий цикл.'
-  } finally {
-    cycleSaving.value = false
   }
 }
 
@@ -2294,16 +1773,6 @@ async function applyActiveFaithFarm() {
   color: #dc2626;
   font-size: 15px;
   margin-top: 8px;
-}
-
-.current-cycle-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.current-cycle-text {
-  padding-left: 6px;
 }
 
 .view-toggle {

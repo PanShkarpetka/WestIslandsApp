@@ -6,25 +6,11 @@
           Заявки до гільдії магів
         </h1>
       </v-col>
-    </v-row>
-
-    <v-row class="my-4">
-      <v-col cols="12">
-        <v-card class="pa-4" variant="tonal">
-          <div class="current-cycle-header">
-            <v-avatar color="primary" variant="elevated">
-              <v-icon>mdi-timeline-clock</v-icon>
-            </v-avatar>
-            <div class="current-cycle-text">
-              <div class="text-overline text-medium-emphasis mb-1">Поточний цикл</div>
-              <div class="text-subtitle-1 font-semibold">{{ currentCycleLabel }}</div>
-            </div>
-            <div class="d-flex ga-3 flex-wrap chips">
-              <v-chip color="warning" variant="flat">Відкрито: {{ store.openCount }}</v-chip>
-              <v-chip color="success" variant="flat">Виконано: {{ store.fulfilledCount }}</v-chip>
-            </div>
-          </div>
-        </v-card>
+      <v-col cols="12" sm="6" class="d-flex justify-sm-end">
+        <div class="mage-cycle-chips">
+          <v-chip color="warning" variant="flat">Відкрито: {{ store.openCount }}</v-chip>
+          <v-chip color="success" variant="flat">Виконано: {{ store.fulfilledCount }}</v-chip>
+        </div>
       </v-col>
     </v-row>
 
@@ -238,14 +224,6 @@ const islandStore = useIslandStore()
 const isAdmin = computed(() => userStore.isAdmin)
 const activeRequestDocument = computed(() => store.latestRequestDocument)
 const historyDocuments = computed(() => store.productionDocuments.slice(1))
-const currentCycleLabel = computed(() => {
-  if (!activeRequestDocument.value) return 'Цикл ще не розпочато'
-
-  const start = activeRequestDocument.value.cycleStartedAt || '—'
-  const end = activeRequestDocument.value.cycleFinishedAt
-
-  return end ? `${start} — ${end}` : `${start} (триває)`
-})
 const heroOptions = computed(() => store.heroes.map((hero) => ({ title: hero.name, value: hero.id })))
 const fulfillmentForms = reactive({})
 const submittingKey = ref('')
@@ -371,7 +349,7 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
+onMounted(async () => {
   store.startListening()
 })
 
@@ -386,18 +364,15 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(76, 110, 245, 0.18);
 }
 
-.current-cycle-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  .chips {
-    margin-left: auto;
-  }
-}
-
 .request-card {
   border: 1px solid rgba(148, 163, 184, 0.18);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.mage-cycle-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .request-card:hover {

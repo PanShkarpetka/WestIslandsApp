@@ -710,63 +710,10 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="newCycleDialogOpen" max-width="640">
-      <v-card rounded="xl">
-        <v-card-title class="d-flex align-center">
-          <v-icon color="primary" class="mr-3">mdi-playlist-plus</v-icon>
-          <span class="text-h6">Почати новий цикл</span>
-        </v-card-title>
-        <v-card-text>
-          <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">
-            {{ cycleError }}
-          </v-alert>
-          <v-form>
-            <FaerunDatePicker
-              v-model="cycleFormModel.startedDate"
-              label="Початок"
-              placeholder="Оберіть дату початку"
-              :year="currentFaerunYear"
-            />
-            <FaerunDatePicker
-              v-model="cycleFormModel.finishedDate"
-              label="Завершення (необов'язково)"
-              placeholder="Оберіть дату завершення"
-              :year="currentFaerunYear"
-              clearable
-              hint="Залиште поле порожнім, якщо цикл ще триває"
-            />
-            <v-text-field
-              :model-value="cycleDurationLabel"
-              label="Тривалість"
-              density="comfortable"
-              hide-details="auto"
-              class="mb-4"
-              readonly
-            />
-            <v-textarea
-              v-model="cycleFormModel.notes"
-              label="Нотатки до дії"
-              auto-grow
-              rows="2"
-              density="comfortable"
-              hide-details="auto"
-            />
-          </v-form>
-        </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="closeNewCycleDialog">Скасувати</v-btn>
-          <v-btn color="primary" :loading="cycleSaving" @click="createCycle">
-            Створити цикл
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
 <script setup>
-import FaerunDatePicker from '@/components/FaerunDatePicker.vue'
-
 const clergyDialogOpen = defineModel('open', { type: Boolean, default: false })
 const faithChangeModel = defineModel('faithChange', { type: Number, default: 0 })
 const logMessageModel = defineModel('logMessage', { type: String, default: '' })
@@ -779,8 +726,6 @@ const changeReligionModeModel = defineModel('changeReligionMode', { type: Boolea
 const selectedReligionIdModel = defineModel('selectedReligionId', { type: String, default: '' })
 const followersDialogOpen = defineModel('followersDialogOpen', { type: Boolean, default: false })
 const editedFollowersModel = defineModel('editedFollowers', { type: Array, default: () => [] })
-const newCycleDialogOpen = defineModel('newCycleDialog', { type: Boolean, default: false })
-const cycleFormModel = defineModel('cycleForm', { type: Object, default: () => ({}) })
 
 const props = defineProps({
   activeClergy: Object,
@@ -851,12 +796,6 @@ const props = defineProps({
   followersOverLimit: { type: Boolean, default: false },
   closeFollowersDialog: { type: Function, required: true },
   saveFollowersDistribution: { type: Function, required: true },
-  cycleError: String,
-  currentFaerunYear: [Number, String],
-  cycleDurationLabel: String,
-  cycleSaving: { type: Boolean, default: false },
-  createCycle: { type: Function, required: true },
-  closeNewCycleDialog: { type: Function, required: true },
 })
 </script>
 
@@ -999,4 +938,3 @@ const props = defineProps({
   }
 }
 </style>
-
