@@ -1009,6 +1009,18 @@ function toggleSort(field) {
   }
 }
 
+function openClergy(item) {
+  if (!item?.id || !isAdmin.value) return
+
+  if (selectedClergyId.value && selectedClergyId.value !== item.id) {
+    religionStore.stopLogs(selectedClergyId.value)
+  }
+
+  selectedClergyId.value = item.id
+  dialogOpen.value = true
+  religionStore.listenLogs(item.id)
+}
+
 watch(activeClergyReligion, () => {
   manualShieldActive.value = Boolean(activeClergyReligion.value?.shieldActive)
 })
