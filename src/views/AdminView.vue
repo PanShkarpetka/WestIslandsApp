@@ -38,13 +38,92 @@
 
       <v-divider class="my-4" />
 
+      <v-card-title class="text-h6">Герої</v-card-title>
+      <v-alert v-if="heroError" type="error" variant="tonal" class="mb-4">{{ heroError }}</v-alert>
+      <v-alert v-if="heroSuccess" type="success" variant="tonal" class="mb-4">{{ heroSuccess }}</v-alert>
+
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Додати нового героя</div>
+        <v-row>
+          <v-col cols="12" md="4">
+            <v-text-field v-model="newHeroForm.name" label="Ім'я героя" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-select
+              v-model="newHeroForm.religionId"
+              :items="religionOptions"
+              label="Релігія"
+              hide-details="auto"
+              density="comfortable"
+            />
+          </v-col>
+          <v-col cols="12" md="4" class="d-flex align-end">
+            <v-btn color="primary" prepend-icon="mdi-account-plus" :loading="heroSaving" @click="createHero">
+              Додати героя
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card>
+
+      <v-data-table
+        :headers="heroHeaders"
+        :items="heroRows"
+        :items-per-page="10"
+        class="elevation-1 mb-2"
+        density="compact"
+      >
+        <template #item.name="{ item }">
+          <span class="text-body-2">{{ item.name }}</span>
+        </template>
+        <template #item.religionName="{ item }">
+          {{ item.religionName || '—' }}
+        </template>
+        <template #item.downtimeAvailable="{ item }">
+          <v-chip size="small" :color="item.downtimeAvailable ? 'warning' : 'success'" variant="tonal">
+            {{ item.downtimeAvailable ? 'Дія не виконана' : 'Дія виконана' }}
+          </v-chip>
+        </template>
+        <template #item.inactive="{ item }">
+          <v-chip size="small" :color="item.inactive ? 'error' : 'success'" variant="tonal">
+            {{ item.inactive ? 'Неактивний' : 'Активний' }}
+          </v-chip>
+        </template>
+        <template #item.actions="{ item }">
+          <v-btn size="small" variant="text" color="primary" @click="openHeroEditor(item)">Редагувати</v-btn>
+        </template>
+      </v-data-table>
+
+      <v-dialog v-model="heroEditDialog" max-width="560">
+        <v-card>
+          <v-card-title class="text-h6">Редагування героя</v-card-title>
+          <v-card-text>
+            <v-text-field v-model="editHeroForm.name" label="Ім'я героя" class="mb-2" />
+            <v-select
+              v-model="editHeroForm.religionId"
+              :items="religionOptions"
+              label="Релігія"
+              class="mb-2"
+            />
+            <v-switch v-model="editHeroForm.downtimeAvailable" label="Дія не виконана" inset color="warning" />
+            <v-switch v-model="editHeroForm.inactive" label="Неактивний герой" inset color="error" />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="heroEditDialog = false">Скасувати</v-btn>
+            <v-btn color="primary" :loading="heroSaving" @click="saveHero">Зберегти</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-divider class="my-4" />
+
       <v-card-title class="text-h6">Лог подій</v-card-title>
       <v-data-table
-          :headers="headers"
-          :items="logEntries"
-          :items-per-page="10"
-          class="elevation-1"
-          density="compact"
+        :headers="headers"
+        :items="logEntries"
+        :items-per-page="10"
+        class="elevation-1"
+        density="compact"
       >
         <template #item.timestamp="{ item }">
           {{ formatTimestamp(item.timestamp) }}
@@ -56,7 +135,17 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { DEFAULT_YEAR, diffInDays, normalizeFaerunDate, parseFaerunDate } from 'faerun-date';
 import { db } from '../services/firebase';
 import FaerunDatePicker from '@/components/FaerunDatePicker.vue';
@@ -76,11 +165,83 @@ const cycleForm = reactive({
   notes: '',
 });
 
+const heroes = ref([]);
+const religions = ref([]);
+const clergyRows = ref([]);
+const heroSaving = ref(false);
+const heroError = ref('');
+const heroSuccess = ref('');
+const heroEditDialog = ref(false);
+const selectedHeroId = ref('');
+
+const newHeroForm = reactive({
+  name: '',
+  religionId: '',
+});
+
+const editHeroForm = reactive({
+  name: '',
+  religionId: '',
+  downtimeAvailable: true,
+  inactive: false,
+});
+
+let stopHeroes = null;
+let stopReligions = null;
+let stopClergy = null;
+
 const headers = [
   { title: 'Час', key: 'timestamp' },
   { title: 'Користувач', key: 'user' },
   { title: 'Дія', key: 'action' },
 ];
+
+const heroHeaders = [
+  { title: 'Герой', key: 'name' },
+  { title: 'Релігія', key: 'religionName' },
+  { title: 'Статус дії', key: 'downtimeAvailable' },
+  { title: 'Стан героя', key: 'inactive' },
+  { title: '', key: 'actions', sortable: false },
+];
+
+const religionOptions = computed(() =>
+  religions.value.map((item) => ({
+    title: item.name,
+    value: item.id,
+  })),
+);
+
+const clergyByHeroId = computed(() => {
+  const map = new Map();
+  for (const row of clergyRows.value) {
+    if (row.heroId) map.set(row.heroId, row);
+  }
+  return map;
+});
+
+const religionById = computed(() => {
+  const map = new Map();
+  for (const religion of religions.value) {
+    map.set(religion.id, religion);
+  }
+  return map;
+});
+
+const heroRows = computed(() =>
+  heroes.value
+    .map((hero) => {
+      const clergy = clergyByHeroId.value.get(hero.id) || null;
+      const religionId = clergy?.religionId || '';
+
+      return {
+        ...hero,
+        religionId,
+        religionName: religionById.value.get(religionId)?.name || '—',
+        clergyId: clergy?.id || '',
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'uk-UA')),
+);
 
 const cycleDurationLabel = computed(() => {
   const start = normalizeFaerunDate(cycleForm.startedDate);
@@ -153,6 +314,159 @@ async function createCycle() {
   }
 }
 
+function subscribeHeroData() {
+  stopHeroes = onSnapshot(collection(db, 'heroes'), (snapshot) => {
+    heroes.value = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data() || {};
+
+      return {
+        id: docSnap.id,
+        name: data.name || data.heroName || data.nickname || docSnap.id,
+        downtimeAvailable: data.downtimeAvailable !== false,
+        inactive: Boolean(data.inactive),
+      };
+    });
+  });
+
+  stopReligions = onSnapshot(collection(db, 'religions'), (snapshot) => {
+    religions.value = snapshot.docs
+      .map((docSnap) => ({
+        id: docSnap.id,
+        name: docSnap.data()?.name || docSnap.id,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'));
+  });
+
+  stopClergy = onSnapshot(collection(db, 'clergy'), (snapshot) => {
+    clergyRows.value = snapshot.docs.map((docSnap) => {
+      const data = docSnap.data() || {};
+      const heroRefPath = data.hero?.path || '';
+      const religionRefPath = data.religion?.path || '';
+
+      return {
+        id: docSnap.id,
+        heroId: heroRefPath.split('/')[1] || '',
+        religionId: religionRefPath.split('/')[1] || '',
+      };
+    });
+  });
+}
+
+function openHeroEditor(hero) {
+  selectedHeroId.value = hero.id;
+  editHeroForm.name = hero.name;
+  editHeroForm.religionId = hero.religionId;
+  editHeroForm.downtimeAvailable = hero.downtimeAvailable;
+  editHeroForm.inactive = hero.inactive;
+  heroEditDialog.value = true;
+}
+
+async function createHero() {
+  heroError.value = '';
+  heroSuccess.value = '';
+
+  const name = newHeroForm.name.trim();
+  if (!name) {
+    heroError.value = 'Вкажіть імʼя героя.';
+    return;
+  }
+  if (!newHeroForm.religionId) {
+    heroError.value = 'Оберіть релігію для героя.';
+    return;
+  }
+
+  heroSaving.value = true;
+  try {
+    const religionRef = doc(db, 'religions', newHeroForm.religionId);
+    await runTransaction(db, async (transaction) => {
+      const heroRef = doc(collection(db, 'heroes'));
+      const clergyRef = doc(collection(db, 'clergy'));
+
+      transaction.set(heroRef, {
+        name,
+        downtimeAvailable: true,
+        inactive: false,
+        createdAt: serverTimestamp(),
+      });
+
+      transaction.set(clergyRef, {
+        hero: heroRef,
+        religion: religionRef,
+        faith: 0,
+        faithMax: 0,
+        createdAt: serverTimestamp(),
+      });
+    });
+
+    newHeroForm.name = '';
+    newHeroForm.religionId = '';
+    heroSuccess.value = 'Героя створено, духовенство додано автоматично.';
+  } catch (error) {
+    console.error('[admin] Failed to create hero', error);
+    heroError.value = 'Не вдалося створити героя.';
+  } finally {
+    heroSaving.value = false;
+  }
+}
+
+async function saveHero() {
+  heroError.value = '';
+  heroSuccess.value = '';
+
+  const name = editHeroForm.name.trim();
+  if (!selectedHeroId.value) {
+    heroError.value = 'Не вдалося визначити героя для редагування.';
+    return;
+  }
+  if (!name) {
+    heroError.value = 'Вкажіть імʼя героя.';
+    return;
+  }
+  if (!editHeroForm.religionId) {
+    heroError.value = 'Оберіть релігію для героя.';
+    return;
+  }
+
+  heroSaving.value = true;
+  try {
+    const heroRef = doc(db, 'heroes', selectedHeroId.value);
+    const currentHero = heroRows.value.find((item) => item.id === selectedHeroId.value);
+    const targetReligionRef = doc(db, 'religions', editHeroForm.religionId);
+
+    await runTransaction(db, async (transaction) => {
+      transaction.update(heroRef, {
+        name,
+        downtimeAvailable: editHeroForm.downtimeAvailable,
+        inactive: editHeroForm.inactive,
+        updatedAt: serverTimestamp(),
+      });
+
+      if (currentHero?.clergyId) {
+        transaction.update(doc(db, 'clergy', currentHero.clergyId), {
+          religion: targetReligionRef,
+        });
+      } else {
+        const clergyRef = doc(collection(db, 'clergy'));
+        transaction.set(clergyRef, {
+          hero: heroRef,
+          religion: targetReligionRef,
+          faith: 0,
+          faithMax: 0,
+          createdAt: serverTimestamp(),
+        });
+      }
+    });
+
+    heroEditDialog.value = false;
+    heroSuccess.value = 'Дані героя оновлено.';
+  } catch (error) {
+    console.error('[admin] Failed to save hero', error);
+    heroError.value = 'Не вдалося оновити героя.';
+  } finally {
+    heroSaving.value = false;
+  }
+}
+
 onMounted(async () => {
   populationStore.startListener(islandStore.currentId || 'island_rock');
   const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
@@ -160,10 +474,14 @@ onMounted(async () => {
   logEntries.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   await loadLatestCycle();
   cycleForm.startedDate = suggestNextCycleDate();
+  subscribeHeroData();
 });
 
 onBeforeUnmount(() => {
   populationStore.stopListener();
+  stopHeroes?.();
+  stopReligions?.();
+  stopClergy?.();
 });
 
 function formatTimestamp(timestamp) {
