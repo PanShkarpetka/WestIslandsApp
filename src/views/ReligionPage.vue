@@ -25,18 +25,11 @@
           class="pa-4"
         />
 
-        <v-card v-else class="pa-4" variant="tonal">
-          <div class="current-cycle-header">
-            <v-avatar color="primary" variant="elevated">
-              <v-icon>mdi-timeline-clock</v-icon>
-            </v-avatar>
-            <div class="current-cycle-text">
-              <div class="text-overline text-medium-emphasis mb-1">Поточний цикл</div>
-              <div class="text-subtitle-1 font-semibold">{{ currentCycleHeadline }}</div>
-              <div class="text-body-2 text-medium-emphasis">{{ currentCycleDetails }}</div>
-            </div>
-          </div>
-        </v-card>
+        <CycleSummaryCard
+          v-else
+          :current-start-date="currentCycleStartDate"
+          :previous-cycle-duration="previousCycleDurationLabel"
+        />
       </v-col>
     </v-row>
 
@@ -271,6 +264,7 @@ import ReligionDistributionTable from '@/components/ReligionDistributionTable.vu
 import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
 import ReligionModals from '@/components/ReligionModals.vue'
+import CycleSummaryCard from '@/components/CycleSummaryCard.vue'
 import { db } from '@/services/firebase'
 import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from '@/services/mageGuildService'
 import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
@@ -286,6 +280,7 @@ const hoveredReligion = ref(null)
 const viewMode = ref('diagram')
 const defaultCardBackground = ''
 const latestCycle = ref(null)
+const previousCycle = ref(null)
 const latestCycleLoading = ref(false)
 const latestCycleError = ref('')
 
@@ -479,24 +474,10 @@ function getCycleDurationDays(cycle) {
   return diff > 0 ? diff : null
 }
 
-const currentCycleHeadline = computed(() => {
-  if (!latestCycle.value) return 'Цикл ще не розпочато'
-
-  const start = latestCycle.value.startedAt || '—'
-  const end = latestCycle.value.finishedAt
-
-  return end ? `${start} — ${end}` : `${start} (триває)`
-})
-
-const currentCycleDetails = computed(() => {
-  if (!latestCycle.value) return 'Додайте перший цикл, щоб відстежувати дії релігії.'
-
-  const durationDays = getCycleDurationDays(latestCycle.value)
-  const durationLabel = durationDays ? `${durationDays} днів` : 'Тривалість не вказана'
-  const status = latestCycle.value.finishedAt ? 'Цикл завершено' : 'Цикл триває'
-  const notes = latestCycle.value.notes?.trim()
-
-  return [durationLabel, status, notes ? `Нотатки: ${notes}` : null].filter(Boolean).join(' • ')
+const currentCycleStartDate = computed(() => latestCycle.value?.startedAt || 'Цикл ще не розпочато')
+const previousCycleDurationLabel = computed(() => {
+  const durationDays = getCycleDurationDays(previousCycle.value)
+  return durationDays ? `${durationDays} днів` : 'невідомо'
 })
 const newCycleDialog = ref(false)
 const cycleSaving = ref(false)
@@ -504,19 +485,18 @@ const cycleError = ref('')
 const currentFaerunYear = DEFAULT_YEAR
 const cycleForm = reactive({
   startedDate: null,
-  finishedDate: null,
   notes: '',
 })
 
 const cycleDurationLabel = computed(() => {
   const start = normalizeFaerunDate(cycleForm.startedDate)
-  const end = normalizeFaerunDate(cycleForm.finishedDate)
+  const previousCycleStart = parseFaerunDate(latestCycle.value?.startedAt)
 
-  if (!start || !end) return 'Тривалість буде розрахована автоматично'
+  if (!start || !previousCycleStart) return 'Тривалість буде розрахована автоматично'
 
-  const diff = diffInDays(start, end)
+  const diff = diffInDays(previousCycleStart, start)
   if (diff === null) return 'Тривалість буде розрахована автоматично'
-  if (diff <= 0) return 'Дата завершення має бути пізнішою за початок'
+  if (diff <= 0) return 'Дата початку нового циклу має бути пізнішою за попередній'
 
   return `${diff} днів`
 })
@@ -1158,14 +1138,16 @@ async function loadLatestCycle() {
 
   try {
     const cyclesRef = collection(db, 'cycles')
-    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1))
+    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(2))
     const snapshot = await getDocs(latestCycleQuery)
 
     if (snapshot.docs.length) {
       const docSnap = snapshot.docs[0]
       latestCycle.value = { id: docSnap.id, ...docSnap.data() }
+      previousCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null
     } else {
       latestCycle.value = null
+      previousCycle.value = null
     }
   } catch (e) {
     console.error('[religion] Failed to load latest cycle', e)
@@ -1176,8 +1158,25 @@ async function loadLatestCycle() {
 }
 
 function openNewCycleDialog() {
-  cycleForm.startedDate = null
-  cycleForm.finishedDate = null
+  const previousCycleStart = parseFaerunDate(latestCycle.value?.startedAt)
+  if (previousCycleStart) {
+    const totalDays = previousCycleStart.month * 30 + (previousCycleStart.day - 1) + 7
+    const normalizedMonth = ((totalDays % 360) + 360) % 360
+    const yearShift = Math.floor(totalDays / 360)
+
+    cycleForm.startedDate = {
+      day: (normalizedMonth % 30) + 1,
+      month: Math.floor(normalizedMonth / 30),
+      year: previousCycleStart.year + yearShift,
+    }
+  } else {
+    const now = new Date()
+    cycleForm.startedDate = {
+      day: now.getUTCDate(),
+      month: now.getUTCMonth(),
+      year: Number(currentFaerunYear) || DEFAULT_YEAR,
+    }
+  }
   cycleForm.notes = ''
   cycleError.value = ''
   newCycleDialog.value = true
@@ -1517,19 +1516,10 @@ async function createCycle() {
   cycleError.value = ''
 
   const startedDate = normalizeFaerunDate(cycleForm.startedDate)
-  const finishedDate = normalizeFaerunDate(cycleForm.finishedDate)
 
   if (!startedDate) {
     cycleError.value = 'Вкажіть початок циклу.'
     return
-  }
-
-  if (finishedDate) {
-    const diff = diffInDays(startedDate, finishedDate)
-    if (!diff || diff <= 0) {
-      cycleError.value = 'Дата завершення має бути пізнішою за початок.'
-      return
-    }
   }
 
   cycleSaving.value = true
@@ -1539,17 +1529,10 @@ async function createCycle() {
     const lastCycleDoc = lastCycleSnapshot.docs[0]
 
     const startedAt = formatFaerunDate(startedDate)
-    const finishedAt = finishedDate ? formatFaerunDate(finishedDate) : null
-    const calculatedDuration = finishedDate ? diffInDays(startedDate, finishedDate) : null
 
     const newCycleData = {
       startedAt,
-      duration: calculatedDuration,
       createdAt: serverTimestamp(),
-    }
-
-    if (finishedAt) {
-      newCycleData.finishedAt = finishedAt
     }
 
     const cycleDoc = await addDoc(cyclesRef, newCycleData)
@@ -1558,8 +1541,14 @@ async function createCycle() {
       const previousCycle = lastCycleDoc.data()
       const parsedPreviousStart = parseFaerunDate(previousCycle.startedAt)
       const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, startedDate) : null
+      const previousFinishedDate = {
+        day: startedDate.day === 1 ? 30 : startedDate.day - 1,
+        month: startedDate.day === 1 ? (startedDate.month === 0 ? 11 : startedDate.month - 1) : startedDate.month,
+        year: startedDate.day === 1 && startedDate.month === 0 ? startedDate.year - 1 : startedDate.year,
+      }
+      const previousFinishedAt = formatFaerunDate(previousFinishedDate)
 
-      const previousUpdate = { finishedAt: startedAt }
+      const previousUpdate = { finishedAt: previousFinishedAt }
       if (previousDuration && previousDuration > 0) {
         previousUpdate.duration = previousDuration
       }
@@ -1570,7 +1559,7 @@ async function createCycle() {
     await resetReligionsSvTemp()
     await createCycleStartAction(cycleDoc.id, cycleForm.notes)
     await distributeBuildingFaithIncome(cycleDoc.id)
-    await distributeManufactureIncome(cycleDoc.id, startedAt, finishedAt)
+    await distributeManufactureIncome(cycleDoc.id, startedAt, null)
     await settlePreviousSpellRequests()
     await generateSpellRequestsForCycle({
       cycleRef: cycleDoc,
@@ -1578,7 +1567,7 @@ async function createCycle() {
       islandId: islandStore.currentId,
       population: totalPopulation.value,
       cycleStartedAt: startedAt,
-      cycleFinishedAt: finishedAt || '',
+      cycleFinishedAt: '',
     })
     await loadLatestCycle()
     closeNewCycleDialog()
@@ -2294,16 +2283,6 @@ async function applyActiveFaithFarm() {
   color: #dc2626;
   font-size: 15px;
   margin-top: 8px;
-}
-
-.current-cycle-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.current-cycle-text {
-  padding-left: 6px;
 }
 
 .view-toggle {

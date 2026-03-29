@@ -10,21 +10,15 @@
 
     <v-row class="my-4">
       <v-col cols="12">
-        <v-card class="pa-4" variant="tonal">
-          <div class="current-cycle-header">
-            <v-avatar color="primary" variant="elevated">
-              <v-icon>mdi-timeline-clock</v-icon>
-            </v-avatar>
-            <div class="current-cycle-text">
-              <div class="text-overline text-medium-emphasis mb-1">Поточний цикл</div>
-              <div class="text-subtitle-1 font-semibold">{{ currentCycleLabel }}</div>
-            </div>
-            <div class="d-flex ga-3 flex-wrap chips">
-              <v-chip color="warning" variant="flat">Відкрито: {{ store.openCount }}</v-chip>
-              <v-chip color="success" variant="flat">Виконано: {{ store.fulfilledCount }}</v-chip>
-            </div>
-          </div>
-        </v-card>
+        <CycleSummaryCard
+          :current-start-date="currentCycleStartDate"
+          :previous-cycle-duration="previousCycleDurationLabel"
+        >
+          <template #chips>
+            <v-chip color="warning" variant="flat">Відкрито: {{ store.openCount }}</v-chip>
+            <v-chip color="success" variant="flat">Виконано: {{ store.fulfilledCount }}</v-chip>
+          </template>
+        </CycleSummaryCard>
       </v-col>
     </v-row>
 
@@ -201,12 +195,16 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
 import { useMageGuildStore } from '@/store/mageGuildStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
 import { formatAmount } from '@/utils/formatters'
 import { normalizeSpellLevel, normalizeSpellTier } from '@/utils/mageGuildRequests'
+import CycleSummaryCard from '@/components/CycleSummaryCard.vue'
+import { diffInDays, parseFaerunDate } from 'faerun-date'
+import { db } from '@/services/firebase'
 
 const SPELL_LEVEL_COLOR_MAP = {
   0: 'blue-grey',
@@ -238,13 +236,16 @@ const islandStore = useIslandStore()
 const isAdmin = computed(() => userStore.isAdmin)
 const activeRequestDocument = computed(() => store.latestRequestDocument)
 const historyDocuments = computed(() => store.productionDocuments.slice(1))
-const currentCycleLabel = computed(() => {
-  if (!activeRequestDocument.value) return 'Цикл ще не розпочато'
-
-  const start = activeRequestDocument.value.cycleStartedAt || '—'
-  const end = activeRequestDocument.value.cycleFinishedAt
-
-  return end ? `${start} — ${end}` : `${start} (триває)`
+const latestCycle = ref(null)
+const previousCycle = ref(null)
+const currentCycleStartDate = computed(() => (
+  latestCycle.value?.startedAt || activeRequestDocument.value?.cycleStartedAt || 'Цикл ще не розпочато'
+))
+const previousCycleDurationLabel = computed(() => {
+  const startedAt = parseFaerunDate(previousCycle.value?.startedAt)
+  const finishedAt = parseFaerunDate(previousCycle.value?.finishedAt)
+  const diff = startedAt && finishedAt ? diffInDays(startedAt, finishedAt) : null
+  return diff && diff > 0 ? `${diff} днів` : 'невідомо'
 })
 const heroOptions = computed(() => store.heroes.map((hero) => ({ title: hero.name, value: hero.id })))
 const fulfillmentForms = reactive({})
@@ -356,10 +357,17 @@ async function ensureCurrentCycleRequests() {
   }
 }
 
+async function loadCycleSummary() {
+  const snapshot = await getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc'), limit(2)))
+  latestCycle.value = snapshot.docs[0] ? { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } : null
+  previousCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null
+}
+
 watch(() => store.requestDocuments, (docs) => {
   for (const doc of docs || []) {
     ensureRequestForms(doc.requests || [], doc.id)
   }
+  loadCycleSummary()
 }, { immediate: true })
 
 watch(
@@ -371,8 +379,9 @@ watch(
   { immediate: true },
 )
 
-onMounted(() => {
+onMounted(async () => {
   store.startListening()
+  await loadCycleSummary()
 })
 
 onBeforeUnmount(() => {
@@ -384,15 +393,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .mage-summary-card {
   border: 1px solid rgba(76, 110, 245, 0.18);
-}
-
-.current-cycle-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  .chips {
-    margin-left: auto;
-  }
 }
 
 .request-card {

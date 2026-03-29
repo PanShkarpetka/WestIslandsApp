@@ -727,17 +727,9 @@
               placeholder="Оберіть дату початку"
               :year="currentFaerunYear"
             />
-            <FaerunDatePicker
-              v-model="cycleFormModel.finishedDate"
-              label="Завершення (необов'язково)"
-              placeholder="Оберіть дату завершення"
-              :year="currentFaerunYear"
-              clearable
-              hint="Залиште поле порожнім, якщо цикл ще триває"
-            />
             <v-text-field
               :model-value="cycleDurationLabel"
-              label="Тривалість"
+              label="Тривалість попереднього циклу"
               density="comfortable"
               hide-details="auto"
               class="mb-4"
@@ -999,4 +991,3 @@ const props = defineProps({
   }
 }
 </style>
-
