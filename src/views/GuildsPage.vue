@@ -16,15 +16,24 @@
         <v-card
           elevation="2"
           rounded="xl"
-          :class="{ 'guild-card-clickable': canViewGuildLogs(guild) }"
+          :class="{
+            'guild-card-clickable': canViewGuildLogs(guild),
+            'guild-card-negative': isNegativeGuild(guild),
+          }"
           @click="openGuildLogs(guild)"
         >
-          <v-card-title class="d-flex justify-space-between align-start ga-2">
-            <div>
+          <v-card-title class="guild-card-title d-flex justify-space-between align-start ga-2">
+            <div class="guild-title-text">
               <div class="text-h6">{{ guild.name || guild.id }}</div>
               <div class="text-caption text-medium-emphasis">Лідер: {{ guild.leader || 'Невідомий' }}</div>
             </div>
-            <v-chip color="amber" variant="tonal">{{ formatAmount(guild.treasure || 0) }} 🪙</v-chip>
+            <v-chip
+              class="guild-balance-chip"
+              :color="isNegativeGuild(guild) ? 'error' : 'amber'"
+              variant="tonal"
+            >
+              {{ formatAmount(guild.treasure || 0) }} 🪙
+            </v-chip>
           </v-card-title>
 
           <v-card-text>
@@ -182,6 +191,10 @@ function canViewGuildLogs(guild) {
   if (!guild) return false;
   if (user.isAdmin) return true;
   return user.canAccessGuild(guild.id);
+}
+
+function isNegativeGuild(guild) {
+  return Number(guild?.treasure || 0) < 0;
 }
 
 async function openGuildLogs(guild) {
@@ -348,5 +361,32 @@ onBeforeUnmount(() => {
 .guild-card-clickable:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.guild-card-title {
+  flex-wrap: wrap;
+}
+
+.guild-title-text {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.guild-balance-chip {
+  margin-left: auto;
+  max-width: 100%;
+}
+
+.guild-card-negative {
+  border: 1px solid #d32f2f;
+}
+
+.guild-card-negative :deep(.v-card-title),
+.guild-card-negative :deep(.v-card-text),
+.guild-card-negative :deep(.v-card-title .text-medium-emphasis),
+.guild-card-negative :deep(.v-card-text .text-medium-emphasis),
+.guild-card-negative :deep(.v-card-text .text-body-2),
+.guild-card-negative :deep(.v-card-text b) {
+  color: #d32f2f !important;
 }
 </style>

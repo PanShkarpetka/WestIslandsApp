@@ -3,7 +3,7 @@
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12" sm="6">
         <h1 class="text-h5">
-          Заявки до гільдії магів
+          Запити на магічні послуги
         </h1>
       </v-col>
       <v-col cols="12" sm="6" class="d-flex justify-sm-end">
