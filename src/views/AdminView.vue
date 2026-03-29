@@ -57,6 +57,14 @@
               density="comfortable"
             />
           </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model="newHeroForm.dndbeyondCharacterId"
+              label="dndbeyondCharacterId"
+              hide-details="auto"
+              density="comfortable"
+            />
+          </v-col>
           <v-col cols="12" md="4" class="d-flex align-end">
             <v-btn color="primary" prepend-icon="mdi-account-plus" :loading="heroSaving" @click="createHero">
               Додати героя
@@ -102,6 +110,11 @@
               v-model="editHeroForm.religionId"
               :items="religionOptions"
               label="Релігія"
+              class="mb-2"
+            />
+            <v-text-field
+              v-model="editHeroForm.dndbeyondCharacterId"
+              label="dndbeyondCharacterId"
               class="mb-2"
             />
             <v-switch v-model="editHeroForm.downtimeAvailable" label="Дія не виконана" inset color="warning" />
@@ -177,11 +190,13 @@ const selectedHeroId = ref('');
 const newHeroForm = reactive({
   name: '',
   religionId: '',
+  dndbeyondCharacterId: '',
 });
 
 const editHeroForm = reactive({
   name: '',
   religionId: '',
+  dndbeyondCharacterId: '',
   downtimeAvailable: true,
   inactive: false,
 });
@@ -322,6 +337,7 @@ function subscribeHeroData() {
       return {
         id: docSnap.id,
         name: data.name || data.heroName || data.nickname || docSnap.id,
+        dndbeyondCharacterId: data.dndbeyondCharacterId || '',
         downtimeAvailable: data.downtimeAvailable !== false,
         inactive: Boolean(data.inactive),
       };
@@ -356,6 +372,7 @@ function openHeroEditor(hero) {
   selectedHeroId.value = hero.id;
   editHeroForm.name = hero.name;
   editHeroForm.religionId = hero.religionId;
+  editHeroForm.dndbeyondCharacterId = hero.dndbeyondCharacterId || '';
   editHeroForm.downtimeAvailable = hero.downtimeAvailable;
   editHeroForm.inactive = hero.inactive;
   heroEditDialog.value = true;
@@ -374,6 +391,7 @@ async function createHero() {
     heroError.value = 'Оберіть релігію для героя.';
     return;
   }
+  const dndbeyondCharacterId = newHeroForm.dndbeyondCharacterId.trim();
 
   heroSaving.value = true;
   try {
@@ -384,6 +402,7 @@ async function createHero() {
 
       transaction.set(heroRef, {
         name,
+        dndbeyondCharacterId,
         downtimeAvailable: true,
         inactive: false,
         createdAt: serverTimestamp(),
@@ -400,6 +419,7 @@ async function createHero() {
 
     newHeroForm.name = '';
     newHeroForm.religionId = '';
+    newHeroForm.dndbeyondCharacterId = '';
     heroSuccess.value = 'Героя створено, духовенство додано автоматично.';
   } catch (error) {
     console.error('[admin] Failed to create hero', error);
@@ -426,6 +446,7 @@ async function saveHero() {
     heroError.value = 'Оберіть релігію для героя.';
     return;
   }
+  const dndbeyondCharacterId = editHeroForm.dndbeyondCharacterId.trim();
 
   heroSaving.value = true;
   try {
@@ -436,6 +457,7 @@ async function saveHero() {
     await runTransaction(db, async (transaction) => {
       transaction.update(heroRef, {
         name,
+        dndbeyondCharacterId,
         downtimeAvailable: editHeroForm.downtimeAvailable,
         inactive: editHeroForm.inactive,
         updatedAt: serverTimestamp(),
