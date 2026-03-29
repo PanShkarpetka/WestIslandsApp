@@ -17,9 +17,9 @@
       <v-btn icon to="/donations">
         <v-icon>mdi-cash-multiple</v-icon>
       </v-btn>
-      <v-btn icon to="/politics">
-        <v-icon>mdi-town-hall</v-icon>
-      </v-btn>
+      <!--<v-btn icon to="/politics">
+      <v-icon>mdi-town-hall</v-icon>
+      </v-btn>-->
       <v-btn icon to="/religion">
         <v-icon>mdi-cross-celtic</v-icon>
       </v-btn>
@@ -77,10 +77,10 @@
           <v-list-item-title>Збори</v-list-item-title>
         </v-list-item>
 
-        <v-list-item tag="router-link" :to="'/politics'" @click="drawer = false">
+        <!--<v-list-item hidden tag="router-link" :to="'/politics'" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-town-hall</v-icon></v-list-item-icon>
           <v-list-item-title>Політика</v-list-item-title>
-        </v-list-item>
+        </v-list-item>-->
 
         <v-list-item tag="router-link" :to="'/religion'" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-cross-celtic</v-icon></v-list-item-icon>
@@ -148,3 +148,6 @@ const isMobile = computed(() => window.innerWidth < 600);
 
 <style scoped>
 </style>
+
+<script setup lang="ts">
+</script>
