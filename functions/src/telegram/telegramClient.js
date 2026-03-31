@@ -20,6 +20,26 @@ export async function sendTelegramMessage({ token, chatId, text, messageThreadId
     const body = await response.text();
     throw new Error(`Telegram API error ${response.status}: ${body}`);
   }
+
+  const payload = await response.json();
+  return payload?.result || null;
+}
+
+export async function pinTelegramMessage({ token, chatId, messageId, disableNotification = true }) {
+  const endpoint = `https://api.telegram.org/bot${token}/pinChatMessage`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      message_id: messageId,
+      disable_notification: disableNotification
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to pin message: ${await response.text()}`);
+  }
 }
 
 export async function setTelegramWebhook({ token, webhookUrl }) {

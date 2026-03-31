@@ -9,6 +9,8 @@ import {
   getFishingLogsForDate,
   getFishingLogsForYesterday,
   getOrCreateUserSession,
+  registerFishingOutcome,
+  resetFishingDailyStateIfNeeded,
   resetFishAvailabilityToDaily,
   upsertUserSession,
   updateFishAvailabilityTransaction
@@ -226,7 +228,23 @@ function extractSuccessfulCatchRows(logs) {
   return rows;
 }
 
-async function processFishing({ db, telegramUserId, telegramUsername, normalizedInput, commandUsed, rawEnteredParams }) {
+function buildDcChangedMessage(outcome) {
+  if (!outcome?.dcChanged) {
+    return null;
+  }
+
+  if (outcome.dcChangeDirection === 'up') {
+    return `📈 DC increased: <b>${outcome.previousDc} → ${outcome.eachRollDc}</b> (5 catches reached).`;
+  }
+
+  if (outcome.dcChangeDirection === 'down') {
+    return `📉 DC decreased: <b>${outcome.previousDc} → ${outcome.eachRollDc}</b> (10 misses reached).`;
+  }
+
+  return null;
+}
+
+async function processFishing({ db, telegramUserId, telegramUsername, normalizedInput, commandUsed, rawEnteredParams, onDcChanged }) {
   const [config, fishes] = await Promise.all([
     getBotConfig(db),
     getAvailableFishes(db)
@@ -264,6 +282,8 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
       fishQuantityCaught: 0,
       fishAvailabilityChanges: []
     });
+    const outcome = await registerFishingOutcome(db, { success: false });
+    onDcChanged?.(buildDcChangedMessage(outcome));
 
     return {
       result,
@@ -294,6 +314,8 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
     catches: [result.selectedFish],
     logData: baseLog
   });
+  const outcome = await registerFishingOutcome(db, { success: true });
+  onDcChanged?.(buildDcChangedMessage(outcome));
 
   return {
     result,
@@ -302,7 +324,7 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
   };
 }
 
-async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed }) {
+async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed, onDcChanged }) {
   const pending = session.payload?.pendingAdditionalRoll;
   if (!pending?.selectedFish) {
     await clearUserSession(db, telegramUserId);
@@ -321,6 +343,8 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
           successFailureResult: true
         }
       });
+      const outcome = await registerFishingOutcome(db, { success: true });
+      onDcChanged?.(buildDcChangedMessage(outcome));
 
       await clearUserSession(db, telegramUserId);
       return formatFishingResult(session.payload.result, txResult.finalCatches, {
@@ -337,6 +361,8 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
       fishQuantityCaught: 0,
       fishAvailabilityChanges: []
     });
+    const outcome = await registerFishingOutcome(db, { success: false });
+    onDcChanged?.(buildDcChangedMessage(outcome));
 
     await clearUserSession(db, telegramUserId);
     return `Перевірку провалено. ${pending.fishName} втекла.`;
@@ -349,12 +375,14 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
       additionalRollPassed: true
     }
   });
+  const outcome = await registerFishingOutcome(db, { success: true });
+  onDcChanged?.(buildDcChangedMessage(outcome));
 
   await clearUserSession(db, telegramUserId);
   return formatFishingResult(session.payload.result, txResult.finalCatches, { additionalRollPassed: true });
 }
 
-export async function handleTelegramMessage({ db, payload }) {
+export async function handleTelegramMessage({ db, payload, onDcChanged }) {
   const { text, telegramUserId } = payload;
   const normalizedText = text.toLowerCase();
   const commandToken = getCommandToken(text);
@@ -369,6 +397,8 @@ export async function handleTelegramMessage({ db, payload }) {
     return null;
   }
 
+  await resetFishingDailyStateIfNeeded(db);
+
   if (session.staleSessionCleared && !isAdminCommand && ![
     COMMANDS.FISH,
     COMMANDS.CANCEL,
@@ -381,7 +411,7 @@ export async function handleTelegramMessage({ db, payload }) {
   if (isAdditionalRollReply) {
     const passed = getYesNoReply(text);
     if (passed !== null) {
-      return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed });
+      return await resolveAdditionalRollAnswer({ db, telegramUserId, session, passed, onDcChanged });
     }
   }
 
@@ -484,7 +514,8 @@ export async function handleTelegramMessage({ db, payload }) {
         telegramUsername: usernameFromPayload(payload),
         normalizedInput: singleLine,
         commandUsed: '/fish inline',
-        rawEnteredParams: text
+        rawEnteredParams: text,
+        onDcChanged
       });
 
       if (pendingAdditionalRoll) {

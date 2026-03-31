@@ -40,16 +40,129 @@ export async function getAvailableFishes(db) {
 
 export async function resetFishAvailabilityToDaily(db) {
   const snapshot = await db.collection(COLLECTIONS.FISHES).get();
-  const batch = db.batch();
-
-  snapshot.docs.forEach((doc) => {
+  await Promise.all(snapshot.docs.map(async (doc) => {
     const data = doc.data();
     const dailyAmount = Math.max(0, Number(data.fishAmountDaily ?? data.fishAmountAvailableNow ?? 0));
-    batch.update(doc.ref, { fishAmountAvailableNow: dailyAmount });
-  });
+    await doc.ref.set({ fishAmountAvailableNow: dailyAmount }, { merge: true });
+  }));
 
-  await batch.commit();
   return snapshot.size;
+}
+
+function getDailyResetKeyNoonUtc(date = new Date()) {
+  const current = new Date(date);
+  const anchor = new Date(Date.UTC(
+    current.getUTCFullYear(),
+    current.getUTCMonth(),
+    current.getUTCDate(),
+    12,
+    0,
+    0,
+    0
+  ));
+
+  if (current.getTime() < anchor.getTime()) {
+    anchor.setUTCDate(anchor.getUTCDate() - 1);
+  }
+
+  return anchor.toISOString().slice(0, 10);
+}
+
+function randomIntInclusive(max, rng = Math.random) {
+  const safeMax = Math.max(0, Number(max || 0));
+  return Math.floor(rng() * (safeMax + 1));
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+export async function resetFishingDailyStateIfNeeded(db, { now = new Date(), rng = Math.random } = {}) {
+  const todayKey = getDailyResetKeyNoonUtc(now);
+  const configRef = db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC);
+  const configSnapshot = await configRef.get();
+  const existing = configSnapshot.exists ? configSnapshot.data() : {};
+  const lastResetKey = existing?.fishingState?.lastResetDateKey;
+
+  if (lastResetKey === todayKey) {
+    return false;
+  }
+
+  const fishesSnapshot = await db.collection(COLLECTIONS.FISHES).get();
+  await Promise.all(fishesSnapshot.docs.map(async (doc) => {
+    const data = doc.data();
+    const dailyAmount = Math.max(0, Number(data.fishAmountDaily ?? 0));
+    const randomizedAmount = randomIntInclusive(dailyAmount, rng);
+    await doc.ref.set({ fishAmountAvailableNow: randomizedAmount }, { merge: true });
+  }));
+
+  await configRef.set({
+    dc: {
+      eachRollDc: 10
+    },
+    fishingState: {
+      lastResetDateKey: todayKey,
+      caughtCounter: 0,
+      notCaughtCounter: 0,
+      resetAt: now.toISOString()
+    }
+  }, { merge: true });
+
+  return true;
+}
+
+export async function registerFishingOutcome(db, { success, now = new Date() }) {
+  await resetFishingDailyStateIfNeeded(db, { now });
+
+  const todayKey = getDailyResetKeyNoonUtc(now);
+  const configRef = db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC);
+  const configSnapshot = await configRef.get();
+  const existing = configSnapshot.exists ? configSnapshot.data() : {};
+  const state = existing?.fishingState || {};
+  const currentDc = clamp(Number(existing?.dc?.eachRollDc ?? 10), 10, 15);
+
+  let caughtCounter = Math.max(0, Number(state.caughtCounter ?? state.caughtCount ?? 0));
+  let notCaughtCounter = Math.max(0, Number(state.notCaughtCounter ?? state.notCaughtCount ?? 0));
+  let eachRollDc = currentDc;
+  let dcChangeDirection = null;
+
+  if (success) {
+    caughtCounter += 1;
+    if (caughtCounter >= 5) {
+      eachRollDc = clamp(currentDc + 1, 10, 15);
+      caughtCounter = 0;
+      dcChangeDirection = eachRollDc > currentDc ? 'up' : null;
+    }
+  } else {
+    notCaughtCounter += 1;
+    if (notCaughtCounter >= 10) {
+      eachRollDc = clamp(currentDc - 1, 10, 15);
+      notCaughtCounter = 0;
+      dcChangeDirection = eachRollDc < currentDc ? 'down' : null;
+    }
+  }
+
+  await configRef.set({
+    dc: {
+      eachRollDc
+    },
+    fishingState: {
+      ...state,
+      lastResetDateKey: state.lastResetDateKey || todayKey,
+      caughtCounter,
+      notCaughtCounter,
+      lastOutcomeAt: now.toISOString()
+    }
+  }, { merge: true });
+
+  return {
+    caughtCounter,
+    notCaughtCounter,
+    eachRollDc,
+    previousDc: currentDc,
+    dcChanged: dcChangeDirection !== null,
+    dcChangeDirection
+  };
 }
 
 function startOfDay(date) {

@@ -398,7 +398,9 @@ test('accepts admin command with bot mention', async () => {
   const telegramUserId = '508';
   const db = createMockDb({
     [COLLECTIONS.BOT_CONFIGS]: {
-      [BOT_CONFIG_DOC]: {}
+      [BOT_CONFIG_DOC]: {
+        fishingState: { lastResetDateKey: new Date().toISOString().slice(0, 10) }
+      }
     },
     [COLLECTIONS.FISHES]: {
       'fish-1': {
