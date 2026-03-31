@@ -1,0 +1,211 @@
+[
+  {
+    "characterId": "154993405",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 8,
+      "gp": 148,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "147593626",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 56,
+      "gp": 414,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "160075687",
+    "status": "success",
+    "balance": {
+      "cp": 43,
+      "sp": 1129,
+      "gp": 201,
+      "ep": 0,
+      "pp": 4
+    }
+  },
+  {
+    "characterId": "159330478",
+    "status": "success",
+    "balance": {
+      "cp": 8,
+      "sp": 211,
+      "gp": 273,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "148075067",
+    "status": "success",
+    "balance": {
+      "cp": 6,
+      "sp": 832,
+      "gp": 193,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "161483405",
+    "status": "success",
+    "balance": {
+      "cp": 21,
+      "sp": 16,
+      "gp": 0,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "146807026",
+    "status": "success",
+    "balance": {
+      "cp": 2,
+      "sp": 9,
+      "gp": 55,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "157562266",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 67,
+      "gp": 235,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "146570422",
+    "status": "success",
+    "balance": {
+      "cp": 5,
+      "sp": 9,
+      "gp": 124,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "146666957",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 0,
+      "gp": 1050,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "146812946",
+    "status": "success",
+    "balance": {
+      "cp": 8,
+      "sp": 307,
+      "gp": 665,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "154782015",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 0,
+      "gp": 487,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "162431032",
+    "status": "success",
+    "balance": {
+      "cp": 10,
+      "sp": 148,
+      "gp": 593,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "163160462",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 0,
+      "gp": 5,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "157586075",
+    "status": "success",
+    "balance": {
+      "cp": 16,
+      "sp": 304,
+      "gp": 0,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "163401624",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 5,
+      "gp": 431,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "146495475",
+    "status": "success",
+    "balance": {
+      "cp": 24,
+      "sp": 17,
+      "gp": 14,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "152149395",
+    "status": "success",
+    "balance": {
+      "cp": 0,
+      "sp": 0,
+      "gp": 24,
+      "ep": 0,
+      "pp": 0
+    }
+  },
+  {
+    "characterId": "146514173",
+    "status": "success",
+    "balance": {
+      "cp": 5,
+      "sp": 9,
+      "gp": 245,
+      "ep": 0,
+      "pp": 0
+    }
+  }
+]

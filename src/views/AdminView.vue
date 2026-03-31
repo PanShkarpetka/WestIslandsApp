@@ -57,6 +57,14 @@
               density="comfortable"
             />
           </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model="newHeroForm.dndbeyondCharacterId"
+              label="dndbeyondCharacterId"
+              hide-details="auto"
+              density="comfortable"
+            />
+          </v-col>
           <v-col cols="12" md="4" class="d-flex align-end">
             <v-btn color="primary" prepend-icon="mdi-account-plus" :loading="heroSaving" @click="createHero">
               Додати героя
@@ -88,10 +96,188 @@
             {{ item.inactive ? 'Неактивний' : 'Активний' }}
           </v-chip>
         </template>
+        <template #item.balanceSummary="{ item }">
+          <div class="text-body-2">
+            GP: {{ normalizeBalance(item.balance).gp }},
+            SP: {{ normalizeBalance(item.balance).sp }},
+            CP: {{ normalizeBalance(item.balance).cp }},
+            EP: {{ normalizeBalance(item.balance).ep }},
+            PP: {{ normalizeBalance(item.balance).pp }}
+          </div>
+        </template>
+        <template #item.deltaSummary="{ item }">
+          <div class="text-body-2">
+            <span :class="deltaClass(normalizeBalance(item.balanceDelta).gp)">
+              GP: {{ formatDelta(normalizeBalance(item.balanceDelta).gp) }}
+            </span>,
+            <span :class="deltaClass(normalizeBalance(item.balanceDelta).sp)">
+              SP: {{ formatDelta(normalizeBalance(item.balanceDelta).sp) }}
+            </span>,
+            <span :class="deltaClass(normalizeBalance(item.balanceDelta).cp)">
+              CP: {{ formatDelta(normalizeBalance(item.balanceDelta).cp) }}
+            </span>,
+            <span :class="deltaClass(normalizeBalance(item.balanceDelta).ep)">
+              EP: {{ formatDelta(normalizeBalance(item.balanceDelta).ep) }}
+            </span>,
+            <span :class="deltaClass(normalizeBalance(item.balanceDelta).pp)">
+              PP: {{ formatDelta(normalizeBalance(item.balanceDelta).pp) }}
+            </span>
+          </div>
+        </template>
         <template #item.actions="{ item }">
           <v-btn size="small" variant="text" color="primary" @click="openHeroEditor(item)">Редагувати</v-btn>
         </template>
       </v-data-table>
+
+      <v-card variant="tonal" class="pa-3 mb-4">
+        <div class="text-subtitle-2 mb-2">Зведення по кампанії (усі герої)</div>
+        <div class="text-body-2 mb-1">
+          Поточні баланси:
+          GP {{ heroBalanceTotals.totalBalance.gp }},
+          SP {{ heroBalanceTotals.totalBalance.sp }},
+          CP {{ heroBalanceTotals.totalBalance.cp }},
+          EP {{ heroBalanceTotals.totalBalance.ep }},
+          PP {{ heroBalanceTotals.totalBalance.pp }}
+        </div>
+        <div class="text-body-2">
+          Сума дельт:
+          <span :class="deltaClass(heroBalanceTotals.totalDelta.gp)">GP {{ formatDelta(heroBalanceTotals.totalDelta.gp) }}</span>,
+          <span :class="deltaClass(heroBalanceTotals.totalDelta.sp)">SP {{ formatDelta(heroBalanceTotals.totalDelta.sp) }}</span>,
+          <span :class="deltaClass(heroBalanceTotals.totalDelta.cp)">CP {{ formatDelta(heroBalanceTotals.totalDelta.cp) }}</span>,
+          <span :class="deltaClass(heroBalanceTotals.totalDelta.ep)">EP {{ formatDelta(heroBalanceTotals.totalDelta.ep) }}</span>,
+          <span :class="deltaClass(heroBalanceTotals.totalDelta.pp)">PP {{ formatDelta(heroBalanceTotals.totalDelta.pp) }}</span>
+        </div>
+      </v-card>
+
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Import D&amp;D Beyond Balance Snapshot</div>
+        <v-alert
+          v-if="snapshotImportState.error"
+          type="error"
+          variant="tonal"
+          density="comfortable"
+          class="mb-3"
+        >
+          {{ snapshotImportState.error }}
+        </v-alert>
+        <v-textarea
+          v-model="snapshotImportState.rawInput"
+          label="Snapshot JSON"
+          auto-grow
+          rows="6"
+          density="comfortable"
+          hide-details="auto"
+          class="mb-3"
+        />
+        <div class="d-flex flex-wrap ga-2 mb-3">
+          <v-btn color="primary" prepend-icon="mdi-eye-outline" @click="previewSnapshotImport">Preview Import</v-btn>
+          <v-btn
+            color="success"
+            prepend-icon="mdi-content-save-edit-outline"
+            :loading="snapshotImportState.applying"
+            :disabled="applyImportDisabled"
+            @click="applySnapshotImport"
+          >
+            Apply Import
+          </v-btn>
+          <v-btn variant="text" prepend-icon="mdi-close-circle-outline" @click="clearSnapshotImport">Clear</v-btn>
+        </div>
+
+        <v-card v-if="snapshotImportState.preview" variant="tonal" class="pa-3 mb-3">
+          <div class="text-subtitle-2 mb-2">Preview summary</div>
+          <v-row dense>
+            <v-col cols="6" md="2">Total rows: {{ snapshotImportState.preview.summary.totalRows }}</v-col>
+            <v-col cols="6" md="2">Valid rows: {{ snapshotImportState.preview.summary.validRows }}</v-col>
+            <v-col cols="6" md="2">Matched: {{ snapshotImportState.preview.summary.matchedRows }}</v-col>
+            <v-col cols="6" md="2">Unmatched: {{ snapshotImportState.preview.summary.unmatchedRows }}</v-col>
+            <v-col cols="6" md="2">Missing heroes: {{ snapshotImportState.preview.summary.missingHeroesFromSnapshot }}</v-col>
+            <v-col cols="6" md="2">Invalid rows: {{ snapshotImportState.preview.summary.invalidRows }}</v-col>
+          </v-row>
+          <v-alert
+            v-if="snapshotImportState.preview.duplicateCharacterIds.length"
+            type="warning"
+            variant="tonal"
+            density="comfortable"
+            class="mt-3"
+          >
+            Duplicate characterId rows found ({{ snapshotImportState.preview.duplicateCharacterIds.join(', ') }}).
+            Resolve duplicates before apply.
+          </v-alert>
+        </v-card>
+
+        <v-card v-if="snapshotImportState.preview?.matched.length" variant="outlined" class="pa-3 mb-3">
+          <div class="text-subtitle-2 mb-2">Matched heroes</div>
+          <v-expansion-panels variant="accordion" density="compact">
+            <v-expansion-panel
+              v-for="row in snapshotImportState.preview.matched"
+              :key="`${row.heroId}-${row.dndbeyondCharacterId}`"
+            >
+              <v-expansion-panel-title>
+                <div class="d-flex flex-wrap ga-2 align-center">
+                  <span>{{ row.heroName }}</span>
+                  <span class="text-medium-emphasis">({{ row.dndbeyondCharacterId }})</span>
+                  <span class="font-weight-medium">
+                    current: {{ row.currentBalance ? `${row.currentBalance.gp} gp` : 'No previous balance' }}
+                    → new: {{ row.newBalance.gp }} gp
+                  </span>
+                  <span :class="deltaClass(row.delta.gp)">({{ formatDelta(row.delta.gp) }})</span>
+                </div>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <div class="text-body-2">
+                  GP: {{ row.newBalance.gp }} ({{ formatDelta(row.delta.gp) }})<br />
+                  SP: {{ row.newBalance.sp }} ({{ formatDelta(row.delta.sp) }})<br />
+                  CP: {{ row.newBalance.cp }} ({{ formatDelta(row.delta.cp) }})<br />
+                  EP: {{ row.newBalance.ep }} ({{ formatDelta(row.delta.ep) }})<br />
+                  PP: {{ row.newBalance.pp }} ({{ formatDelta(row.delta.pp) }})
+                </div>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </v-card>
+
+        <v-card v-if="snapshotImportState.preview?.unmatched.length" variant="outlined" class="pa-3 mb-3">
+          <div class="text-subtitle-2 mb-2">Unmatched snapshot rows</div>
+          <v-list density="compact">
+            <v-list-item v-for="row in snapshotImportState.preview.unmatched" :key="`u-${row.characterId}`">
+              <v-list-item-title>{{ row.characterId }} — new: {{ row.balance.gp }} gp</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-card>
+
+        <v-card v-if="snapshotImportState.preview?.invalid.length" variant="outlined" class="pa-3 mb-3">
+          <div class="text-subtitle-2 mb-2">Invalid rows</div>
+          <v-list density="compact">
+            <v-list-item v-for="row in snapshotImportState.preview.invalid" :key="`i-${row.index}-${row.reason}`">
+              <v-list-item-title>Row {{ row.index + 1 }}: {{ row.reason }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-card>
+
+        <v-card v-if="snapshotImportState.preview?.missingHeroesFromSnapshot.length" variant="outlined" class="pa-3 mb-3">
+          <div class="text-subtitle-2 mb-2">Heroes missing from snapshot</div>
+          <v-list density="compact">
+            <v-list-item
+              v-for="row in snapshotImportState.preview.missingHeroesFromSnapshot"
+              :key="`m-${row.heroId}`"
+            >
+              <v-list-item-title>{{ row.heroName }} ({{ row.dndbeyondCharacterId }})</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-card>
+
+        <v-alert
+          v-if="snapshotImportState.applySummary"
+          type="success"
+          variant="tonal"
+          density="comfortable"
+        >
+          Updated: {{ snapshotImportState.applySummary.updatedCount }},
+          failed: {{ snapshotImportState.applySummary.failedCount }},
+          unmatched: {{ snapshotImportState.applySummary.unmatchedCount }},
+          skipped: {{ snapshotImportState.applySummary.skippedCount }}.
+        </v-alert>
+      </v-card>
 
       <v-dialog v-model="heroEditDialog" max-width="560">
         <v-card>
@@ -102,6 +288,11 @@
               v-model="editHeroForm.religionId"
               :items="religionOptions"
               label="Релігія"
+              class="mb-2"
+            />
+            <v-text-field
+              v-model="editHeroForm.dndbeyondCharacterId"
+              label="dndbeyondCharacterId"
               class="mb-2"
             />
             <v-switch v-model="editHeroForm.downtimeAvailable" label="Дія не виконана" inset color="warning" />
@@ -136,6 +327,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import {
+  addDoc,
   collection,
   doc,
   getDocs,
@@ -145,6 +337,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import { DEFAULT_YEAR, diffInDays, normalizeFaerunDate, parseFaerunDate } from 'faerun-date';
 import { db } from '../services/firebase';
@@ -173,15 +366,24 @@ const heroError = ref('');
 const heroSuccess = ref('');
 const heroEditDialog = ref(false);
 const selectedHeroId = ref('');
+const snapshotImportState = reactive({
+  rawInput: '',
+  preview: null,
+  error: '',
+  applying: false,
+  applySummary: null,
+});
 
 const newHeroForm = reactive({
   name: '',
   religionId: '',
+  dndbeyondCharacterId: '',
 });
 
 const editHeroForm = reactive({
   name: '',
   religionId: '',
+  dndbeyondCharacterId: '',
   downtimeAvailable: true,
   inactive: false,
 });
@@ -201,6 +403,8 @@ const heroHeaders = [
   { title: 'Релігія', key: 'religionName' },
   { title: 'Статус дії', key: 'downtimeAvailable' },
   { title: 'Стан героя', key: 'inactive' },
+  { title: 'Поточний баланс', key: 'balanceSummary', sortable: false },
+  { title: 'Дельта балансу', key: 'deltaSummary', sortable: false },
   { title: '', key: 'actions', sortable: false },
 ];
 
@@ -242,6 +446,36 @@ const heroRows = computed(() =>
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'uk-UA')),
 );
+
+const applyImportDisabled = computed(() => {
+  const preview = snapshotImportState.preview;
+  if (!preview) return true;
+  if (snapshotImportState.applying) return true;
+  if (preview.duplicateCharacterIds.length) return true;
+  return preview.matched.length === 0;
+});
+
+const heroBalanceTotals = computed(() => {
+  const totalBalance = { cp: 0, sp: 0, gp: 0, ep: 0, pp: 0 };
+  const totalDelta = { cp: 0, sp: 0, gp: 0, ep: 0, pp: 0 };
+
+  for (const hero of heroRows.value) {
+    const normalizedBalance = normalizeBalance(hero.balance || {});
+    const normalizedDelta = normalizeBalance(hero.balanceDelta || {});
+    totalBalance.cp += normalizedBalance.cp;
+    totalBalance.sp += normalizedBalance.sp;
+    totalBalance.gp += normalizedBalance.gp;
+    totalBalance.ep += normalizedBalance.ep;
+    totalBalance.pp += normalizedBalance.pp;
+    totalDelta.cp += normalizedDelta.cp;
+    totalDelta.sp += normalizedDelta.sp;
+    totalDelta.gp += normalizedDelta.gp;
+    totalDelta.ep += normalizedDelta.ep;
+    totalDelta.pp += normalizedDelta.pp;
+  }
+
+  return { totalBalance, totalDelta };
+});
 
 const cycleDurationLabel = computed(() => {
   const start = normalizeFaerunDate(cycleForm.startedDate);
@@ -322,6 +556,9 @@ function subscribeHeroData() {
       return {
         id: docSnap.id,
         name: data.name || data.heroName || data.nickname || docSnap.id,
+        dndbeyondCharacterId: data.dndbeyondCharacterId || '',
+        balance: data.balance || null,
+        balanceDelta: data.balanceDelta || null,
         downtimeAvailable: data.downtimeAvailable !== false,
         inactive: Boolean(data.inactive),
       };
@@ -352,10 +589,254 @@ function subscribeHeroData() {
   });
 }
 
+function normalizeBalance(balance) {
+  return {
+    cp: Number(balance?.cp ?? 0) || 0,
+    sp: Number(balance?.sp ?? 0) || 0,
+    gp: Number(balance?.gp ?? 0) || 0,
+    ep: Number(balance?.ep ?? 0) || 0,
+    pp: Number(balance?.pp ?? 0) || 0,
+  };
+}
+
+function computeDelta(oldBalance, newBalance) {
+  const oldB = normalizeBalance(oldBalance || {});
+  const newB = normalizeBalance(newBalance || {});
+  return {
+    cp: newB.cp - oldB.cp,
+    sp: newB.sp - oldB.sp,
+    gp: newB.gp - oldB.gp,
+    ep: newB.ep - oldB.ep,
+    pp: newB.pp - oldB.pp,
+  };
+}
+
+function formatDelta(value) {
+  if (value > 0) return `+${value}`;
+  if (value < 0) return `${value}`;
+  return '0';
+}
+
+function deltaClass(value) {
+  if (value > 0) return 'text-success';
+  if (value < 0) return 'text-error';
+  return 'text-medium-emphasis';
+}
+
+function clearSnapshotImport() {
+  snapshotImportState.rawInput = '';
+  snapshotImportState.preview = null;
+  snapshotImportState.error = '';
+  snapshotImportState.applySummary = null;
+}
+
+async function previewSnapshotImport() {
+  snapshotImportState.error = '';
+  snapshotImportState.applySummary = null;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(snapshotImportState.rawInput);
+  } catch (error) {
+    snapshotImportState.preview = null;
+    snapshotImportState.error = 'Snapshot JSON is invalid.';
+    return;
+  }
+
+  if (!Array.isArray(parsed)) {
+    snapshotImportState.preview = null;
+    snapshotImportState.error = 'Snapshot root must be an array.';
+    return;
+  }
+
+  const invalid = [];
+  const validRows = [];
+  const counts = new Map();
+
+  parsed.forEach((row, index) => {
+    if (!row || typeof row !== 'object') {
+      invalid.push({ index, reason: 'Row must be an object.' });
+      return;
+    }
+
+    const characterId = typeof row.characterId === 'string' ? row.characterId.trim() : '';
+    if (!characterId) {
+      invalid.push({ index, reason: 'characterId must be a non-empty string.' });
+      return;
+    }
+
+    if (row.status !== 'success') {
+      invalid.push({ index, reason: 'status must be "success".' });
+      return;
+    }
+
+    if (!row.balance || typeof row.balance !== 'object') {
+      invalid.push({ index, reason: 'balance must be an object.' });
+      return;
+    }
+
+    const normalizedBalance = normalizeBalance(row.balance);
+    validRows.push({
+      index,
+      characterId,
+      rawCharacterId: row.characterId,
+      balance: normalizedBalance,
+    });
+    counts.set(characterId, (counts.get(characterId) || 0) + 1);
+  });
+
+  const duplicateCharacterIds = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([characterId]) => characterId);
+
+  if (duplicateCharacterIds.length) {
+    validRows.forEach((row) => {
+      if (duplicateCharacterIds.includes(row.characterId)) {
+        invalid.push({
+          index: row.index,
+          reason: `Duplicate characterId "${row.characterId}" detected.`,
+        });
+      }
+    });
+  }
+
+  const usableRows = validRows.filter((row) => !duplicateCharacterIds.includes(row.characterId));
+  const heroByCharacterId = new Map(
+    heroes.value
+      .filter((hero) => typeof hero.dndbeyondCharacterId === 'string' && hero.dndbeyondCharacterId !== '')
+      .map((hero) => [hero.dndbeyondCharacterId, hero]),
+  );
+
+  const matched = [];
+  const unmatched = [];
+  const snapshotCharacterIds = new Set();
+
+  usableRows.forEach((row) => {
+    snapshotCharacterIds.add(row.characterId);
+    const hero = heroByCharacterId.get(row.characterId);
+    if (!hero) {
+      unmatched.push({
+        characterId: row.characterId,
+        rawCharacterId: row.rawCharacterId,
+        balance: row.balance,
+      });
+      return;
+    }
+
+    const currentBalance = hero.balance && typeof hero.balance === 'object' ? normalizeBalance(hero.balance) : null;
+    matched.push({
+      heroId: hero.id,
+      heroName: hero.name || hero.id,
+      dndbeyondCharacterId: hero.dndbeyondCharacterId,
+      currentBalance,
+      newBalance: row.balance,
+      delta: computeDelta(currentBalance || {}, row.balance),
+      rawCharacterId: row.rawCharacterId,
+    });
+  });
+
+  const missingHeroesFromSnapshot = heroes.value
+    .filter(
+      (hero) =>
+        typeof hero.dndbeyondCharacterId === 'string' &&
+        hero.dndbeyondCharacterId !== '' &&
+        !snapshotCharacterIds.has(hero.dndbeyondCharacterId),
+    )
+    .map((hero) => ({
+      heroId: hero.id,
+      heroName: hero.name || hero.id,
+      dndbeyondCharacterId: hero.dndbeyondCharacterId,
+    }))
+    .sort((a, b) => a.heroName.localeCompare(b.heroName, 'uk-UA'));
+
+  snapshotImportState.preview = {
+    summary: {
+      totalRows: parsed.length,
+      validRows: usableRows.length,
+      matchedRows: matched.length,
+      unmatchedRows: unmatched.length,
+      invalidRows: invalid.length,
+      missingHeroesFromSnapshot: missingHeroesFromSnapshot.length,
+    },
+    matched,
+    unmatched,
+    invalid: invalid.sort((a, b) => a.index - b.index),
+    duplicateCharacterIds,
+    missingHeroesFromSnapshot,
+  };
+}
+
+async function applySnapshotImport() {
+  if (applyImportDisabled.value) return;
+
+  snapshotImportState.applying = true;
+  snapshotImportState.error = '';
+  snapshotImportState.applySummary = null;
+
+  const preview = snapshotImportState.preview;
+  let updatedCount = 0;
+  let failedCount = 0;
+  const failures = [];
+
+  try {
+    for (const row of preview.matched) {
+      const heroRef = doc(db, 'heroes', row.heroId);
+      const syncedAt = serverTimestamp();
+      const payload = {
+        balance: row.newBalance,
+        balanceDelta: row.delta,
+        balanceSyncedAt: syncedAt,
+        balanceSyncStatus: 'manual_import',
+        balanceSyncError: null,
+        balanceSyncSource: 'manual_snapshot_import',
+      };
+      if (row.currentBalance) {
+        payload.previousBalance = row.currentBalance;
+      }
+
+      try {
+        await updateDoc(heroRef, payload);
+        await addDoc(collection(db, 'hero-balance-sync-logs'), {
+          heroId: row.heroId,
+          heroName: row.heroName,
+          dndbeyondCharacterId: row.dndbeyondCharacterId,
+          syncedAt,
+          source: 'manual_snapshot_import',
+          balance: row.newBalance,
+          previousBalance: row.currentBalance || null,
+          balanceDelta: row.delta,
+          rawCharacterId: row.rawCharacterId,
+        });
+        updatedCount += 1;
+      } catch (error) {
+        console.error('[admin] Failed to apply snapshot row', row, error);
+        failedCount += 1;
+        failures.push(`${row.heroName} (${row.dndbeyondCharacterId})`);
+      }
+    }
+
+    snapshotImportState.applySummary = {
+      updatedCount,
+      failedCount,
+      unmatchedCount: preview.unmatched.length,
+      skippedCount: preview.invalid.length + preview.missingHeroesFromSnapshot.length,
+    };
+
+    if (failures.length) {
+      snapshotImportState.error = `Some hero updates failed: ${failures.join(', ')}`;
+    } else {
+      heroSuccess.value = `Manual snapshot import updated ${updatedCount} heroes.`;
+    }
+  } finally {
+    snapshotImportState.applying = false;
+  }
+}
+
 function openHeroEditor(hero) {
   selectedHeroId.value = hero.id;
   editHeroForm.name = hero.name;
   editHeroForm.religionId = hero.religionId;
+  editHeroForm.dndbeyondCharacterId = hero.dndbeyondCharacterId || '';
   editHeroForm.downtimeAvailable = hero.downtimeAvailable;
   editHeroForm.inactive = hero.inactive;
   heroEditDialog.value = true;
@@ -374,6 +855,7 @@ async function createHero() {
     heroError.value = 'Оберіть релігію для героя.';
     return;
   }
+  const dndbeyondCharacterId = newHeroForm.dndbeyondCharacterId.trim();
 
   heroSaving.value = true;
   try {
@@ -384,6 +866,7 @@ async function createHero() {
 
       transaction.set(heroRef, {
         name,
+        dndbeyondCharacterId,
         downtimeAvailable: true,
         inactive: false,
         createdAt: serverTimestamp(),
@@ -400,6 +883,7 @@ async function createHero() {
 
     newHeroForm.name = '';
     newHeroForm.religionId = '';
+    newHeroForm.dndbeyondCharacterId = '';
     heroSuccess.value = 'Героя створено, духовенство додано автоматично.';
   } catch (error) {
     console.error('[admin] Failed to create hero', error);
@@ -426,6 +910,7 @@ async function saveHero() {
     heroError.value = 'Оберіть релігію для героя.';
     return;
   }
+  const dndbeyondCharacterId = editHeroForm.dndbeyondCharacterId.trim();
 
   heroSaving.value = true;
   try {
@@ -436,6 +921,7 @@ async function saveHero() {
     await runTransaction(db, async (transaction) => {
       transaction.update(heroRef, {
         name,
+        dndbeyondCharacterId,
         downtimeAvailable: editHeroForm.downtimeAvailable,
         inactive: editHeroForm.inactive,
         updatedAt: serverTimestamp(),
