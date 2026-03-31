@@ -1,7 +1,7 @@
 import admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import { handleTelegramMessage } from './src/telegram/handlers.js';
-import { sendTelegramMessage } from './src/telegram/telegramClient.js';
+import { pinTelegramMessage, sendTelegramMessage } from './src/telegram/telegramClient.js';
 import { markUpdateProcessed } from './src/services/firestoreService.js';
 import { validateTelegramUpdate } from './src/utils/validation.js';
 
@@ -35,7 +35,17 @@ export const telegramWebhook = onRequest(async (req, res) => {
       return;
     }
 
-    const reply = await handleTelegramMessage({ db, payload });
+    const dcChangedMessages = [];
+    const reply = await handleTelegramMessage({
+      db,
+      payload,
+      onDcChanged: (message) => {
+        if (message) {
+          dcChangedMessages.push(message);
+        }
+      }
+    });
+
     if (reply) {
       await sendTelegramMessage({
         token: TELEGRAM_BOT_TOKEN,
@@ -43,6 +53,27 @@ export const telegramWebhook = onRequest(async (req, res) => {
         messageThreadId: payload.messageThreadId,
         text: reply
       });
+    }
+
+    for (const dcMessage of dcChangedMessages) {
+      try {
+        const sent = await sendTelegramMessage({
+          token: TELEGRAM_BOT_TOKEN,
+          chatId: payload.chatId,
+          messageThreadId: payload.messageThreadId,
+          text: dcMessage
+        });
+
+        if (sent?.message_id) {
+          await pinTelegramMessage({
+            token: TELEGRAM_BOT_TOKEN,
+            chatId: payload.chatId,
+            messageId: sent.message_id
+          });
+        }
+      } catch (pinError) {
+        console.warn('Failed to post/pin DC change message', pinError);
+      }
     }
 
     res.status(200).send('OK');
