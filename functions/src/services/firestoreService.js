@@ -77,14 +77,14 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-export async function resetFishingDailyStateIfNeeded(db, { now = new Date(), rng = Math.random } = {}) {
+export async function resetFishingDailyStateIfNeeded(db, { now = new Date(), rng = Math.random, force = false } = {}) {
   const todayKey = getDailyResetKeyNoonUtc(now);
   const configRef = db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC);
   const configSnapshot = await configRef.get();
   const existing = configSnapshot.exists ? configSnapshot.data() : {};
   const lastResetKey = existing?.fishingState?.lastResetDateKey;
 
-  if (lastResetKey === todayKey) {
+  if (!force && lastResetKey === todayKey) {
     return false;
   }
 

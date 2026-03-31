@@ -421,7 +421,42 @@ test('accepts admin command with bot mention', async () => {
   });
 
   assert.match(reply, /Available fishes today/);
-}); 
+});
+
+test('supports manual forced daily reset command', async () => {
+  const telegramUserId = '5082';
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        dc: { eachRollDc: 14 },
+        fishingState: {
+          lastResetDateKey: new Date().toISOString().slice(0, 10),
+          caughtCounter: 4,
+          notCaughtCounter: 9
+        }
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      'fish-1': {
+        fishName: 'Test Fish',
+        fishAmountDaily: 3,
+        fishAmountAvailableNow: 3
+      }
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: COMMANDS.FORCE_DAILY_RESET, telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.equal(reply, 'Forced daily reset completed: fish randomized, DC reset to 10, counters reset.');
+
+  const config = await db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC).get();
+  assert.equal(config.data().dc.eachRollDc, 10);
+  assert.equal(config.data().fishingState.caughtCounter, 0);
+  assert.equal(config.data().fishingState.notCaughtCounter, 0);
+});
 
 test('lists only successful catches from current day for /admin_fish_catches_today', async () => {
   const telegramUserId = '509';

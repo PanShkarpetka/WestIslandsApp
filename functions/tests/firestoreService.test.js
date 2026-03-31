@@ -171,3 +171,33 @@ test('reset key flips at UTC noon', async () => {
   });
   assert.equal(didReset, true);
 });
+
+test('force option performs reset even when current noon-key was already reset', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        dc: { eachRollDc: 15 },
+        fishingState: {
+          lastResetDateKey: '2026-03-31',
+          caughtCounter: 4,
+          notCaughtCounter: 9
+        }
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      a: { fishAmountDaily: 5, fishAmountAvailableNow: 5 }
+    }
+  });
+
+  const reset = await resetFishingDailyStateIfNeeded(db, {
+    now: new Date('2026-03-31T15:00:00.000Z'),
+    force: true,
+    rng: () => 0
+  });
+
+  assert.equal(reset, true);
+  const config = await db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC).get();
+  assert.equal(config.data().dc.eachRollDc, 10);
+  assert.equal(config.data().fishingState.caughtCounter, 0);
+  assert.equal(config.data().fishingState.notCaughtCounter, 0);
+});

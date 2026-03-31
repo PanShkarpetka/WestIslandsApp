@@ -14,6 +14,7 @@ export const COMMANDS = {
   RESET: '/reset',
   HELP: '/fishing_help',
   RESET_FISH_AVAILABILITY: '/admin_fish_reset_availability',
+  FORCE_DAILY_RESET: '/admin_fish_force_daily_reset',
   LIST_AVAILABLE_FISHES_TODAY: '/admin_fish_available_today',
   GET_FISH_PRICE: '/admin_fish_price',
   LIST_SUCCESSFUL_CATCHES_TODAY: '/admin_fish_catches_today',

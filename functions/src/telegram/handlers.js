@@ -424,6 +424,11 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
     return `Reset availability to daily defaults for ${resetCount} fishes.`;
   }
 
+  if (commandToken === COMMANDS.FORCE_DAILY_RESET) {
+    await resetFishingDailyStateIfNeeded(db, { force: true });
+    return 'Forced daily reset completed: fish randomized, DC reset to 10, counters reset.';
+  }
+
   if (commandToken === COMMANDS.LIST_AVAILABLE_FISHES_TODAY) {
     const fishes = await getAvailableFishes(db);
     const available = fishes
