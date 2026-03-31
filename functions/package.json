@@ -4,6 +4,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "deploy": "firebase deploy --only functions",
     "test": "node --test tests/*.test.js"
   },
   "engines": {
