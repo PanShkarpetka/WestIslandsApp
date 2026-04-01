@@ -234,11 +234,11 @@ function buildDcChangedMessage(outcome) {
   }
 
   if (outcome.dcChangeDirection === 'up') {
-    return `📈 DC increased: <b>${outcome.previousDc} → ${outcome.eachRollDc}</b> (5 catches reached).`;
+    return `📈 DC збільшено: <b>${outcome.previousDc} → ${outcome.eachRollDc}</b> (5 піймано рибин).`;
   }
 
   if (outcome.dcChangeDirection === 'down') {
-    return `📉 DC decreased: <b>${outcome.previousDc} → ${outcome.eachRollDc}</b> (10 misses reached).`;
+    return `📉 DC зменшено: <b>${outcome.previousDc} → ${outcome.eachRollDc}</b> (10 рибин не піймано).`;
   }
 
   return null;
