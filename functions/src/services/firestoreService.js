@@ -131,12 +131,14 @@ export async function registerFishingOutcome(db, { success, now = new Date() }) 
     if (caughtCounter >= 5) {
       eachRollDc = clamp(currentDc + 1, 10, 15);
       caughtCounter = 0;
+      notCaughtCounter = 0;
       dcChangeDirection = eachRollDc > currentDc ? 'up' : null;
     }
   } else {
     notCaughtCounter += 1;
     if (notCaughtCounter >= 10) {
       eachRollDc = clamp(currentDc - 1, 10, 15);
+      caughtCounter = 0;
       notCaughtCounter = 0;
       dcChangeDirection = eachRollDc < currentDc ? 'down' : null;
     }

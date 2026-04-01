@@ -108,7 +108,7 @@ test('daily reset randomizes fish availability and resets dc to 10', async () =>
   });
 });
 
-test('register outcome raises dc every 5 catches and resets catch counter', async () => {
+test('register outcome raises dc every 5 catches and resets both counters', async () => {
   const db = createMockDb({
     [COLLECTIONS.BOT_CONFIGS]: {
       [BOT_CONFIG_DOC]: {
@@ -124,13 +124,13 @@ test('register outcome raises dc every 5 catches and resets catch counter', asyn
   });
 
   assert.equal(result.caughtCounter, 0);
-  assert.equal(result.notCaughtCounter, 9);
+  assert.equal(result.notCaughtCounter, 0);
   assert.equal(result.eachRollDc, 11);
   assert.equal(result.dcChanged, true);
   assert.equal(result.dcChangeDirection, 'up');
 });
 
-test('register outcome lowers dc every 10 misses and resets miss counter', async () => {
+test('register outcome lowers dc every 10 misses and resets both counters', async () => {
   const db = createMockDb({
     [COLLECTIONS.BOT_CONFIGS]: {
       [BOT_CONFIG_DOC]: {
@@ -145,7 +145,7 @@ test('register outcome lowers dc every 10 misses and resets miss counter', async
     now: new Date('2026-03-31T15:00:00.000Z')
   });
 
-  assert.equal(result.caughtCounter, 2);
+  assert.equal(result.caughtCounter, 0);
   assert.equal(result.notCaughtCounter, 0);
   assert.equal(result.eachRollDc, 11);
   assert.equal(result.dcChanged, true);
