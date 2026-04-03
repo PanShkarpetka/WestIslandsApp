@@ -96,38 +96,61 @@
             {{ item.inactive ? 'Неактивний' : 'Активний' }}
           </v-chip>
         </template>
-        <template #item.balanceSummary="{ item }">
-          <div class="text-body-2">
-            GP: {{ normalizeBalance(item.balance).gp }},
-            SP: {{ normalizeBalance(item.balance).sp }},
-            CP: {{ normalizeBalance(item.balance).cp }},
-            EP: {{ normalizeBalance(item.balance).ep }},
-            PP: {{ normalizeBalance(item.balance).pp }}
-          </div>
-        </template>
-        <template #item.deltaSummary="{ item }">
-          <div class="text-body-2">
-            <span :class="deltaClass(normalizeBalance(item.balanceDelta).gp)">
-              GP: {{ formatDelta(normalizeBalance(item.balanceDelta).gp) }}
-            </span>,
-            <span :class="deltaClass(normalizeBalance(item.balanceDelta).sp)">
-              SP: {{ formatDelta(normalizeBalance(item.balanceDelta).sp) }}
-            </span>,
-            <span :class="deltaClass(normalizeBalance(item.balanceDelta).cp)">
-              CP: {{ formatDelta(normalizeBalance(item.balanceDelta).cp) }}
-            </span>,
-            <span :class="deltaClass(normalizeBalance(item.balanceDelta).ep)">
-              EP: {{ formatDelta(normalizeBalance(item.balanceDelta).ep) }}
-            </span>,
-            <span :class="deltaClass(normalizeBalance(item.balanceDelta).pp)">
-              PP: {{ formatDelta(normalizeBalance(item.balanceDelta).pp) }}
-            </span>
-          </div>
-        </template>
         <template #item.actions="{ item }">
           <v-btn size="small" variant="text" color="primary" @click="openHeroEditor(item)">Редагувати</v-btn>
         </template>
       </v-data-table>
+
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="d-flex flex-wrap justify-space-between align-center ga-3 mb-3">
+          <div class="text-subtitle-1">Історія балансів героїв (знімки)</div>
+          <v-select
+            v-model="snapshotHistoryLimit"
+            :items="snapshotHistoryLimitOptions"
+            label="Кількість останніх знімків"
+            density="comfortable"
+            hide-details
+            style="max-width: 260px;"
+          />
+        </div>
+
+        <v-alert
+          v-if="!snapshotColumns.length"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Немає даних знімків балансів для відображення.
+        </v-alert>
+
+        <v-table v-else density="compact" class="snapshot-history-table">
+          <thead>
+            <tr>
+              <th class="text-left">Герой</th>
+              <th v-for="snapshot in snapshotColumns" :key="snapshot.key" class="text-left">
+                <div>{{ snapshot.label }}</div>
+                <div class="text-caption text-medium-emphasis">
+                  {{ formatSnapshotDateTime(snapshot.syncedAt) }}
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in heroSnapshotRows" :key="`snapshot-row-${row.heroId}`">
+              <td class="font-weight-medium">{{ row.heroName }}</td>
+              <td v-for="snapshot in snapshotColumns" :key="`${row.heroId}-${snapshot.key}`">
+                <template v-if="row.entriesByKey[snapshot.key]">
+                  <div>GP: {{ row.entriesByKey[snapshot.key].balance.gp }}</div>
+                  <div class="text-caption" :class="deltaClass(row.entriesByKey[snapshot.key].balanceDelta.gp)">
+                    Δ GP: {{ formatDelta(row.entriesByKey[snapshot.key].balanceDelta.gp) }}
+                  </div>
+                </template>
+                <span v-else class="text-medium-emphasis">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card>
 
       <v-card variant="tonal" class="pa-3 mb-4">
         <div class="text-subtitle-2 mb-2">Зведення по кампанії (усі герої)</div>
@@ -337,6 +360,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  Timestamp,
   updateDoc,
 } from 'firebase/firestore';
 import { DEFAULT_YEAR, diffInDays, normalizeFaerunDate, parseFaerunDate } from 'faerun-date';
@@ -361,6 +385,7 @@ const cycleForm = reactive({
 const heroes = ref([]);
 const religions = ref([]);
 const clergyRows = ref([]);
+const heroBalanceSyncLogs = ref([]);
 const heroSaving = ref(false);
 const heroError = ref('');
 const heroSuccess = ref('');
@@ -391,6 +416,7 @@ const editHeroForm = reactive({
 let stopHeroes = null;
 let stopReligions = null;
 let stopClergy = null;
+let stopHeroBalanceSyncLogs = null;
 
 const headers = [
   { title: 'Час', key: 'timestamp' },
@@ -403,10 +429,16 @@ const heroHeaders = [
   { title: 'Релігія', key: 'religionName' },
   { title: 'Статус дії', key: 'downtimeAvailable' },
   { title: 'Стан героя', key: 'inactive' },
-  { title: 'Поточний баланс', key: 'balanceSummary', sortable: false },
-  { title: 'Дельта балансу', key: 'deltaSummary', sortable: false },
   { title: '', key: 'actions', sortable: false },
 ];
+
+const snapshotHistoryLimitOptions = [
+  { title: '5 знімків', value: 5 },
+  { title: '10 знімків', value: 10 },
+  { title: '20 знімків', value: 20 },
+  { title: '50 знімків', value: 50 },
+];
+const snapshotHistoryLimit = ref(5);
 
 const religionOptions = computed(() =>
   religions.value.map((item) => ({
@@ -453,6 +485,71 @@ const applyImportDisabled = computed(() => {
   if (snapshotImportState.applying) return true;
   if (preview.duplicateCharacterIds.length) return true;
   return preview.matched.length === 0;
+});
+
+const snapshotColumns = computed(() => {
+  const timelineMap = new Map();
+
+  for (const row of heroBalanceSyncLogs.value) {
+    if (!row.syncedAt || !row.snapshotGroupKey) continue;
+    if (!timelineMap.has(row.snapshotGroupKey)) {
+      timelineMap.set(row.snapshotGroupKey, {
+        key: row.snapshotGroupKey,
+        syncedAt: row.syncedAt,
+      });
+      continue;
+    }
+
+    const existing = timelineMap.get(row.snapshotGroupKey);
+    if (row.syncedAt.toMillis() > existing.syncedAt.toMillis()) {
+      timelineMap.set(row.snapshotGroupKey, {
+        ...existing,
+        syncedAt: row.syncedAt,
+      });
+    }
+  }
+
+  return [...timelineMap.values()]
+    .sort((a, b) => b.syncedAt.toMillis() - a.syncedAt.toMillis())
+    .slice(0, snapshotHistoryLimit.value)
+    .map((item, index) => ({
+      ...item,
+      label: `Знімок ${index + 1}`,
+    }));
+});
+
+const heroSnapshotRows = computed(() => {
+  const entriesByHeroId = new Map();
+  const allowedKeys = new Set(snapshotColumns.value.map((item) => item.key));
+
+  for (const row of heroBalanceSyncLogs.value) {
+    if (!row.heroId || !row.snapshotGroupKey || !allowedKeys.has(row.snapshotGroupKey)) continue;
+
+    if (!entriesByHeroId.has(row.heroId)) {
+      entriesByHeroId.set(row.heroId, {
+        heroId: row.heroId,
+        heroName: row.heroName || row.heroId,
+        entriesByKey: {},
+      });
+    }
+
+    const heroRow = entriesByHeroId.get(row.heroId);
+    const existingEntry = heroRow.entriesByKey[row.snapshotGroupKey];
+    if (!existingEntry || row.syncedAt?.toMillis?.() > existingEntry.syncedAt?.toMillis?.()) {
+      heroRow.entriesByKey[row.snapshotGroupKey] = row;
+    }
+    if (!heroRow.heroName && row.heroName) {
+      heroRow.heroName = row.heroName;
+    }
+  }
+
+  return heroRows.value
+    .map((hero) => entriesByHeroId.get(hero.id) || {
+      heroId: hero.id,
+      heroName: hero.name || hero.id,
+      entriesByKey: {},
+    })
+    .sort((a, b) => a.heroName.localeCompare(b.heroName, 'uk-UA'));
 });
 
 const heroBalanceTotals = computed(() => {
@@ -587,6 +684,28 @@ function subscribeHeroData() {
       };
     });
   });
+
+  stopHeroBalanceSyncLogs = onSnapshot(
+    query(collection(db, 'hero-balance-sync-logs'), orderBy('syncedAt', 'desc'), limit(1000)),
+    (snapshot) => {
+      heroBalanceSyncLogs.value = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data() || {};
+        const syncedAt = data.syncedAt || null;
+        const source = data.source || '';
+
+        return {
+          id: docSnap.id,
+          heroId: data.heroId || '',
+          heroName: data.heroName || '',
+          syncedAt,
+          source,
+          snapshotGroupKey: buildSnapshotGroupKey(syncedAt, source),
+          balance: normalizeBalance(data.balance || {}),
+          balanceDelta: normalizeBalance(data.balanceDelta || {}),
+        };
+      });
+    },
+  );
 }
 
 function normalizeBalance(balance) {
@@ -774,6 +893,7 @@ async function applySnapshotImport() {
   snapshotImportState.applySummary = null;
 
   const preview = snapshotImportState.preview;
+  const syncedAt = Timestamp.now();
   let updatedCount = 0;
   let failedCount = 0;
   const failures = [];
@@ -781,7 +901,6 @@ async function applySnapshotImport() {
   try {
     for (const row of preview.matched) {
       const heroRef = doc(db, 'heroes', row.heroId);
-      const syncedAt = serverTimestamp();
       const payload = {
         balance: row.newBalance,
         balanceDelta: row.delta,
@@ -968,6 +1087,7 @@ onBeforeUnmount(() => {
   stopHeroes?.();
   stopReligions?.();
   stopClergy?.();
+  stopHeroBalanceSyncLogs?.();
 });
 
 function formatTimestamp(timestamp) {
@@ -978,7 +1098,25 @@ function formatTimestamp(timestamp) {
     timeStyle: 'short',
   });
 }
+
+function formatSnapshotDateTime(timestamp) {
+  if (!timestamp?.toDate) return '—';
+  const date = timestamp.toDate();
+  return date.toLocaleString('uk-UA', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function buildSnapshotGroupKey(timestamp, source) {
+  if (!timestamp?.toMillis) return '';
+  const minuteBucket = Math.floor(timestamp.toMillis() / 60000);
+  return `snapshot-${source || 'unknown_source'}-${minuteBucket}`;
+}
 </script>
 
 <style scoped>
+.snapshot-history-table {
+  overflow-x: auto;
+}
 </style>
