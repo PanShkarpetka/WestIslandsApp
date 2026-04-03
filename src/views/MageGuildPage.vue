@@ -107,7 +107,7 @@
         </v-col>
       </v-row>
 
-      <v-card v-if="historyDocuments.length" class="mt-6" rounded="xl">
+      <v-card v-if="isAdmin && historyDocuments.length" class="mt-6" rounded="xl">
         <v-card-title>Попередні цикли</v-card-title>
         <v-card-text>
           <v-expansion-panels variant="accordion">
