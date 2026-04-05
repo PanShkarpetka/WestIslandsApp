@@ -219,6 +219,40 @@ test('accepts shorthand /n while waiting for an additional roll confirmation', a
   assert.equal(reply, 'Перевірку провалено. Test Fish втекла.');
 });
 
+test('shows failure description on failed additional roll', async () => {
+  const telegramUserId = '5021';
+  const db = createMockDb({
+    [COLLECTIONS.USER_SESSIONS]: {
+      [telegramUserId]: {
+        telegramUserId,
+        step: SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM,
+        payload: {
+          pendingAdditionalRoll: {
+            fishName: 'Test Fish',
+            baseLog: {},
+            selectedFish: {
+              id: 'fish-1',
+              fishName: 'Test Fish'
+            },
+            requirements: [{ name: 'Dexterity save', failureDescription: 'Корабель зазнав пошкоджень.' }]
+          }
+        },
+        updatedAt: new Date().toISOString()
+      }
+    },
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: '/n', telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.equal(reply, 'Перевірку провалено. Корабель зазнав пошкоджень.');
+});
+
 test('ignores slash commands that do not contain fish', async () => {
   const telegramUserId = '503';
   const db = createMockDb({
