@@ -333,6 +333,7 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
 
   if (!passed) {
     const catchesOnFailure = pending.requirements?.[0]?.catchEvenIfFailed === true;
+    const failureDescription = String(pending.requirements?.[0]?.failureDescription || '').trim();
     if (catchesOnFailure) {
       const txResult = await updateFishAvailabilityTransaction(db, {
         catches: [pending.selectedFish],
@@ -365,6 +366,10 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
     onDcChanged?.(buildDcChangedMessage(outcome));
 
     await clearUserSession(db, telegramUserId);
+    if (failureDescription) {
+      return `Перевірку провалено. ${htmlEscape(failureDescription)}`;
+    }
+
     return `Перевірку провалено. ${pending.fishName} втекла.`;
   }
 
