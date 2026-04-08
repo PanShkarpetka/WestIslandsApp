@@ -66,7 +66,7 @@ export function diffInDays(start, end) {
   const startOrdinal = toOrdinalDay(start)
   const endOrdinal = toOrdinalDay(end)
   if (startOrdinal === null || endOrdinal === null) return null
-  return endOrdinal - startOrdinal
+  return endOrdinal - startOrdinal + 1;
 }
 
 export function normalizeFaerunDate(date) {
