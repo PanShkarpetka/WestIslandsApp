@@ -219,6 +219,75 @@ test('accepts shorthand /n while waiting for an additional roll confirmation', a
   assert.equal(reply, 'Перевірку провалено. Test Fish втекла.');
 });
 
+test('shows failure description when failed additional roll still catches fish', async () => {
+  const telegramUserId = '5022';
+  const db = createMockDb({
+    [COLLECTIONS.USER_SESSIONS]: {
+      [telegramUserId]: {
+        telegramUserId,
+        step: SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM,
+        payload: {
+          result: {
+            normalizedInput: { modifiers: [1, 2, 3], baitType: 'basic', useShip: false },
+            rawRolls: [10, 10, 10],
+            modifiedRolls: [11, 12, 13],
+            finalRolls: [11, 12, 13],
+            guidance: { guidanceRolls: [], totalGuidanceBonus: 0 },
+            baitBonusRoll: null,
+            shipBonusRoll: null,
+            computedSum: 36,
+            finalSum: 36,
+            eachRollDc: 10,
+            passedEachRollDc: true,
+            failedRollIndexes: [],
+            rolledFish: null,
+            effectiveRollUsed: 36
+          },
+          pendingAdditionalRoll: {
+            fishName: 'Комарові тільки',
+            baseLog: { successFailureResult: true },
+            selectedFish: {
+              id: 'fish-1',
+              fishName: 'Комарові тільки',
+              fishDescription: 'desc',
+              fishCodeNumber: { min: 75, max: 75 },
+              fishValueSilver: 5,
+              fishAdditionalRollsRequiredForSuccessfulCatch: [{ name: 'Dexterity save', catchEvenIfFailed: true }]
+            },
+            requirements: [{
+              name: 'Dexterity save',
+              catchEvenIfFailed: true,
+              failureDescription: 'Вони напригують на шкіру.'
+            }]
+          }
+        },
+        updatedAt: new Date().toISOString()
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      'fish-1': {
+        fishName: 'Комарові тільки',
+        fishDescription: 'desc',
+        fishCodeNumber: { min: 75, max: 75 },
+        fishValueSilver: 5,
+        fishAmountAvailableNow: 1,
+        fishAdditionalRollsRequiredForSuccessfulCatch: [{ name: 'Dexterity save', catchEvenIfFailed: true }]
+      }
+    },
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {}
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: '/n', telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.match(reply, /Додатковий кидок: <b>ПРОВАЛ ❌<\/b>/);
+  assert.match(reply, /Наслідки провалу: Вони напригують на шкіру\./);
+});
+
 test('ignores slash commands that do not contain fish', async () => {
   const telegramUserId = '503';
   const db = createMockDb({
