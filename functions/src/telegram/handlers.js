@@ -350,7 +350,8 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
       await clearUserSession(db, telegramUserId);
       return formatFishingResult(session.payload.result, txResult.finalCatches, {
         additionalRollPassed: false,
-        additionalRollCaughtDespiteFailure: true
+        additionalRollCaughtDespiteFailure: true,
+        additionalRollFailureDescription: failureDescription
       });
     }
 

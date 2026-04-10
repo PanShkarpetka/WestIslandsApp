@@ -102,6 +102,9 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
 
   if (options.additionalRollCaughtDespiteFailure === true) {
     lines.push('⚠️ Додатковий кидок: <b>ПРОВАЛ ❌</b>. Але за особливим правилом цієї риби невдалий кидок усе одно дозволяє її спіймати.');
+    if (options.additionalRollFailureDescription) {
+      lines.push(`Наслідки провалу: ${escapeHtml(options.additionalRollFailureDescription)}`);
+    }
   }
 
   return lines.join('\n');

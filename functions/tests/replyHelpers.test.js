@@ -117,6 +117,36 @@ test('shows catch-on-failed-additional-roll message', () => {
   assert.match(reply, /за особливим правилом цієї риби/);
 });
 
+test('shows failure description when fish is still caught after failed additional roll', () => {
+  const result = {
+    normalizedInput: { modifiers: [1, 2, 3], baitType: 'simple', useShip: false },
+    rawRolls: [10, 10, 10],
+    modifiedRolls: [11, 12, 13],
+    finalRolls: [11, 12, 13],
+    guidance: { guidanceRolls: [], totalGuidanceBonus: 0 },
+    baitBonusRoll: null,
+    shipBonusRoll: null,
+    computedSum: 36,
+    finalSum: 36,
+    eachRollDc: 10,
+    passedEachRollDc: true,
+    failedRollIndexes: [],
+    rolledFish: null,
+    effectiveRollUsed: 36
+  };
+
+  const reply = formatFishingResult(result, [{
+    fishName: 'Комарові тільки',
+    fishCodeNumber: { min: 75, max: 75 },
+    fishDescription: 'desc'
+  }], {
+    additionalRollCaughtDespiteFailure: true,
+    additionalRollFailureDescription: 'Вони напригують на шкіру.'
+  });
+
+  assert.match(reply, /Наслідки провалу: Вони напригують на шкіру\./);
+});
+
 
 test('help message describes one-line fish command with defaults', () => {
   const reply = helpMessage();
