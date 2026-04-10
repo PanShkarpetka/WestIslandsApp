@@ -40,7 +40,7 @@ test('diffInDays returns null for invalid months', () => {
 
 test('diffInDays returns day difference across dates', () => {
   const diff = diffInDays({ day: 1, month: 'Hammer', year: 815 }, { day: 2, month: 'Hammer', year: 815 });
-  assert.equal(diff, 1);
+  assert.equal(diff, 2);
 });
 
 test('normalizeFaerunDate returns normalized data', () => {

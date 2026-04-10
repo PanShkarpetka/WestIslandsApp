@@ -140,9 +140,17 @@
               <td class="font-weight-medium">{{ row.heroName }}</td>
               <td v-for="snapshot in snapshotColumns" :key="`${row.heroId}-${snapshot.key}`">
                 <template v-if="row.entriesByKey[snapshot.key]">
-                  <div>GP: {{ row.entriesByKey[snapshot.key].balance.gp }}</div>
-                  <div class="text-caption" :class="deltaClass(row.entriesByKey[snapshot.key].balanceDelta.gp)">
-                    Δ GP: {{ formatDelta(row.entriesByKey[snapshot.key].balanceDelta.gp) }}
+                  <div v-for="currency in currencyKeys" :key="`${row.heroId}-${snapshot.key}-${currency}`">
+                    {{ formatCurrencyLabel(currency) }}: {{ row.entriesByKey[snapshot.key].balance[currency] }}
+                  </div>
+                  <div
+                    v-for="currency in currencyKeys"
+                    :key="`${row.heroId}-${snapshot.key}-${currency}-delta`"
+                    class="text-caption"
+                    :class="deltaClass(row.entriesByKey[snapshot.key].balanceDelta[currency])"
+                  >
+                    Δ {{ formatCurrencyLabel(currency) }}:
+                    {{ formatDelta(row.entriesByKey[snapshot.key].balanceDelta[currency]) }}
                   </div>
                 </template>
                 <span v-else class="text-medium-emphasis">—</span>
@@ -439,6 +447,7 @@ const snapshotHistoryLimitOptions = [
   { title: '50 знімків', value: 50 },
 ];
 const snapshotHistoryLimit = ref(5);
+const currencyKeys = ['cp', 'sp', 'gp', 'ep', 'pp'];
 
 const religionOptions = computed(() =>
   religions.value.map((item) => ({
@@ -716,6 +725,10 @@ function normalizeBalance(balance) {
     ep: Number(balance?.ep ?? 0) || 0,
     pp: Number(balance?.pp ?? 0) || 0,
   };
+}
+
+function formatCurrencyLabel(currency) {
+  return String(currency || '').toUpperCase();
 }
 
 function computeDelta(oldBalance, newBalance) {
