@@ -192,7 +192,21 @@ async function distributeBuildingFaithIncome(cycleId) {
   for (const religion of religionsWithIncome) {
     const clergySnapshot = await getDocs(query(collection(db, 'clergy'), where('religion', '==', religion.ref)))
     if (clergySnapshot.empty) continue
-    const eligible = clergySnapshot.docs
+    const eligibilityChecks = await Promise.all(clergySnapshot.docs.map(async (docSnap) => {
+      const data = docSnap.data() || {}
+      const heroRef = data.hero
+      if (!heroRef) return { docSnap, eligible: true }
+
+      try {
+        const heroSnap = await getDoc(heroRef)
+        const heroData = heroSnap.exists() ? heroSnap.data() || {} : {}
+        return { docSnap, eligible: heroData.passiveOVInactive !== true }
+      } catch (error) {
+        console.error('[cycle] Failed to load hero for passive faith distribution', error)
+        return { docSnap, eligible: true }
+      }
+    }))
+    const eligible = eligibilityChecks.filter((entry) => entry.eligible).map((entry) => entry.docSnap)
     const heroCount = eligible.length
     if (!heroCount) continue
     const baseShare = Math.floor(religion.passiveFaith / heroCount)
