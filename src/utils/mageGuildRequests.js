@@ -52,7 +52,11 @@ export function getSpellPrice(spell, fallback = 0) {
 
 export function getSpellMaterialComponentPrice(spell, fallback = 0) {
   return toFiniteNumber(
-    spell?.consumablePrice
+    spell?.materialComponentPrice
+      ?? spell?.raw?.materialComponentPrice
+      ?? spell?.componentCost
+      ?? spell?.raw?.componentCost
+      ?? spell?.consumablePrice
       ?? spell?.raw?.consumablePrice,
     fallback,
   )
