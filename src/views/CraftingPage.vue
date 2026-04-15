@@ -3,25 +3,53 @@
     <v-sheet class="hero-banner pa-5 pa-md-8 mb-5" rounded="xl">
       <div class="d-flex flex-column flex-md-row justify-space-between ga-4">
         <div>
-          <h1 class="text-h3 font-weight-bold mb-2">Crafting Mastery</h1>
+          <h1 class="text-h3 font-weight-bold mb-2">Майстерність крафту</h1>
           <p class="text-body-1 text-medium-emphasis text-info mb-0">
-            Progress dashboard for categories, subcategories, item mastery, and final craft price simulation.
+            Панель прогресу для категорій, сабкатегорій, спеціалізації та розрахунку ціни компонентів.
           </p>
         </div>
 
         <div class="d-flex flex-wrap ga-2 align-start">
-          <v-btn color="info" variant="tonal" prepend-icon="mdi-refresh" @click="loadData">Refresh progress</v-btn>
+          <v-btn color="info" variant="tonal" prepend-icon="mdi-refresh" @click="loadData">Оновити</v-btn>
           <v-btn
             v-if="isAdmin"
             color="primary"
             prepend-icon="mdi-hammer"
             @click="craftDialog = true"
           >
-            Add craft
+            Додати крафт
           </v-btn>
         </div>
       </div>
     </v-sheet>
+
+    <v-row dense class="mb-4">
+      <v-col cols="12" md="6" lg="4">
+        <v-select
+            v-model="selectedHeroId"
+            :items="heroOptions"
+            label="Персонаж"
+            prepend-inner-icon="mdi-account"
+            hide-details
+            density="comfortable"
+            class="rounded-lg"
+        />
+      </v-col>
+      <v-col cols="12" md="6" lg="4">
+        <v-switch
+            v-model="showUncraftedItems"
+            color="info"
+            inset
+            hide-details
+            label="Показати предмети, які ще не були вироблені персонажем"
+        />
+      </v-col>
+      <v-col cols="12" lg="4" class="d-flex align-center justify-lg-end">
+        <v-chip color="success" variant="tonal" size="large">
+          Сумарна знижка: {{ highestDiscountLabel }}
+        </v-chip>
+      </v-col>
+    </v-row>
 
     <v-row class="mb-2" dense>
       <v-col cols="12" md="6" lg="3" v-for="card in summaryCards" :key="card.label">
@@ -35,46 +63,18 @@
       </v-col>
     </v-row>
 
-    <v-row dense class="mb-4">
-      <v-col cols="12" md="6" lg="4">
-        <v-select
-          v-model="selectedHeroId"
-          :items="heroOptions"
-          label="Hero"
-          prepend-inner-icon="mdi-account"
-          hide-details
-          density="comfortable"
-          class="rounded-lg"
-        />
-      </v-col>
-      <v-col cols="12" md="6" lg="4">
-        <v-switch
-          v-model="showUncraftedItems"
-          color="info"
-          inset
-          hide-details
-          label="Show items with 0 crafted"
-        />
-      </v-col>
-      <v-col cols="12" lg="4" class="d-flex align-center justify-lg-end">
-        <v-chip color="success" variant="tonal" size="large">
-          Total discount: {{ highestDiscountLabel }}
-        </v-chip>
-      </v-col>
-    </v-row>
-
     <v-row dense>
       <v-col cols="12" lg="7">
         <v-card rounded="xl" class="panel-card mb-4" elevation="2">
           <v-card-title class="d-flex justify-space-between align-center">
-            <span>Hero progress</span>
+            <span>Прогрес крафту персонажа</span>
             <v-chip color="success" variant="tonal">
-              {{ selectedHero?.name || 'No hero selected' }}
+              {{ selectedHero?.name || 'Не вибрано' }}
             </v-chip>
           </v-card-title>
           <v-divider />
           <v-card-text>
-            <div class="text-subtitle-2 mb-2">Category progress</div>
+            <div class="text-subtitle-1 mb-1 font-weight-bold">Прогрес категорії</div>
             <v-row>
               <v-col v-for="category in categoryRows" :key="category.key" cols="12" md="6">
                 <CraftingProgressBar
@@ -86,7 +86,7 @@
               </v-col>
             </v-row>
 
-            <div class="text-subtitle-2 mt-4 mb-2">Subcategory progress</div>
+            <div class="text-subtitle-1 mt-4 mb-1 font-weight-bold">Прогрес підкатегорії</div>
             <v-row>
               <v-col v-for="subcategory in subcategoryRows" :key="subcategory.key" cols="12" md="6">
                 <CraftingProgressBar
@@ -103,7 +103,7 @@
 
       <v-col cols="12" lg="5">
         <v-card rounded="xl" class="panel-card mb-4" elevation="2">
-          <v-card-title>Most crafted items</v-card-title>
+          <v-card-title>Найпопулярніші вироби</v-card-title>
           <v-divider />
           <v-list density="comfortable" class="bg-transparent">
             <v-list-item
@@ -116,20 +116,20 @@
                 <v-chip size="small" color="info" variant="tonal">{{ row.progress.craftedAmount }}</v-chip>
               </template>
             </v-list-item>
-            <v-list-item v-if="!craftedHighlights.length" title="No crafted items yet" subtitle="Register first craft action" />
+            <v-list-item v-if="!craftedHighlights.length" title="Вироби відсутні" subtitle="Надайте майстру список виробів" />
           </v-list>
         </v-card>
 
         <v-card rounded="xl" class="panel-card" elevation="2">
-          <v-card-title>Future craft calculator</v-card-title>
-          <v-card-subtitle>Fast estimate of final component costs with current mastery.</v-card-subtitle>
+          <v-card-title>Калькулятор крафту</v-card-title>
+          <v-card-subtitle>Швидкий підрахунок фінальної ціни компонентів з врахуванням майстерності.</v-card-subtitle>
           <v-card-text>
             <v-row dense>
               <v-col cols="12" md="6">
                 <v-select
                   v-model="calculator.itemSlug"
                   :items="itemOptions"
-                  label="Item"
+                  label="Предмет"
                   density="comfortable"
                   hide-details
                 />
@@ -139,7 +139,7 @@
                   v-model.number="calculator.amount"
                   type="number"
                   min="1"
-                  label="Amount"
+                  label="Кількість"
                   density="comfortable"
                   hide-details
                 />
@@ -148,42 +148,42 @@
 
             <v-sheet class="calc-sheet mt-4 pa-4" rounded="lg" border>
               <div class="d-flex justify-space-between mb-2">
-                <span>Base unit price</span>
+                <span>Ціна компонентів</span>
                 <strong>{{ formatNumber(calculatorResult?.componentPrice) }}</strong>
               </div>
               <div class="d-flex justify-space-between mb-2">
-                <span>Category discount</span>
+                <span>Знижка від категорії</span>
                 <strong>{{ calculatorResult?.categoryDiscount?.toFixed(2) || '0.00' }}%</strong>
               </div>
               <div class="d-flex justify-space-between mb-2">
-                <span>Subcategory discount</span>
+                <span>Знижка від підкатегорії</span>
                 <strong>{{ calculatorResult?.subcategoryDiscount?.toFixed(2) || '0.00' }}%</strong>
               </div>
               <div class="d-flex justify-space-between mb-2">
-                <span>Specialization discount</span>
+                <span>Знижка від спеціалізації</span>
                 <strong>{{ calculatorResult?.specializationDiscount?.toFixed(2) || '0.00' }}%</strong>
               </div>
               <div class="d-flex justify-space-between mb-2">
-                <span>Total discount</span>
+                <span>Сумарна знижка</span>
                 <v-chip color="success" size="small" variant="tonal">
                   {{ calculatorResult?.totalDiscount?.toFixed(1) || '0.0' }} / 25%
                 </v-chip>
               </div>
               <v-divider class="my-3" />
               <div class="d-flex justify-space-between mb-2">
-                <span>Discounted unit price</span>
+                <span>Ціна компонентів зі знижкою</span>
                 <strong>{{ formatNumber(calculatorResult?.discountedUnitComponentPrice) }}</strong>
               </div>
               <div class="d-flex justify-space-between mb-2">
-                <span>Amount</span>
+                <span>Кількість</span>
                 <strong>{{ calculatorResult?.amount || 0 }}</strong>
               </div>
               <div class="d-flex justify-space-between text-h6 font-weight-bold mt-3">
-                <span>Final total</span>
+                <span>Фінальна ціна</span>
                 <span class="text-success">{{ formatNumber(calculatorResult?.finalTotalComponentPrice) }}</span>
               </div>
               <div class="text-caption text-medium-emphasis mt-3">
-                Weight: {{ selectedItem?.weight ?? '—' }} • Days: {{ selectedItem?.craftDays ?? 0 }} • DC: {{ selectedItem?.dc ?? 0 }}
+                Days: {{ (selectedItem?.craftDays ?? 0) * (calculatorResult?.amount) }} • DC: {{ selectedItem?.dc ?? 0 }}
               </div>
             </v-sheet>
           </v-card-text>
@@ -194,19 +194,19 @@
     <v-expansion-panels variant="accordion" class="mb-4">
       <v-expansion-panel>
         <v-expansion-panel-title>
-          Item progress table ({{ visibleCraftRows.length }} rows)
+          Прогрес майстерності крафту предметів ({{ visibleCraftRows.length }} rows)
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <v-table density="comfortable">
             <thead>
               <tr>
-                <th>Item</th>
-                <th>Crafted</th>
-                <th>Category</th>
-                <th>Subcategory</th>
-                <th>Item mastery</th>
-                <th>Total discount</th>
-                <th>Status</th>
+                <th>Предмет</th>
+                <th>Вироблено</th>
+                <th>Категорія</th>
+                <th>Підкатегорія</th>
+                <th>Спеціалізація</th>
+                <th>Сумарна знижка</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -223,7 +223,7 @@
                     :max="100"
                     color="info"
                     :capped="row.progress.categoryCapped"
-                    capped-hint="This item already gave its maximum category progress"
+                    capped-hint="Прогрес цього предмета в даній категорії досягнув максимуму"
                   />
                 </td>
                 <td>
@@ -233,7 +233,7 @@
                     :max="100"
                     color="deep-purple-accent-2"
                     :capped="row.progress.subcategoryCapped"
-                    capped-hint="This item already gave its maximum subcategory progress"
+                    capped-hint="Прогрес цього предмета в даній підкатегорії досягнув максимуму"
                   />
                 </td>
                 <td>
@@ -243,14 +243,14 @@
                     :max="100"
                     color="amber"
                     :capped="row.progress.specializationCapped"
-                    capped-hint="Item mastery maxed"
+                    capped-hint="Досягнуто максимальний рівень майстерності"
                   />
                 </td>
                 <td>{{ row.discount.totalDiscount.toFixed(2) }}%</td>
                 <td>
-                  <div v-if="row.progress.categoryCapped" class="text-caption">Craft another item from this category to progress further</div>
-                  <div v-if="row.progress.subcategoryCapped" class="text-caption">Craft another item from this subcategory to progress further</div>
-                  <v-chip v-if="row.progress.specializationCapped" size="x-small" color="amber" variant="tonal">Item mastery maxed</v-chip>
+                  <div v-if="row.progress.categoryCapped" class="text-caption">Для подальшого прогресу категорії виробляйте інші предмети з цієї категорії</div>
+                  <div v-if="row.progress.subcategoryCapped" class="text-caption">Для подальшого прогресу підкатегорії виробляйте інші предмети з цієї підкатегорії</div>
+                  <v-chip v-if="row.progress.specializationCapped" size="x-small" color="amber" variant="tonal">Досягнуто максимальної майстерності</v-chip>
                 </td>
               </tr>
             </tbody>
@@ -347,29 +347,29 @@ const summaryCards = computed(() => {
 
   return [
     {
-      label: 'Total crafted',
+      label: 'Всього створено',
       value: normalizedCrafting.value.summary.totalItemsCrafted || 0,
-      subtext: 'All selected hero actions',
+      subtext: 'Усі творіння вибраного персонажа',
     },
     {
-      label: 'Best item discount',
+      label: 'Найкраща знижка',
       value: `${highestDiscount.value.toFixed(1)}%`,
-      subtext: 'Current max total discount',
+      subtext: 'Максимальна знижка',
     },
     {
-      label: 'Category caps',
+      label: 'Прокачані категорії',
       value: cappedCategory,
-      subtext: 'Items capped for category progress',
+      subtext: 'Кількість предметів, які досягнули максимуму прогресу категорії',
     },
     {
-      label: 'Subcategory caps',
+      label: 'Прокачані підкатегорії',
       value: cappedSubcategory,
-      subtext: 'Items capped for subcategory progress',
+      subtext: 'Кількість предметів, які досягнули максимуму прогресу підкатегорії',
     },
     {
-      label: 'Item mastery maxed',
+      label: 'Майстерність',
       value: cappedSpecialization,
-      subtext: 'Fully maxed specializations',
+      subtext: 'Кількість предметів, які досягнули максимуму в майстерності',
     },
   ];
 });
