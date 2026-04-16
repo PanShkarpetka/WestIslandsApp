@@ -144,3 +144,105 @@ Fish schema includes both:
 - `fishAmountAvailableNow`
 
 This supports a future scheduled refill job to reset `fishAmountAvailableNow = fishAmountDaily`.
+
+## Crafting Mastery
+
+### Firestore structure
+
+- `craftItems/{itemSlug}`
+  - `name`, `slug`, `category`, `subcategory`, `categoryKey`, `subcategoryKey`
+  - `componentPrice`, `weight`, `craftDays`, `dc`, `isActive`
+- `heroes/{heroId}.crafting`
+  - `summary` (`totalCraftActions`, `totalItemsCrafted`, `updatedAt`)
+  - `itemProgress` map keyed by `itemSlug`
+  - `categoryProgress` map keyed by `categoryKey`
+  - `subcategoryProgress` map keyed by `subcategoryKey`
+- `heroes/{heroId}/craftingLogs/{logId}`
+  - one entry per registered craft action
+
+### Formulas
+
+- Category discount: `(categoryCurrent / categoryMax) * 7`
+- Subcategory discount: `(subcategoryCurrent / subcategoryMax) * 8`
+- Specialization discount: `(specializationProgress / 100) * 10`
+- Total discount: `min(25, category + subcategory + specialization)`
+- Discounted component unit price: `componentPrice * (1 - totalDiscount / 100)`
+- Final total component price: `discountedUnitPrice * amountToCraft`
+
+### Import script
+
+Use the one-off script to seed `craftItems` from CSV:
+
+```bash
+node scripts/importCraftItems.js ./path/to/craft-items.csv
+```
+
+Environment variables for Firebase config are optional; if omitted, the script falls back to the same default Firebase project config used by the app. You can still override with `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, etc.
+
+## Crafting Mastery
+
+### Firestore structure
+
+- `craftItems/{itemSlug}`
+  - `name`, `slug`, `category`, `subcategory`, `categoryKey`, `subcategoryKey`
+  - `componentPrice`, `weight`, `craftDays`, `dc`, `isActive`
+- `heroes/{heroId}.crafting`
+  - `summary` (`totalCraftActions`, `totalItemsCrafted`, `updatedAt`)
+  - `itemProgress` map keyed by `itemSlug`
+  - `categoryProgress` map keyed by `categoryKey`
+  - `subcategoryProgress` map keyed by `subcategoryKey`
+- `heroes/{heroId}/craftingLogs/{logId}`
+  - one entry per registered craft action
+
+### Formulas
+
+- Category discount: `(categoryCurrent / categoryMax) * 7`
+- Subcategory discount: `(subcategoryCurrent / subcategoryMax) * 8`
+- Specialization discount: `(specializationProgress / 100) * 10`
+- Total discount: `min(25, category + subcategory + specialization)`
+- Discounted component unit price: `componentPrice * (1 - totalDiscount / 100)`
+- Final total component price: `discountedUnitPrice * amountToCraft`
+
+### Import script
+
+Use the one-off script to seed `craftItems` from CSV:
+
+```bash
+node scripts/importCraftItems.js ./path/to/craft-items.csv
+```
+
+Environment variables for Firebase config are optional; if omitted, the script falls back to the same default Firebase project config used by the app. You can still override with `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, etc.
+
+## Crafting Mastery
+
+### Firestore structure
+
+- `craftItems/{itemSlug}`
+  - `name`, `slug`, `category`, `subcategory`, `categoryKey`, `subcategoryKey`
+  - `componentPrice`, `weight`, `craftDays`, `dc`, `isActive`
+- `heroes/{heroId}.crafting`
+  - `summary` (`totalCraftActions`, `totalItemsCrafted`, `updatedAt`)
+  - `itemProgress` map keyed by `itemSlug`
+  - `categoryProgress` map keyed by `categoryKey`
+  - `subcategoryProgress` map keyed by `subcategoryKey`
+- `heroes/{heroId}/craftingLogs/{logId}`
+  - one entry per registered craft action
+
+### Formulas
+
+- Category discount: `(categoryCurrent / categoryMax) * 7`
+- Subcategory discount: `(subcategoryCurrent / subcategoryMax) * 8`
+- Specialization discount: `(specializationProgress / 100) * 10`
+- Total discount: `min(25, category + subcategory + specialization)`
+- Discounted component unit price: `componentPrice * (1 - totalDiscount / 100)`
+- Final total component price: `discountedUnitPrice * amountToCraft`
+
+### Import script
+
+Use the one-off script to seed `craftItems` from CSV:
+
+```bash
+node scripts/importCraftItems.js ./path/to/craft-items.csv
+```
+
+Environment variables for Firebase config are required (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, etc.).

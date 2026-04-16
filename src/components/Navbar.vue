@@ -32,6 +32,9 @@
       <v-btn icon to="/mage-guild">
         <v-icon>mdi-wizard-hat</v-icon>
       </v-btn>
+      <v-btn icon to="/crafting">
+        <v-icon>mdi-hammer-wrench</v-icon>
+      </v-btn>
       <v-btn v-if="userStore.isAdmin" icon to="/admin">
         <v-icon>mdi-shield-account</v-icon>
       </v-btn>
@@ -100,6 +103,11 @@
         <v-list-item tag="router-link" :to="'/mage-guild'" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-wizard-hat</v-icon></v-list-item-icon>
           <v-list-item-title>Магічні послуги</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item tag="router-link" :to="'/crafting'" @click="drawer = false">
+          <v-list-item-icon><v-icon>mdi-hammer-wrench</v-icon></v-list-item-icon>
+          <v-list-item-title>Крафтинг</v-list-item-title>
         </v-list-item>
 
         <v-list-item

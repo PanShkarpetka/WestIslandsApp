@@ -337,7 +337,18 @@
         </v-card>
       </v-dialog>
 
+
+
       <v-divider class="my-4" />
+
+      <v-card-title class="text-h6">Crafting</v-card-title>
+      <CraftActionForm
+        class="mb-4"
+        :heroes="heroRows"
+        :items="craftItemsForAdmin"
+        :default-hero-id="selectedHeroIdForCrafting"
+        @saved="refreshCraftingAdminData"
+      />
 
       <v-card-title class="text-h6">Лог подій</v-card-title>
       <v-data-table
@@ -356,7 +367,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import {
   addDoc,
   collection,
@@ -377,6 +388,8 @@ import FaerunDatePicker from '@/components/FaerunDatePicker.vue';
 import { useIslandStore } from '@/store/islandStore';
 import { usePopulationStore } from '@/store/populationStore';
 import { createNewCycleWithEffects } from '@/services/cycleService';
+import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
+import { loadCraftItems } from '@/services/craftingService';
 
 const logEntries = ref([]);
 const cycleSaving = ref(false);
@@ -406,6 +419,9 @@ const snapshotImportState = reactive({
   applying: false,
   applySummary: null,
 });
+
+const craftItemsForAdmin = ref([]);
+const selectedHeroIdForCrafting = ref('');
 
 const newHeroForm = reactive({
   name: '',
@@ -1085,6 +1101,16 @@ async function saveHero() {
   }
 }
 
+async function refreshCraftingAdminData() {
+  craftItemsForAdmin.value = await loadCraftItems();
+}
+
+watch(heroRows, (rows) => {
+  if (!selectedHeroIdForCrafting.value && rows.length) {
+    selectedHeroIdForCrafting.value = rows[0].id;
+  }
+}, { immediate: true });
+
 onMounted(async () => {
   populationStore.startListener(islandStore.currentId || 'island_rock');
   const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
@@ -1093,6 +1119,7 @@ onMounted(async () => {
   await loadLatestCycle();
   cycleForm.startedDate = suggestNextCycleDate();
   subscribeHeroData();
+  await refreshCraftingAdminData();
 });
 
 onBeforeUnmount(() => {
