@@ -259,7 +259,11 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
-    <v-dialog v-model="craftDialog" max-width="860">
+    <v-dialog
+      v-model="craftDialog"
+      max-width="860"
+      scrim="rgba(6, 12, 32, 0.78)"
+    >
       <CraftActionForm
         :heroes="heroes"
         :items="craftItems"

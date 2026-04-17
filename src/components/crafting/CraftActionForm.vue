@@ -1,5 +1,5 @@
 <template>
-  <v-card class="pa-4" variant="outlined">
+  <v-card class="pa-4 craft-action-card" elevation="10">
     <div class="text-h6 mb-3">Register craft action</div>
     <v-alert v-if="error" type="error" variant="tonal" class="mb-2">{{ error }}</v-alert>
     <v-alert v-if="success" type="success" variant="tonal" class="mb-2">{{ success }}</v-alert>
@@ -92,3 +92,12 @@ async function submit() {
   }
 }
 </script>
+
+
+<style scoped>
+.craft-action-card {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(20, 37, 84, 0.16);
+  backdrop-filter: none;
+}
+</style>
