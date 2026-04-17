@@ -411,7 +411,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
     COMMANDS.RESET,
     COMMANDS.HELP,
   ].some((command) => normalizedText.startsWith(command))) {
-    return 'Fishing flow auto-canceled due to 2 minutes of inactivity. Use /fish to start again.';
+    return 'Хтось давно не ловив рибу? Вудку в зуби і бігом рибалити. Ловись рибка велика та маленька...';
   }
 
   if (isAdditionalRollReply) {
