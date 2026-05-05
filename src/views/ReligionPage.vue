@@ -60,6 +60,14 @@
                     >
                       <span class="toggle-label">Здібності</span>
                     </v-btn>
+                    <v-btn
+                      value="celestial"
+                      prepend-icon="mdi-weather-sunny-alert"
+                      aria-label="Небожитель"
+                      class="view-toggle__btn"
+                    >
+                      <span class="toggle-label">Небожитель</span>
+                    </v-btn>
                   </v-btn-toggle>
                 </div>
                 <v-chip color="primary" variant="tonal" class="chart-chip">
@@ -73,6 +81,47 @@
                   :items="religionAbilitiesTable"
                 />
                 <div v-else class="text-gray-500">Немає інформації про конфесії.</div>
+              </template>
+              <template v-else-if="viewMode === 'celestial'">
+                <div class="deva-panel mb-4">
+                  <div class="deva-gauge-wrapper">
+                    <div class="deva-gauge">
+                      <div class="deva-liquid" :style="{ height: `${devaFaithFillPercent}%` }">
+                        <div class="deva-wave"></div>
+                        <div class="deva-wave deva-wave--alt"></div>
+                      </div>
+                      <div class="deva-consumption" :style="{ height: `${devaConsumptionPercent}%` }"></div>
+                      <div class="deva-overlay">Дева</div>
+                    </div>
+                  </div>
+                  <div class="deva-bottom-labels">
+                    <div class="deva-side-label">Віра: {{ devaFaith }}/100</div>
+                    <div class="deva-side-label">Місячні втрати: {{ devaFaithPerMonth }}</div>
+                  </div>
+                </div>
+                <v-data-table
+                  :headers="celestialHeaders"
+                  :items="celestialRows"
+                  density="comfortable"
+                  items-per-page="-1"
+                  class="characters-table"
+
+                >
+                  <template #item.bonuses="{ item }">
+                    <div class="bonuses-cell">
+                      <v-chip
+                        v-for="(bonus, index) in item.bonuses"
+                        :key="`${item.heroName}-${bonus.id}-${index}`"
+                        size="small"
+                        color="primary"
+                        class="mr-2 mb-2"
+                        :variant="bonus.active ? 'flat' : 'tonal'"
+                      >
+                        {{ bonus.name }}
+                      </v-chip>
+                    </div>
+                  </template>
+                </v-data-table>
               </template>
               <template v-else>
                 <template v-if="distribution.length">
@@ -115,6 +164,7 @@
       v-model:faith-change="faithChange"
       v-model:log-message="logMessage"
       v-model:active-faith-farm-form="activeFaithFarmForm"
+      v-model:celestial-transfer-form="celestialTransferForm"
       v-model:clergy-defense-form="clergyDefenseForm"
       v-model:spread-religion-form="spreadReligionForm"
       v-model:downtime-available="downtimeAvailable"
@@ -135,6 +185,9 @@
       :current-faith-points="currentFaithPoints"
       :active-faith-farm-followers="activeFaithFarmFollowers"
       :apply-active-faith-farm="applyActiveFaithFarm"
+      :celestial-transfer-error="celestialTransferError"
+      :celestial-transfer-loading="celestialTransferLoading"
+      :apply-celestial-transfer="applyCelestialTransfer"
       :clergy-defense-error="clergyDefenseError"
       :clergy-defense-faith-error="clergyDefenseFaithError"
       :clergy-defense-target="clergyDefenseTarget"
@@ -206,6 +259,7 @@ import {
   getDocs,
   limit,
   orderBy,
+  onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
@@ -225,6 +279,7 @@ import ReligionTable from '@/components/ReligionTable.vue'
 import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
 import { formatAmount } from '@/utils/formatters'
+import { parseFaerunDate } from '@/utils/faerun-date'
 
 const iconCache = new Map()
 
@@ -237,6 +292,8 @@ const viewMode = ref('diagram')
 const defaultCardBackground = ''
 const latestCycle = ref(null)
 const previousCycle = ref(null)
+const devaCustom = ref({})
+let devaCustomUnsubscribe = null
 
 const abilitiesById = computed(() =>
   religionStore.abilities.reduce((acc, ability) => {
@@ -378,6 +435,15 @@ onMounted(() => {
 onBeforeUnmount(() => populationStore.stopListener())
 
 onMounted(loadLatestCycle)
+onMounted(() => {
+  const devaCustomRef = doc(db, 'religions', 'psevdo', 'customs', 'Deva')
+  devaCustomUnsubscribe = onSnapshot(devaCustomRef, (snap) => {
+    devaCustom.value = snap.data() || {}
+  })
+})
+onBeforeUnmount(() => {
+  if (devaCustomUnsubscribe) devaCustomUnsubscribe()
+})
 
 const loading = computed(() => religionStore.loading)
 const error = computed(() => religionStore.error)
@@ -392,8 +458,12 @@ const followersSaving = ref(false)
 const activeFaithFarmForm = reactive({
   roll: null,
   dmMod: 0,
+  target: 'confession',
   notes: '',
 })
+const celestialTransferForm = reactive({ investedOV: 50, roll: null, notes: '' })
+const celestialTransferError = ref('')
+const celestialTransferLoading = ref(false)
 const activeFaithFarmError = ref('')
 const activeFaithFarmLoading = ref(false)
 const spreadReligionForm = reactive({
@@ -521,7 +591,8 @@ const bonusesByReligion = computed(() => {
 })
 
 const religionAbilitiesTable = computed(() =>
-  religionStore.religions.map((religion) => {
+  [
+    ...religionStore.religions.map((religion) => {
     const resolvedAbilities = resolveAbilitiesList(religion.abilities)
     const resolvedMilestoneAbilities = resolveMilestoneAbilities(religion.milestoneAbilities)
 
@@ -536,8 +607,98 @@ const religionAbilitiesTable = computed(() =>
       milestoneAbilities: resolvedMilestoneAbilities,
       followersPercent,
     }
-  })
+    }),
+    {
+      id: 'angel-celestial',
+      name: 'Янгол',
+      color: '#90caf9',
+      abilities: celestialVisibleAbilities.value,
+      milestoneAbilities: [],
+      followersPercent: 0,
+    },
+  ]
 )
+const celestialHeaders = [
+  { title: 'Персонаж', key: 'heroName' },
+  { title: 'Згенеровано для небожителя', key: 'generated' },
+  { title: 'Передано небожителю', key: 'transferred' },
+  { title: 'Ранг', key: 'tier' },
+  { title: 'Доступні бонуси', key: 'bonuses' },
+]
+const celestialTierAbilities = computed(() => {
+  const byId = new Map(religionStore.abilities.map((a) => [a.id, a.name || a.id]))
+  return [
+    ['EyeOfTheAngel', 'AngelicTouch'],
+    ['EyeOfTheAngel', 'AngelicTouch', 'AngelicCure'],
+    ['EyeOfTheAngel', 'AngelicTouch', 'AngelicCure', 'AngelicRestoration'],
+    ['EyeOfTheAngel', 'AngelicTouch', 'AngelicCure', 'AngelicRestoration', 'AngelicUncurse'],
+  ].map((ids) => ids.map((id) => byId.get(id) || id))
+})
+const celestialRows = computed(() => {
+  const maxTier = records.value.reduce((max, c) => {
+    const t = Number(c.celestialTransferred ?? 0)
+    const tier = t >= 500 ? 3 : t >= 250 ? 2 : t >= 100 ? 1 : 0
+    return Math.max(max, tier)
+  }, 0)
+  const shownTiers = [maxTier]
+  const shownAbilities = []
+  const seen = new Set()
+  for (const tier of shownTiers) {
+    for (const name of celestialTierAbilities.value[tier] || []) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      shownAbilities.push(name)
+    }
+  }
+
+  return records.value.map((r) => {
+    const transferred = Number(r.celestialTransferred ?? 0)
+    const generated = Number(r.celestialGenerated ?? 0)
+    const tier = transferred >= 500 ? 3 : transferred >= 250 ? 2 : transferred >= 100 ? 1 : 0
+    const available = new Set(celestialTierAbilities.value[tier] || [])
+    const hasTransferred = transferred > 0
+    const bonuses = shownAbilities.map((name) => ({
+      id: name,
+      name,
+      active: hasTransferred && available.has(name),
+    }))
+
+    return { heroName: r.heroName, generated, transferred, tier, bonuses }
+  })
+})
+const celestialVisibleAbilities = computed(() => {
+  const maxTier = records.value.reduce((max, c) => {
+    const t = Number(c.celestialTransferred ?? 0)
+    const tier = t >= 500 ? 3 : t >= 250 ? 2 : t >= 100 ? 1 : 0
+    return Math.max(max, tier)
+  }, 0)
+  const shownTiers = [maxTier]
+  if (maxTier < 3) shownTiers.push(maxTier + 1)
+
+  const result = []
+  const seen = new Set()
+  for (const tier of shownTiers) {
+    for (const name of celestialTierAbilities.value[tier] || []) {
+      if (seen.has(name)) continue
+      seen.add(name)
+      const ability = religionStore.abilities.find((a) => a.name === name || a.id === name)
+      const isCurrentTier = tier <= maxTier
+      result.push({
+        id: `angel-${name}-tier-${tier}`,
+        name,
+        description: ability?.description || 'Немає опису',
+        milestoneLabel: `${tier} тір`,
+        active: isCurrentTier,
+      })
+    }
+  }
+  return result
+})
+const devaFaith = computed(() => Number(devaCustom.value?.devaFaith ?? 0))
+const devaFaithPerDay = computed(() => Number(devaCustom.value?.devaFaithPerDay ?? 1))
+const devaFaithPerMonth = computed(() => devaFaithPerDay.value * 30)
+const devaFaithFillPercent = computed(() => Math.min(100, Math.max(0, devaFaith.value)))
+const devaConsumptionPercent = computed(() => Math.min(devaFaithFillPercent.value, devaFaithPerMonth.value))
 
 const followersSliderCeiling = computed(() => {
   const base = totalPopulation.value || 0
@@ -1072,6 +1233,7 @@ async function loadLatestCycle() {
       const docSnap = snapshot.docs[0]
       latestCycle.value = { id: docSnap.id, ...docSnap.data() }
       previousCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null
+      await handleCycleDevaConsumption()
     } else {
       latestCycle.value = null
       previousCycle.value = null
@@ -1079,6 +1241,29 @@ async function loadLatestCycle() {
   } catch (e) {
     console.error('[religion] Failed to load latest cycle', e)
   }
+}
+
+async function handleCycleDevaConsumption() {
+  if (!latestCycle.value?.startedAt || !previousCycle.value?.startedAt) return
+
+  const current = parseFaerunDate(latestCycle.value.startedAt)
+  const previous = parseFaerunDate(previousCycle.value.startedAt)
+
+  if (!current || !previous) return
+  if (current.day !== 1 || (current.month === previous.month && current.year === previous.year)) return
+
+  const devaRef = doc(db, 'religions', 'psevdo', 'customs', 'Deva')
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(devaRef)
+    const data = snap.data() || {}
+    if (data.lastConsumedCycleId === latestCycle.value.id) return
+
+    transaction.update(devaRef, {
+      devaFaith: Math.max(0, Number(data.devaFaith ?? 0) - devaFaithPerMonth.value),
+      lastConsumedCycleId: latestCycle.value.id,
+    })
+  })
 }
 
 function closeDialog() {
@@ -1725,6 +1910,10 @@ async function applyActiveFaithFarm() {
       const currentFaithMax = Number(clergyData.faithMax ?? 0)
       const updatedFaith = currentFaith + gained
       const updates = { faith: updatedFaith }
+      const generatedKey = activeFaithFarmForm.target === 'celestial' ? 'celestialGenerated' : null
+      if (generatedKey) {
+        updates[generatedKey] = Number(clergyData[generatedKey] ?? 0) + gained
+      }
 
       if (updatedFaith > currentFaithMax) {
         updates.faithMax = updatedFaith
@@ -1760,6 +1949,7 @@ async function applyActiveFaithFarm() {
         farmBase: activeFaithFarmBase.value,
         farmDCBase: activeFaithFarmDCBase.value,
         currentFaith: currentFaithPoints.value,
+        farmTarget: activeFaithFarmForm.target,
         cycleId,
         user: userStore.nickname || 'Адміністратор',
         createdAt: serverTimestamp(),
@@ -1776,6 +1966,42 @@ async function applyActiveFaithFarm() {
     activeFaithFarmError.value = e?.message || 'Не вдалося застосувати ферму віри.'
   } finally {
     activeFaithFarmLoading.value = false
+  }
+}
+
+async function applyCelestialTransfer() {
+  if (!isAdmin.value || !activeClergy.value) return
+  const invested = Number(celestialTransferForm.investedOV)
+  const roll = Number(celestialTransferForm.roll)
+  const bonus = Math.max(0, roll + Math.floor(invested / 50) - 10)
+  const total = invested + bonus
+  if (Number.isNaN(invested) || invested < 1 || Number.isNaN(roll)) {
+    celestialTransferError.value = 'Вкажіть коректні значення.'
+    return
+  }
+  celestialTransferLoading.value = true
+  celestialTransferError.value = ''
+  try {
+    const clergyRef = doc(db, 'clergy', activeClergy.value.id)
+    const devaRef = doc(db, 'religions', 'psevdo', 'customs', 'Deva')
+    await runTransaction(db, async (transaction) => {
+      const clergySnapshot = await transaction.get(clergyRef)
+      const devaSnapshot = await transaction.get(devaRef)
+      const c = clergySnapshot.data() || {}
+      const d = devaSnapshot.data() || {}
+      if (Number(c.faith ?? 0) < invested) throw new Error('Недостатньо ОВ.')
+      transaction.update(clergyRef, {
+        faith: Number(c.faith ?? 0) - invested,
+        celestialTransferred: Number(c.celestialTransferred ?? 0) + total,
+      })
+      transaction.update(devaRef, {
+        devaFaith: Number(d.devaFaith ?? 0) + total,
+      })
+    })
+  } catch (e) {
+    celestialTransferError.value = e?.message || 'Не вдалося переказати ОВ.'
+  } finally {
+    celestialTransferLoading.value = false
   }
 }
 
@@ -1908,4 +2134,43 @@ async function applyActiveFaithFarm() {
     background-size: 80% !important;
   }
 }
+
+.deva-gauge-wrapper { display:flex; justify-content:center; align-items:center; }
+.deva-side-label { color:#155e75; font-weight:700; background:rgba(224,247,250,.75); padding:8px 12px; border-radius:10px; }
+.deva-gauge { position:relative; width:220px; height:220px; border-radius:50%; overflow:hidden; background: radial-gradient(circle at center, rgba(224,247,250,.95), rgba(125,211,252,.9)); border:2px solid rgba(125,211,252,.8); }
+.deva-liquid { position:absolute; bottom:0; left:0; width:100%; background: linear-gradient(180deg, rgba(56,189,248,.75), rgba(14,116,144,.9)); overflow:hidden; }
+.deva-wave {
+  position: absolute;
+  top: -18px;
+  left: -40%;
+  width: 180%;
+  height: 40px;
+  background: radial-gradient(ellipse at center, rgba(186,230,253,.9) 0%, rgba(56,189,248,.15) 70%, rgba(56,189,248,0) 100%);
+  animation: deva-wave 3.4s ease-in-out infinite alternate;
+}
+.deva-wave--alt {
+  top: -14px;
+  opacity: 0.65;
+  animation-duration: 4.2s;
+  animation-direction: alternate-reverse;
+}
+.deva-overlay { position:absolute; inset:auto 0 14px 0; text-align:center; color:#083344; font-weight:800; text-shadow:0 1px 2px rgba(255,255,255,.7); }
+.bonuses-cell { display:flex; flex-wrap:wrap; }
+.deva-bottom-labels { margin-top: 10px; display:flex; justify-content:center; gap:10px; }
+@keyframes deva-wave {
+  0% { transform: translateX(0) }
+  50% { transform: translateX(12%) }
+  100% { transform: translateX(0) }
+}
+
+.characters-table {
+  background:
+      linear-gradient(135deg, rgba(240, 249, 255, 0.86), rgba(224, 242, 254, 0.66)),
+      url('@/images/religions/Deva.png') center no-repeat;
+  background-size: contain;
+  .v-data-table__th {
+    font-weight: 600;
+  }
+}
+
 </style>

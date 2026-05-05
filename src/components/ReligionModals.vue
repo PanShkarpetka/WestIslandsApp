@@ -97,6 +97,13 @@
               </v-alert>
 
               <div class="field-row">
+                <v-select
+                  v-model="activeFaithFarmFormModel.target"
+                  :items="[{ title: 'Для конфесії', value: 'confession' }, { title: 'Для небожителя', value: 'celestial' }]"
+                  label="Тип фарму"
+                  density="comfortable"
+                  hide-details="auto"
+                />
                 <v-text-field
                   :model-value="activeClergy?.heroRef?.id || ''"
                   label="ID героя"
@@ -169,6 +176,22 @@
                   Застосувати
                 </v-btn>
               </div>
+            </v-sheet>
+
+            <v-sheet class="action-card" rounded="lg" elevation="0">
+              <div class="action-card__header">
+                <div>
+                  <div class="text-subtitle-2 font-semibold">Переказ віри небожителю</div>
+                  <div class="text-body-2 text-medium-emphasis">Бонус = кидок + (ОВ/50) - 10</div>
+                </div>
+              </div>
+              <v-alert v-if="celestialTransferError" type="error" variant="tonal" class="mb-3">{{ celestialTransferError }}</v-alert>
+              <div class="field-row">
+                <v-text-field v-model.number="celestialTransferFormModel.investedOV" type="number" min="1" label="ОВ для переказу" />
+                <v-text-field v-model.number="celestialTransferFormModel.roll" type="number" label="Результат чеку" />
+              </div>
+              <v-text-field v-model="celestialTransferFormModel.notes" label="Нотатки" density="comfortable" hide-details="auto" />
+              <v-btn color="secondary" class="mt-3" :loading="celestialTransferLoading" @click="applyCelestialTransfer">Переказати</v-btn>
             </v-sheet>
 
             <v-sheet class="action-card" rounded="lg" elevation="0">
@@ -718,6 +741,7 @@ const clergyDialogOpen = defineModel('open', { type: Boolean, default: false })
 const faithChangeModel = defineModel('faithChange', { type: Number, default: 0 })
 const logMessageModel = defineModel('logMessage', { type: String, default: '' })
 const activeFaithFarmFormModel = defineModel('activeFaithFarmForm', { type: Object, default: () => ({}) })
+const celestialTransferFormModel = defineModel('celestialTransferForm', { type: Object, default: () => ({}) })
 const clergyDefenseFormModel = defineModel('clergyDefenseForm', { type: Object, default: () => ({}) })
 const spreadReligionFormModel = defineModel('spreadReligionForm', { type: Object, default: () => ({}) })
 const manualShieldActiveModel = defineModel('manualShieldActive', { type: Boolean, default: false })
@@ -740,6 +764,9 @@ const props = defineProps({
   currentFaithPoints: [Number, String],
   activeFaithFarmFollowers: [Number, String],
   applyActiveFaithFarm: { type: Function, required: true },
+  celestialTransferError: String,
+  celestialTransferLoading: { type: Boolean, default: false },
+  applyCelestialTransfer: { type: Function, required: true },
   clergyDefenseError: String,
   clergyDefenseFaithError: String,
   clergyDefenseTarget: String,

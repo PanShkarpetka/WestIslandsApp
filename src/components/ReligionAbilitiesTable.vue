@@ -67,11 +67,11 @@ const tableRows = computed(() =>
         key: `${religion.id}-${ability.id || index}`,
         religion,
         ability,
-        milestoneLabel: 'Базові',
+        milestoneLabel: ability.milestoneLabel || 'Базові',
         showReligionCell: index === 0,
         rowspan: totalRows,
         isEmpty: false,
-        isActive: true,
+        isActive: ability.active !== false,
       })),
       ...visibleMilestones.map((item, index) => ({
         key: `${religion.id}-milestone-${item.key || index}`,

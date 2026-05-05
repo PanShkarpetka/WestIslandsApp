@@ -188,7 +188,9 @@ export const useReligionStore = defineStore('religion', () => {
     })
 
     religionUnsubscribe = onSnapshot(religionsRef, (snapshot) => {
-      religions.value = snapshot.docs.map((docSnap) => {
+      religions.value = snapshot.docs
+        .filter((docSnap) => docSnap.id !== 'psevdo')
+        .map((docSnap) => {
         const data = docSnap.data() || {}
         return {
           id: docSnap.id,
