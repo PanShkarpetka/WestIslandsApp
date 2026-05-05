@@ -190,6 +190,7 @@
                 <v-text-field v-model.number="celestialTransferFormModel.investedOV" type="number" min="1" label="ОВ для переказу" />
                 <v-text-field v-model.number="celestialTransferFormModel.roll" type="number" label="Результат чеку" />
               </div>
+              <v-select v-model="celestialTransferFormModel.selectedBonus" :items="celestialBonusOptions" label="Обраний бонус небожителя" density="comfortable" hide-details="auto" />
               <v-text-field v-model="celestialTransferFormModel.notes" label="Нотатки" density="comfortable" hide-details="auto" />
               <v-btn color="secondary" class="mt-3" :loading="celestialTransferLoading" @click="applyCelestialTransfer">Переказати</v-btn>
             </v-sheet>
@@ -767,6 +768,7 @@ const props = defineProps({
   celestialTransferError: String,
   celestialTransferLoading: { type: Boolean, default: false },
   applyCelestialTransfer: { type: Function, required: true },
+  celestialBonusOptions: { type: Array, default: () => [] },
   clergyDefenseError: String,
   clergyDefenseFaithError: String,
   clergyDefenseTarget: String,

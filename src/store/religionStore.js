@@ -166,6 +166,11 @@ export const useReligionStore = defineStore('religion', () => {
           religionName,
           faith: Number(data.faith ?? 0),
           faithMax: Number(data.faithMax ?? 0),
+          celestialFaith: Number(data.celestialFaith ?? 0),
+          sharedFaith: Number(data.sharedFaith ?? 0),
+          celestialTransferred: Number(data.celestialTransferred ?? 0),
+          celestialGenerated: Number(data.celestialGenerated ?? 0),
+          selectedCelestialBonus: data.selectedCelestialBonus || '',
           downtimeAvailable: hero.downtimeAvailable,
           heroRef: hero.ref,
         }

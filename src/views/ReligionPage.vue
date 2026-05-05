@@ -190,6 +190,7 @@
       :celestial-transfer-error="celestialTransferError"
       :celestial-transfer-loading="celestialTransferLoading"
       :apply-celestial-transfer="applyCelestialTransfer"
+      :celestial-bonus-options="celestialBonusOptions"
       :clergy-defense-error="clergyDefenseError"
       :clergy-defense-faith-error="clergyDefenseFaithError"
       :clergy-defense-target="clergyDefenseTarget"
@@ -470,7 +471,7 @@ const activeFaithFarmForm = reactive({
   target: 'confession',
   notes: '',
 })
-const celestialTransferForm = reactive({ investedOV: 50, roll: null, notes: '' })
+const celestialTransferForm = reactive({ investedOV: 50, roll: null, notes: '', selectedBonus: '' })
 const celestialTransferError = ref('')
 const celestialTransferLoading = ref(false)
 const activeFaithFarmError = ref('')
@@ -629,9 +630,8 @@ const religionAbilitiesTable = computed(() =>
 )
 const celestialHeaders = [
   { title: 'Персонаж', key: 'heroName' },
-  { title: 'Згенеровано для небожителя', key: 'generated' },
+  { title: 'Віра небожителя', key: 'celestialFaith' },
   { title: 'Передано небожителю', key: 'transferred' },
-  { title: 'Ранг', key: 'tier' },
   { title: 'Доступні бонуси', key: 'bonuses' },
 ]
 const celestialTierAbilities = computed(() => {
@@ -662,13 +662,14 @@ const celestialRows = computed(() => {
 
   return records.value.map((r) => {
     const transferred = Number(r.celestialTransferred ?? 0)
-    const generated = Number(r.celestialGenerated ?? 0)
+    const celestialFaith = Math.min(100, Math.max(0, Number(r.celestialFaith ?? 0)))
     const tier = transferred >= 500 ? 3 : transferred >= 250 ? 2 : transferred >= 100 ? 1 : 0
     const available = new Set(celestialTierAbilities.value[tier] || [])
     const hasTransferred = transferred > 0
+    const selectedBonus = String(r.selectedCelestialBonus || '')
     const bonuses = shownAbilities.map((name) => {
       const ability = religionStore.abilities.find((a) => a.name === name || a.id === name)
-      const active = hasTransferred && available.has(name)
+      const active = hasTransferred && available.has(name) && selectedBonus === name
       return {
         id: name,
         name,
@@ -678,7 +679,7 @@ const celestialRows = computed(() => {
       }
     })
 
-    return { heroName: r.heroName, generated, transferred, tier, bonuses }
+    return { heroName: r.heroName, celestialFaith, transferred, bonuses }
   })
 })
 const celestialVisibleAbilities = computed(() => {
@@ -1923,15 +1924,17 @@ async function applyActiveFaithFarm() {
       const clergyData = clergySnapshot.data() || {}
       const currentFaith = Number(clergyData.faith ?? 0)
       const currentFaithMax = Number(clergyData.faithMax ?? 0)
-      const updatedFaith = currentFaith + gained
-      const updates = { faith: updatedFaith }
-      const generatedKey = activeFaithFarmForm.target === 'celestial' ? 'celestialGenerated' : null
-      if (generatedKey) {
-        updates[generatedKey] = Number(clergyData[generatedKey] ?? 0) + gained
-      }
+      const updates = {}
 
-      if (updatedFaith > currentFaithMax) {
-        updates.faithMax = updatedFaith
+      if (activeFaithFarmForm.target === 'celestial') {
+        updates.celestialFaith = Math.min(100, Number(clergyData.celestialFaith ?? 0) + gained)
+        updates.celestialGenerated = Number(clergyData.celestialGenerated ?? 0) + gained
+      } else {
+        const updatedFaith = currentFaith + gained
+        updates.faith = updatedFaith
+        if (updatedFaith > currentFaithMax) {
+          updates.faithMax = updatedFaith
+        }
       }
 
       transaction.update(clergyRef, updates)
@@ -2004,10 +2007,11 @@ async function applyCelestialTransfer() {
       const devaSnapshot = await transaction.get(devaRef)
       const c = clergySnapshot.data() || {}
       const d = devaSnapshot.data() || {}
-      if (Number(c.faith ?? 0) < invested) throw new Error('Недостатньо ОВ.')
+      if (Number(c.celestialFaith ?? 0) < invested) throw new Error('Недостатньо небесної віри.')
       transaction.update(clergyRef, {
-        faith: Number(c.faith ?? 0) - invested,
+        celestialFaith: Number(c.celestialFaith ?? 0) - invested,
         celestialTransferred: Number(c.celestialTransferred ?? 0) + total,
+        selectedCelestialBonus: celestialTransferForm.selectedBonus || '',
       })
       transaction.update(devaRef, {
         devaFaith: Number(d.devaFaith ?? 0) + total,
@@ -2019,6 +2023,12 @@ async function applyCelestialTransfer() {
     celestialTransferLoading.value = false
   }
 }
+
+const celestialBonusOptions = computed(() => {
+  const transferred = Number(activeClergy.value?.celestialTransferred ?? 0)
+  const tier = transferred >= 500 ? 3 : transferred >= 250 ? 2 : transferred >= 100 ? 1 : 0
+  return (celestialTierAbilities.value[tier] || []).map((name) => ({ title: name, value: name }))
+})
 
 </script>
 <style scoped>
