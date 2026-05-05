@@ -62,7 +62,7 @@
                     </v-btn>
                     <v-btn
                       value="celestial"
-                      prepend-icon="mdi-weather-sunny-alert"
+                      prepend-icon="mdi-weather-sunny"
                       aria-label="Небожитель"
                       class="view-toggle__btn"
                     >
@@ -86,12 +86,13 @@
                 <div class="deva-panel mb-4">
                   <div class="deva-gauge-wrapper">
                     <div class="deva-gauge">
-                      <div class="deva-liquid" :style="{ height: `${devaFaithFillPercent}%` }">
+                      <div class="deva-liquid" :style="{ height: `${devaFaithVisualPercent}%` }">
+                        <div class="deva-liquid-sheen"></div>
+                        <div class="deva-surface"></div>
                         <div class="deva-wave"></div>
                         <div class="deva-wave deva-wave--alt"></div>
                       </div>
-                      <div class="deva-consumption" :style="{ height: `${devaConsumptionPercent}%` }"></div>
-                      <div class="deva-overlay">Дева</div>
+                      <div class="deva-overlay">Deva</div>
                     </div>
                   </div>
                   <div class="deva-bottom-labels">
@@ -116,6 +117,7 @@
                         color="primary"
                         class="mr-2 mb-2"
                         :variant="bonus.active ? 'flat' : 'tonal'"
+                        :title="bonusTooltip(bonus)"
                       >
                         {{ bonus.name }}
                       </v-chip>
@@ -335,6 +337,13 @@ function resolveMilestoneAbilities(milestoneAbilities) {
     })
 }
 
+
+function bonusTooltip(bonus) {
+  const parts = []
+  if (bonus?.description) parts.push(bonus.description)
+  if (bonus?.active === false) parts.push(bonus.hint || 'Бонус неактивний')
+  return parts.join(' • ')
+}
 function hasIcon(name) {
   switch (name) {
     case 'Амберлі':
@@ -657,11 +666,17 @@ const celestialRows = computed(() => {
     const tier = transferred >= 500 ? 3 : transferred >= 250 ? 2 : transferred >= 100 ? 1 : 0
     const available = new Set(celestialTierAbilities.value[tier] || [])
     const hasTransferred = transferred > 0
-    const bonuses = shownAbilities.map((name) => ({
-      id: name,
-      name,
-      active: hasTransferred && available.has(name),
-    }))
+    const bonuses = shownAbilities.map((name) => {
+      const ability = religionStore.abilities.find((a) => a.name === name || a.id === name)
+      const active = hasTransferred && available.has(name)
+      return {
+        id: name,
+        name,
+        description: ability?.description || 'Немає опису',
+        active,
+        hint: active ? '' : 'Бонус стане активним після передачі віри небожителю.',
+      }
+    })
 
     return { heroName: r.heroName, generated, transferred, tier, bonuses }
   })
@@ -698,7 +713,7 @@ const devaFaith = computed(() => Number(devaCustom.value?.devaFaith ?? 0))
 const devaFaithPerDay = computed(() => Number(devaCustom.value?.devaFaithPerDay ?? 1))
 const devaFaithPerMonth = computed(() => devaFaithPerDay.value * 30)
 const devaFaithFillPercent = computed(() => Math.min(100, Math.max(0, devaFaith.value)))
-const devaConsumptionPercent = computed(() => Math.min(devaFaithFillPercent.value, devaFaithPerMonth.value))
+const devaFaithVisualPercent = computed(() => Math.min(100, devaFaithFillPercent.value + 6))
 
 const followersSliderCeiling = computed(() => {
   const base = totalPopulation.value || 0
@@ -2137,32 +2152,70 @@ async function applyCelestialTransfer() {
 
 .deva-gauge-wrapper { display:flex; justify-content:center; align-items:center; }
 .deva-side-label { color:#155e75; font-weight:700; background:rgba(224,247,250,.75); padding:8px 12px; border-radius:10px; }
-.deva-gauge { position:relative; width:220px; height:220px; border-radius:50%; overflow:hidden; background: radial-gradient(circle at center, rgba(224,247,250,.95), rgba(125,211,252,.9)); border:2px solid rgba(125,211,252,.8); }
-.deva-liquid { position:absolute; bottom:0; left:0; width:100%; background: linear-gradient(180deg, rgba(56,189,248,.75), rgba(14,116,144,.9)); overflow:hidden; }
-.deva-wave {
+.deva-gauge {
+  position:relative;
+  width:220px;
+  height:220px;
+  border-radius:50%;
+  overflow:hidden;
+  background: radial-gradient(circle at center, rgba(224,247,250,.95), rgba(125,211,252,.9));
+  border:2px solid rgba(125,211,252,.8);
+  box-shadow: inset 0 0 28px rgba(8, 51, 68, 0.22);
+}
+.deva-liquid {
+  position:absolute;
+  inset:auto 0 0 0;
+  width:100%;
+  overflow:visible;
+  background: linear-gradient(180deg, rgba(125,211,252,.78), rgba(14,116,144,.88));
+  transition: height 1s cubic-bezier(.22,.61,.36,1);
+}
+.deva-surface {
   position: absolute;
-  top: -18px;
+  top: -16px;
   left: -40%;
   width: 180%;
-  height: 40px;
-  background: radial-gradient(ellipse at center, rgba(186,230,253,.9) 0%, rgba(56,189,248,.15) 70%, rgba(56,189,248,0) 100%);
-  animation: deva-wave 3.4s ease-in-out infinite alternate;
+  height: 28px;
+  background: radial-gradient(35px 12px at 20px 18px, rgba(186,230,253,.95) 55%, rgba(186,230,253,0) 57%) repeat-x;
+  background-size: 70px 28px;
+  animation: deva-surface-bounce 2.8s ease-in-out infinite alternate;
+}
+.deva-liquid-sheen {
+  position:absolute;
+  inset:0;
+  background: linear-gradient(120deg, rgba(255,255,255,.22), rgba(255,255,255,0) 45%);
+  mix-blend-mode: screen;
+}
+.deva-wave {
+  position: absolute;
+  top: -22px;
+  left: -35%;
+  width: 170%;
+  height: 38px;
+  border-radius: 999px;
+  background: rgba(186,230,253,.28);
+  animation: deva-wave-slosh 2.9s ease-in-out infinite alternate;
 }
 .deva-wave--alt {
-  top: -14px;
-  opacity: 0.65;
-  animation-duration: 4.2s;
+  top: -18px;
+  left: -30%;
+  opacity: 0.45;
+  animation-duration: 3.6s;
   animation-direction: alternate-reverse;
 }
-.deva-overlay { position:absolute; inset:auto 0 14px 0; text-align:center; color:#083344; font-weight:800; text-shadow:0 1px 2px rgba(255,255,255,.7); }
+.deva-overlay { position:absolute; inset:auto 0 14px 0; text-align:center; color:#083344; font-weight:800; text-shadow:0 1px 2px rgba(255,255,255,.7); z-index:4; }
 .bonuses-cell { display:flex; flex-wrap:wrap; }
 .deva-bottom-labels { margin-top: 10px; display:flex; justify-content:center; gap:10px; }
-@keyframes deva-wave {
-  0% { transform: translateX(0) }
-  50% { transform: translateX(12%) }
-  100% { transform: translateX(0) }
+@keyframes deva-wave-slosh {
+  0% { transform: translateX(-10%) translateY(2px) scaleX(1.02); }
+  50% { transform: translateX(0) translateY(-2px) scaleX(1); }
+  100% { transform: translateX(10%) translateY(2px) scaleX(1.02); }
 }
 
+@keyframes deva-surface-bounce {
+  0% { transform: translateX(-28px); }
+  100% { transform: translateX(28px); }
+}
 .characters-table {
   background:
       linear-gradient(135deg, rgba(240, 249, 255, 0.86), rgba(224, 242, 254, 0.66)),

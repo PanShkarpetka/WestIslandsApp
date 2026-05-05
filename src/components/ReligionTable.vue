@@ -94,7 +94,7 @@
                 :color="record.religionColor || 'primary'"
                 variant="flat"
                 :class="['mr-2', 'mb-2', { 'bonus-chip--inactive': bonus.active === false }]"
-                :title="bonus.active === false ? bonus.hint || 'Бонус неактивний' : ''"
+                :title="bonusTooltip(bonus)"
                 size="small"
               >
                 {{ bonus.name }}
@@ -129,6 +129,13 @@ defineProps({
 })
 
 const emit = defineEmits(['toggle-sort', 'select'])
+
+function bonusTooltip(bonus) {
+  const parts = []
+  if (bonus?.description) parts.push(bonus.description)
+  if (bonus?.active === false) parts.push(bonus.hint || 'Бонус неактивний')
+  return parts.join(' • ')
+}
 </script>
 
 <style scoped>
