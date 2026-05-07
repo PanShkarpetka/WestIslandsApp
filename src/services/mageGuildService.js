@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore'
-import { db } from '@/services/firebase'
+import { db } from './firebase.js'
 import {
   applySpellPriceDelta,
   buildSpellRequestDrafts,
@@ -22,7 +22,7 @@ import {
   getSpellPrice,
   getSpellTier,
   normalizeSpellLevel,
-} from '@/utils/mageGuildRequests'
+} from '../utils/mageGuildRequests.js'
 
 const SPELL_REQUEST_CONFIG_ID = 'spell-request-prices'
 const HERO_COLLECTION = 'heroes'

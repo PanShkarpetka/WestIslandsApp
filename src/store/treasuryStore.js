@@ -4,6 +4,44 @@ import {
     getDocs, onSnapshot, runTransaction, serverTimestamp
 } from "firebase/firestore";
 
+// Exported for testing. Accepts injectable firebase deps so the transaction
+// logic can be verified without a real Firestore connection.
+export async function applyTreasuryTransaction(
+    { delta, type, comment, user },
+    {
+        runTransactionFn = runTransaction,
+        docFn = doc,
+        collectionFn = collection,
+        serverTimestampFn = serverTimestamp,
+        db: firestoreDb,
+    } = {},
+) {
+    const db = firestoreDb ?? getFirestore();
+    const metaRef = docFn(db, "treasury/meta");
+    const txCol = collectionFn(db, "treasuryTransactions");
+
+    await runTransactionFn(db, async (t) => {
+        const metaSnap = await t.get(metaRef);
+        const metaData = metaSnap.exists() ? metaSnap.data() : {};
+        const current = metaData.balance || 0;
+        const newBalance = current + delta;
+
+        if (newBalance < 0) throw new Error("Недостатньо золота у скарбниці.");
+
+        const txRef = docFn(txCol);
+        t.set(txRef, {
+            amount: delta,
+            type,
+            comment: (comment || "").slice(0, 500),
+            userId: user?.uid || "anon",
+            nickname: (user?.nickname || "Гравець").slice(0, 80),
+            createdAt: serverTimestampFn(),
+            balanceAfter: newBalance,
+        });
+        t.set(metaRef, { balance: newBalance, updatedAt: serverTimestampFn() }, { merge: true });
+    });
+}
+
 export const useTreasuryStore = defineStore("treasury", {
     state: () => ({
         balance: 0,
@@ -76,40 +114,8 @@ export const useTreasuryStore = defineStore("treasury", {
             } finally { this.loading = false; }
         },
 
-        // Внутрішня утиліта: атомарна операція
         async _applyTx({ delta, type, comment, user }) {
-            const db = getFirestore();
-            const metaRef = doc(db, "treasury/meta");
-            const txCol = collection(db, "treasuryTransactions");
-
-            await runTransaction(db, async (t) => {
-                // 1) читаємо поточний баланс
-                const metaSnap = await t.get(metaRef);
-                const metaData = metaSnap.exists() ? metaSnap.data() : {};
-                const current = metaData.balance || 0;
-
-                const newBalance = current + delta;
-                if (newBalance < 0) {
-                    throw new Error("Недостатньо золота у скарбниці.");
-                }
-                // 2) створюємо запис транзакції
-                const txRef = doc(txCol); // авто-ID
-                t.set(txRef, {
-                    amount: delta,                   // +для внеску, –для зняття
-                    type,                            // "deposit"|"withdraw"
-                    comment: (comment || "").slice(0, 500),
-                    userId: user?.uid || "anon",
-                    nickname: (user?.nickname || "Гравець").slice(0, 80),
-                    createdAt: serverTimestamp(),
-                    balanceAfter: newBalance
-                });
-
-                // 3) оновлюємо баланс
-                t.set(metaRef, {
-                    balance: newBalance,
-                    updatedAt: serverTimestamp()
-                }, { merge: true });
-            });
+            await applyTreasuryTransaction({ delta, type, comment, user });
         },
 
         // Публічні методи

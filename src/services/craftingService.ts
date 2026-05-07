@@ -8,7 +8,7 @@ import {
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from './firebase.js';
 import {
   applyCraftProgress,
   createDefaultItemProgress,
@@ -16,7 +16,7 @@ import {
   getSubcategoryKey,
   recalculateHeroCrafting,
   slugifyKey,
-} from '@/utils/crafting/craftingCalculations';
+} from '../utils/crafting/craftingCalculations.ts';
 
 function normalizeNumber(value: unknown, fallback = 0): number {
   const parsed = Number(value);
@@ -76,16 +76,24 @@ export function getEmptyCraftingState() {
   };
 }
 
-export async function registerCraftAction({ heroId, itemSlug, amountCrafted, craftItems, createdBy = null }: any) {
-  const heroRef = doc(db, 'heroes', heroId);
-  const logsRef = collection(db, 'heroes', heroId, 'craftingLogs');
+export async function registerCraftAction({ heroId, itemSlug, amountCrafted, craftItems, createdBy = null }: any, {
+  doc: docFn = doc,
+  collection: collectionFn = collection,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  runTransaction: runTransactionFn = runTransaction,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+}: any = {}) {
+  const heroRef = docFn(firestoreDb, 'heroes', heroId);
+  const logsRef = collectionFn(firestoreDb, 'heroes', heroId, 'craftingLogs');
 
   const allItems = (craftItems?.length
     ? craftItems
-    : (await getDocs(query(collection(db, 'craftItems')))).docs.map((row) => normalizeCraftItem(row.data(), row.id))
+    : (await getDocsFn(queryFn(collectionFn(firestoreDb, 'craftItems')))).docs.map((row: any) => normalizeCraftItem(row.data(), row.id))
   ).filter((item: any) => item.isActive);
 
-  return runTransaction(db, async (transaction) => {
+  return runTransactionFn(firestoreDb, async (transaction: any) => {
     const heroDoc = await transaction.get(heroRef);
 
     if (!heroDoc.exists()) throw new Error('Hero not found');
@@ -125,12 +133,12 @@ export async function registerCraftAction({ heroId, itemSlug, amountCrafted, cra
         ...recalc,
         summary: {
           ...recalc.summary,
-          updatedAt: serverTimestamp(),
+          updatedAt: serverTimestampFn(),
         },
       },
     });
 
-    const logRef = doc(logsRef);
+    const logRef = docFn(logsRef);
     const totalComponentPriceAtTime = Number(item.componentPrice || 0) * Number(amountCrafted || 0);
 
     transaction.set(logRef, {
@@ -149,7 +157,7 @@ export async function registerCraftAction({ heroId, itemSlug, amountCrafted, cra
       categoryCappedReached: progressUpdate.categoryCappedReached,
       subcategoryCappedReached: progressUpdate.subcategoryCappedReached,
       specializationCappedReached: progressUpdate.specializationCappedReached,
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestampFn(),
       createdBy,
     });
 
