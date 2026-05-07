@@ -18,7 +18,7 @@ export async function applyTreasuryTransaction(
 ) {
     const db = firestoreDb ?? getFirestore();
     const metaRef = docFn(db, "treasury/meta");
-    const txCol = collectionFn(db, "treasuryTransactions");
+    const txCol = collectionFn(db, "treasury-transactions");
 
     await runTransactionFn(db, async (t) => {
         const metaSnap = await t.get(metaRef);
@@ -83,7 +83,7 @@ export const useTreasuryStore = defineStore("treasury", {
             try {
                 const db = getFirestore();
                 const q = query(
-                    collection(db, "treasuryTransactions"),
+                    collection(db, "treasury-transactions"),
                     orderBy("createdAt", "desc"),
                     limit(this._pageSize)
                 );
@@ -101,7 +101,7 @@ export const useTreasuryStore = defineStore("treasury", {
             try {
                 const db = getFirestore();
                 const q = query(
-                    collection(db, "treasuryTransactions"),
+                    collection(db, "treasury-transactions"),
                     orderBy("createdAt", "desc"),
                     startAfter(this._lastDoc),
                     limit(this._pageSize)

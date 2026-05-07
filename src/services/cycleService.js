@@ -138,7 +138,7 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   if (!combinedEntries.length) return
 
   const metaRef = docFn(firestoreDb, 'treasury/meta')
-  const txCol = collectionFn(firestoreDb, 'treasuryTransactions')
+  const txCol = collectionFn(firestoreDb, 'treasury-transactions')
   const cycleLabel = formatCycleLabel(startedAt, finishedAt)
   const treasuryEntries = combinedEntries.filter((item) => item.type !== 'manufacture' || !item.incomeDestination?.startsWith('guild:'))
   const totalIncome = treasuryEntries.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
@@ -326,8 +326,8 @@ export async function createNewCycleWithEffects({
   }
 
   await resetReligionsSvTemp(sharedDeps)
-  await addDocFn(collectionFn(firestoreDb, 'religionActions'), {
-    actionType: docFn(firestoreDb, 'religionActionTypes', 'cycleStart'),
+  await addDocFn(collectionFn(firestoreDb, 'religion-actions'), {
+    actionType: docFn(firestoreDb, 'religion-action-types', 'cycleStart'),
     cycleId: cycleDoc.id,
     notes: notes?.trim() || '',
     createdAt: serverTimestampFn(),

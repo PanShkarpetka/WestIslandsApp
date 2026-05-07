@@ -30,7 +30,7 @@ export const useInterestGroupStore = defineStore('interestGroup', () => {
         const db = getFirestore()
 
         // 1) interestGroup по islandId (якщо задано) або вся колекція
-        const refGroups = collection(db, 'interestGroup')
+        const refGroups = collection(db, 'interest-groups')
         const qGroups = islandId
             ? query(refGroups, where('islandId', '==', islandId), orderBy('name'))
             : query(refGroups, orderBy('name'))

@@ -65,7 +65,7 @@ test('registerCraftAction updates hero crafting progress and writes a log entry'
   assert.ok(heroData.crafting, 'hero crafting field should be updated');
   assert.ok(heroData.crafting.itemProgress?.longsword, 'item progress should be recorded');
 
-  const logs = Object.values(mock.list('heroes/hero1/craftingLogs'));
+  const logs = Object.values(mock.list('heroes/hero1/crafting-logs'));
   assert.equal(logs.length, 1);
   assert.equal(logs[0].itemSlug, 'longsword');
   assert.equal(logs[0].itemName, 'Longsword');
@@ -89,7 +89,7 @@ test('registerCraftAction accumulates progress across multiple craft actions', a
     deps,
   );
 
-  const logs = Object.values(mock.list('heroes/hero1/craftingLogs'));
+  const logs = Object.values(mock.list('heroes/hero1/crafting-logs'));
   assert.equal(logs.length, 2);
 
   const heroData = mock.get('heroes/hero1');
@@ -107,7 +107,7 @@ test('registerCraftAction logs before/after progress values', async () => {
     deps,
   );
 
-  const logs = Object.values(mock.list('heroes/hero1/craftingLogs'));
+  const logs = Object.values(mock.list('heroes/hero1/crafting-logs'));
   const log = logs[0];
   assert.equal(log.categoryBefore, 0);
   assert.ok(log.categoryAfter >= 0, 'categoryAfter should be set');

@@ -895,8 +895,8 @@ async function saveFollowersDistribution() {
 
     await batch.commit()
 
-    await addDoc(collection(db, 'religionActions'), {
-      actionType: doc(db, 'religionActionTypes', 'religionsDistributionChange'),
+    await addDoc(collection(db, 'religion-actions'), {
+      actionType: doc(db, 'religion-action-types', 'religionsDistributionChange'),
       changes,
       totalPopulation: totalPopulation.value,
       remaining: followersRemaining.value,
@@ -1367,8 +1367,8 @@ async function confirmReligionChange() {
         previousReligion: activeClergy.value.religionName,
         newReligion: newReligion.name,
       }),
-      addDoc(collection(db, 'religionActions'), {
-        actionType: doc(db, 'religionActionTypes', 'changeReligion'),
+      addDoc(collection(db, 'religion-actions'), {
+        actionType: doc(db, 'religion-action-types', 'changeReligion'),
         hero: heroRef || null,
         clergy: clergyRef,
         fromReligion: currentReligionRef,
@@ -1399,8 +1399,8 @@ async function createFaithAwardAction(delta) {
     ? doc(db, activeClergy.value.religion.path)
     : activeClergy.value.religion || null
 
-  await addDoc(collection(db, 'religionActions'), {
-    actionType: doc(db, 'religionActionTypes', 'awardAdventure'),
+  await addDoc(collection(db, 'religion-actions'), {
+    actionType: doc(db, 'religion-action-types', 'awardAdventure'),
     hero: heroRef,
     clergy: clergyRef,
     religion: religionRef,
@@ -1626,8 +1626,8 @@ async function applyClergyDefense() {
         user: userStore.nickname || 'Адміністратор',
         createdAt: serverTimestamp(),
       }),
-      addDoc(collection(db, 'religionActions'), {
-        actionType: doc(db, 'religionActionTypes', 'shield'),
+      addDoc(collection(db, 'religion-actions'), {
+        actionType: doc(db, 'religion-action-types', 'shield'),
         hero: heroRef,
         heroId: heroRef.id,
         clergy: clergyRef,
@@ -1798,8 +1798,8 @@ async function applySpreadReligion() {
         user: userStore.nickname || 'Адміністратор',
         createdAt: serverTimestamp(),
       }),
-      addDoc(collection(db, 'religionActions'), {
-        actionType: doc(db, 'religionActionTypes', 'influence'),
+      addDoc(collection(db, 'religion-actions'), {
+        actionType: doc(db, 'religion-action-types', 'influence'),
         hero: heroRef || null,
         heroId: heroRef?.id,
         clergy: clergyRef,
@@ -1953,8 +1953,8 @@ async function applyActiveFaithFarm() {
         user: userStore.nickname || 'Адміністратор',
         createdAt: serverTimestamp(),
       }),
-      addDoc(collection(db, 'religionActions'), {
-        actionType: doc(db, 'religionActionTypes', 'generate'),
+      addDoc(collection(db, 'religion-actions'), {
+        actionType: doc(db, 'religion-action-types', 'generate'),
         hero: heroRef,
         clergy: clergyRef,
         religion: religionRef,

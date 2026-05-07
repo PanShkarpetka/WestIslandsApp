@@ -28,7 +28,7 @@ test('deposit adds amount to balance and writes transaction record', async () =>
   const meta = mock.get('treasury/meta');
   assert.equal(meta.balance, 150);
 
-  const txDocs = Object.values(mock.list('treasuryTransactions'));
+  const txDocs = Object.values(mock.list('treasury-transactions'));
   assert.equal(txDocs.length, 1);
   assert.equal(txDocs[0].amount, 50);
   assert.equal(txDocs[0].type, 'deposit');
@@ -49,7 +49,7 @@ test('withdraw subtracts amount and writes transaction record', async () => {
   const meta = mock.get('treasury/meta');
   assert.equal(meta.balance, 120);
 
-  const txDocs = Object.values(mock.list('treasuryTransactions'));
+  const txDocs = Object.values(mock.list('treasury-transactions'));
   assert.equal(txDocs[0].amount, -80);
   assert.equal(txDocs[0].type, 'withdraw');
   assert.equal(txDocs[0].balanceAfter, 120);
@@ -84,7 +84,7 @@ test('truncates comment to 500 characters', async () => {
     deps,
   );
 
-  const txDocs = Object.values(mock.list('treasuryTransactions'));
+  const txDocs = Object.values(mock.list('treasury-transactions'));
   assert.equal(txDocs[0].comment.length, 500);
 });
 
@@ -93,7 +93,7 @@ test('falls back to anon and default nickname when user is missing', async () =>
 
   await applyTreasuryTransaction({ delta: 10, type: 'deposit', comment: '', user: null }, deps);
 
-  const txDocs = Object.values(mock.list('treasuryTransactions'));
+  const txDocs = Object.values(mock.list('treasury-transactions'));
   assert.equal(txDocs[0].userId, 'anon');
   assert.equal(txDocs[0].nickname, 'Гравець');
 });
@@ -104,7 +104,7 @@ test('each deposit writes a separate transaction document', async () => {
   await applyTreasuryTransaction({ delta: 10, type: 'deposit', comment: 'A', user: null }, deps);
   await applyTreasuryTransaction({ delta: 20, type: 'deposit', comment: 'B', user: null }, deps);
 
-  const txDocs = Object.values(mock.list('treasuryTransactions'));
+  const txDocs = Object.values(mock.list('treasury-transactions'));
   assert.equal(txDocs.length, 2);
   assert.equal(mock.get('treasury/meta').balance, 30);
 });

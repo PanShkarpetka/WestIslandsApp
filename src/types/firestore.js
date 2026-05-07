@@ -75,7 +75,7 @@
  */
 
 /**
- * Collection: `treasuryTransactions/{txId}`
+ * Collection: `treasury-transactions/{txId}`
  * @typedef {Object} TreasuryTransactionDoc
  * @property {string} id
  * @property {number} amount - Positive for deposits, negative for withdrawals
@@ -144,7 +144,7 @@
  */
 
 /**
- * Collection: `religionsAbilities/{abilityId}`
+ * Collection: `religion-abilities/{abilityId}`
  * @typedef {Object} ReligionAbilityDoc
  * @property {string} id
  * @property {string} name
@@ -178,9 +178,9 @@
  */
 
 /**
- * Collection: `religionActions/{actionId}`
+ * Collection: `religion-actions/{actionId}`
  * @typedef {Object} ReligionActionDoc
- * @property {import('firebase/firestore').DocumentReference} actionType - Ref to religionActionTypes
+ * @property {import('firebase/firestore').DocumentReference} actionType - Ref to religion-action-types
  * @property {string} cycleId
  * @property {string} notes
  * @property {import('firebase/firestore').Timestamp} createdAt
@@ -191,7 +191,7 @@
 // ─── DONATIONS ───────────────────────────────────────────────────────────────
 
 /**
- * Collection: `donationGoals/{goalId}`
+ * Collection: `donation-goals/{goalId}`
  * @typedef {Object} DonationGoalDoc
  * @property {string} id
  * @property {string} title
@@ -277,7 +277,7 @@
  */
 
 /**
- * Subcollection: `heroes/{heroId}/craftingLogs/{logId}`
+ * Subcollection: `heroes/{heroId}/crafting-logs/{logId}`
  * @typedef {Object} CraftingLogDoc
  * @property {string} id
  * @property {string} itemSlug
@@ -299,7 +299,7 @@
  */
 
 /**
- * Collection: `craftItems/{itemSlug}`
+ * Collection: `craft-items/{itemSlug}`
  * @typedef {Object} CraftItemDoc
  * @property {string} id
  * @property {string} name
@@ -317,7 +317,7 @@
 // ─── MAGE GUILD ──────────────────────────────────────────────────────────────
 
 /**
- * Collection: `spellRequests/{requestId}`
+ * Collection: `spell-requests/{requestId}`
  * @typedef {Object} SpellRequestDoc
  * @property {string} id
  * @property {import('firebase/firestore').DocumentReference} cycle - Ref to cycles/{cycleId}

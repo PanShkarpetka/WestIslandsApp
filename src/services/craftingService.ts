@@ -45,7 +45,7 @@ export function normalizeCraftItem(raw: any, id = '') {
 }
 
 export async function loadCraftItems() {
-  const snapshot = await getDocs(query(collection(db, 'craftItems'), orderBy('name', 'asc')));
+  const snapshot = await getDocs(query(collection(db, 'craft-items'), orderBy('name', 'asc')));
   return snapshot.docs
     .map((docSnap) => normalizeCraftItem(docSnap.data(), docSnap.id))
     .filter((item) => item.isActive);
@@ -86,11 +86,11 @@ export async function registerCraftAction({ heroId, itemSlug, amountCrafted, cra
   db: firestoreDb = db,
 }: any = {}) {
   const heroRef = docFn(firestoreDb, 'heroes', heroId);
-  const logsRef = collectionFn(firestoreDb, 'heroes', heroId, 'craftingLogs');
+  const logsRef = collectionFn(firestoreDb, 'heroes', heroId, 'crafting-logs');
 
   const allItems = (craftItems?.length
     ? craftItems
-    : (await getDocsFn(queryFn(collectionFn(firestoreDb, 'craftItems')))).docs.map((row: any) => normalizeCraftItem(row.data(), row.id))
+    : (await getDocsFn(queryFn(collectionFn(firestoreDb, 'craft-items')))).docs.map((row: any) => normalizeCraftItem(row.data(), row.id))
   ).filter((item: any) => item.isActive);
 
   return runTransactionFn(firestoreDb, async (transaction: any) => {

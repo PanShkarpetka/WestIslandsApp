@@ -78,7 +78,7 @@ test('distributeManufactureIncome adds treasury balance from population income',
 
   assert.equal(mock.get('treasury/meta').balance, 1050);
 
-  const txs = Object.values(mock.list('treasuryTransactions'));
+  const txs = Object.values(mock.list('treasury-transactions'));
   assert.equal(txs.length, 1);
   assert.equal(txs[0].amount, 50);
   assert.equal(txs[0].type, 'deposit');
@@ -118,7 +118,7 @@ test('distributeManufactureIncome does nothing when island has no income sources
     { ...mock.firebase, db: mock.db },
   );
 
-  assert.equal(Object.keys(mock.list('treasuryTransactions')).length, 0);
+  assert.equal(Object.keys(mock.list('treasury-transactions')).length, 0);
 });
 
 test('distributeManufactureIncome does nothing when island doc is missing', async () => {
@@ -268,7 +268,7 @@ test('createNewCycleWithEffects writes religionAction doc', async () => {
     },
   );
 
-  const actions = Object.values(mock.list('religionActions'));
+  const actions = Object.values(mock.list('religion-actions'));
   assert.equal(actions.length, 1);
   assert.equal(actions[0].notes, 'Test cycle');
   assert.equal(actions[0].convertedFollowers, 0);

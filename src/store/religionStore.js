@@ -142,7 +142,7 @@ export const useReligionStore = defineStore('religion', () => {
 
     const colRef = collection(db, 'clergy')
     const religionsRef = collection(db, 'religions')
-    const abilitiesRef = collection(db, 'religionsAbilities')
+    const abilitiesRef = collection(db, 'religion-abilities')
     const heroCache = new Map()
     const religionCache = new Map()
 
