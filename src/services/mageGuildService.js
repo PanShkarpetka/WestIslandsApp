@@ -122,7 +122,7 @@ function sortRequests(requests = []) {
 }
 
 function getIslandPopulationValue(data = {}) {
-  return Number(data.population ?? data.populationCount ?? data.people ?? 0) || 0
+  return Number(data.population ?? 0) || 0
 }
 
 async function resolvePopulation(islandId, fallbackPopulation) {

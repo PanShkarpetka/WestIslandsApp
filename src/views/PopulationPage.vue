@@ -133,13 +133,13 @@ const islandStore = useIslandStore()
 const userStore = useUserStore()
 
 onMounted(() => {
-  store.startListener(islandStore.currentId)
+  store.startListening(islandStore.currentId)
   console.log(islandStore.currentId)
 });
-onBeforeUnmount(() => store.stopListener())
+onBeforeUnmount(() => store.stopListening())
 
 watch(() => islandStore.currentId, (id) => {
-  store.startListener(id)
+  store.startListening(id)
 })
 
 const totalPopulation = computed(() => store.totalPopulation)

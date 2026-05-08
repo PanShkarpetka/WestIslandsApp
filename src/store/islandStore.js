@@ -4,10 +4,11 @@ import { ref, computed } from 'vue'
 import {
     getFirestore, doc, onSnapshot, updateDoc, getDoc,
 } from 'firebase/firestore'
+import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
 
 export const useIslandStore = defineStore('islands', () => {
     const db = getFirestore()
-    const currentId = ref('island_rock')
+    const currentId = ref(DEFAULT_ISLAND_ID)
     const data = ref(null)
     const loading = ref(false)
     const error = ref(null)

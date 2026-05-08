@@ -12,6 +12,8 @@ import {
   runTransaction,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { BUILDING_LEVEL_BONUSES } from '@/config/religion.js'
+import { PSEUDO_RELIGION_ID } from '@/config/constants.js'
 
 export const DEFAULT_VALUES = {
   farmBase: 10,
@@ -22,24 +24,7 @@ export const DEFAULT_VALUES = {
   svTemp: 0,
 };
 
-export const BUILDING_LEVEL_BONUSES = {
-  none: {
-    svBonus: 0,
-    passiveFaith: 0,
-  },
-  chapel: {
-    svBonus: 1,
-    passiveFaith: 20,
-  },
-  temple:  {
-    svBonus: 2,
-    passiveFaith: 40,
-  },
-  cathedral: {
-    svBonus: 3,
-    passiveFaith: 60,
-  },
-}
+export { BUILDING_LEVEL_BONUSES }
 
 function getTempSV(data) {
   const svTemp = Number(data.svTemp ?? DEFAULT_VALUES.svTemp)
@@ -155,7 +140,6 @@ export const useReligionStore = defineStore('religion', () => {
           resolveHero(heroRef, heroCache, 'Невідомий герой'),
           resolveName(religionRef, religionCache, 'Невідома релігія'),
         ])
-            // [{"id":"Ashkarot","name":"Ашкарот","followers":0},{"id":"Asmodei","name":"Девіл","followers":66},{"id":"Blibdoolpoolp","name":"Блібдулпулп","followers":1},{"id":"Godless","name":"Атеїзм","followers":10},{"id":"Istishia","name":"Істишія","followers":1},{"id":"Panzuriel","name":"Панцуріель","followers":5},{"id":"Umberlee","name":"Амберлі","followers":27},{"id":"Unknown","name":"Не визначено","followers":86},{"id":"quadro","name":"Четвірка","followers":37},{"id":"test","name":"test religion","followers":12},{"id":"trio","name":"Трійка","followers":130}]
 
         if (hero.inactive) return null
 
@@ -194,7 +178,7 @@ export const useReligionStore = defineStore('religion', () => {
 
     religionUnsubscribe = onSnapshot(religionsRef, (snapshot) => {
       religions.value = snapshot.docs
-        .filter((docSnap) => docSnap.id !== 'psevdo')
+        .filter((docSnap) => docSnap.id !== PSEUDO_RELIGION_ID)
         .map((docSnap) => {
         const data = docSnap.data() || {}
         return {
@@ -305,18 +289,6 @@ export const useReligionStore = defineStore('religion', () => {
     })
   }
 
-  function setDowntimeAvailability(clergyId, downtimeAvailable) {
-    const index = records.value.findIndex((item) => item.id === clergyId)
-    if (index === -1) return
-
-    const updated = { ...records.value[index], downtimeAvailable }
-    records.value = [
-      ...records.value.slice(0, index),
-      updated,
-      ...records.value.slice(index + 1),
-    ]
-  }
-
   return {
     records,
     loading,
@@ -330,7 +302,6 @@ export const useReligionStore = defineStore('religion', () => {
     listenLogs,
     stopLogs,
     changeFaith,
-    setDowntimeAvailability,
     abilities,
   }
 })

@@ -70,7 +70,7 @@
           <v-list-item-title>Головна</v-list-item-title>
         </v-list-item>
 
-        <v-list-item tag="router-link" :to="'/islands/island_rock'" @click="drawer = false">
+        <v-list-item tag="router-link" :to="`/islands/${DEFAULT_ISLAND_ID}`" @click="drawer = false">
           <v-list-item-icon><v-icon>mdi-island</v-icon></v-list-item-icon>
           <v-list-item-title>Острови</v-list-item-title>
         </v-list-item>
@@ -135,6 +135,7 @@
 import { useUserStore } from '../store/userStore';
 import { useRouter } from 'vue-router';
 import { ref, computed } from 'vue';
+import { DEFAULT_ISLAND_ID } from '../config/constants.js';
 
 const userStore = useUserStore();
 const router = useRouter();

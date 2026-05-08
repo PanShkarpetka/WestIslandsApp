@@ -16,13 +16,13 @@ export const useInterestGroupStore = defineStore('interestGroup', () => {
         islandId: null,
     })
 
-    function stopListener() {
+    function stopListening() {
         if (state._unsubGroups) { state._unsubGroups(); state._unsubGroups = null }
         if (state._unsubIsland) { state._unsubIsland(); state._unsubIsland = null }
     }
 
-    function startListener(islandId) {
-        stopListener()
+    function startListening(islandId) {
+        stopListening()
         state.loading = true
         state.error = null
         state.islandId = islandId || null
@@ -47,7 +47,7 @@ export const useInterestGroupStore = defineStore('interestGroup', () => {
             const islandRef = doc(db, 'islands', islandId)
             state._unsubIsland = onSnapshot(islandRef, (snap) => {
                 const data = snap.data() || {}
-                const pop = data.population ?? data.populationCount ?? data.people ?? 0
+                const pop = data.population ?? 0
                 state.totalPopulation = Number(pop) || 0
             }, (err) => {
                 console.error('[interestGroup] island error:', err)
@@ -85,8 +85,8 @@ export const useInterestGroupStore = defineStore('interestGroup', () => {
 
     return {
         ...toRefs(state),
-        startListener,
-        stopListener,
+        startListening,
+        stopListening,
         totalPopulation,
         totalCountFromGroups,
         groupsAugmented,
