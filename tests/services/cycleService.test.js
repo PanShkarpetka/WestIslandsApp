@@ -1,0 +1,275 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  resetReligionsSvTemp,
+  loadManufacturesByIds,
+  distributeManufactureIncome,
+  distributeBuildingFaithIncome,
+  createNewCycleWithEffects,
+} from '../../src/services/cycleService.js';
+import { createMockFirestore } from '../helpers/mockFirestore.js';
+
+// ─── resetReligionsSvTemp ────────────────────────────────────────────────────
+
+test('resetReligionsSvTemp sets svTemp to 0 on all religion docs', async () => {
+  const mock = createMockFirestore({
+    'religions/rel1': { name: 'Tyr', svTemp: 5 },
+    'religions/rel2': { name: 'Helm', svTemp: 12 },
+  });
+
+  await resetReligionsSvTemp({ ...mock.firebase, db: mock.db });
+
+  assert.equal(mock.get('religions/rel1').svTemp, 0);
+  assert.equal(mock.get('religions/rel2').svTemp, 0);
+});
+
+test('resetReligionsSvTemp does nothing when collection is empty', async () => {
+  const mock = createMockFirestore({});
+  await assert.doesNotReject(() => resetReligionsSvTemp({ ...mock.firebase, db: mock.db }));
+});
+
+// ─── loadManufacturesByIds ───────────────────────────────────────────────────
+
+test('loadManufacturesByIds returns normalised manufacture entries', async () => {
+  const mock = createMockFirestore({
+    'manufactures/m1': { name: '  Mine  ', income: 100, incomeDestination: 'treasury' },
+    'manufactures/m2': { name: 'Farm', income: 50, incomeDestination: 'guild:guild-a' },
+  });
+
+  const result = await loadManufacturesByIds(['m1', 'm2'], { ...mock.firebase, db: mock.db });
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].name, 'Mine');
+  assert.equal(result[0].income, 100);
+  assert.equal(result[1].incomeDestination, 'guild:guild-a');
+});
+
+test('loadManufacturesByIds returns empty array for empty ids', async () => {
+  const mock = createMockFirestore({});
+  const result = await loadManufacturesByIds([], { ...mock.firebase, db: mock.db });
+  assert.deepEqual(result, []);
+});
+
+test('loadManufacturesByIds preserves requested order', async () => {
+  const mock = createMockFirestore({
+    'manufactures/a': { name: 'A', income: 10, incomeDestination: 'treasury' },
+    'manufactures/b': { name: 'B', income: 20, incomeDestination: 'treasury' },
+  });
+
+  const result = await loadManufacturesByIds(['b', 'a'], { ...mock.firebase, db: mock.db });
+
+  assert.equal(result[0].id, 'b');
+  assert.equal(result[1].id, 'a');
+});
+
+// ─── distributeManufactureIncome ─────────────────────────────────────────────
+
+test('distributeManufactureIncome adds treasury balance from population income', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 1000 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [{ id: 'p1', name: 'Merchants', count: 10, incomePerPerson: 5, description: '' }],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 1050);
+
+  const txs = Object.values(mock.list('treasury-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].amount, 50);
+  assert.equal(txs[0].type, 'deposit');
+  assert.equal(txs[0].userId, 'system');
+  assert.equal(txs[0].cycleId, 'cycle-1');
+});
+
+test('distributeManufactureIncome routes guild-destined manufacture income to guild', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': { name: 'Quarry', income: 200, incomeDestination: 'guild:guild-a' },
+    'guilds/guild-a': { treasure: 300 },
+    'treasury/meta': { balance: 500 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('guilds/guild-a').treasure, 500);
+  assert.equal(mock.get('treasury/meta').balance, 500); // treasury unchanged
+
+  const guildLogs = Object.values(mock.list('guilds/guild-a/logs'));
+  assert.equal(guildLogs.length, 1);
+  assert.equal(guildLogs[0].amount, 200);
+});
+
+test('distributeManufactureIncome does nothing when island has no income sources', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(Object.keys(mock.list('treasury-transactions')).length, 0);
+});
+
+test('distributeManufactureIncome does nothing when island doc is missing', async () => {
+  const mock = createMockFirestore({ 'treasury/meta': { balance: 100 } });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'nonexistent_island', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 100);
+});
+
+// ─── distributeBuildingFaithIncome ───────────────────────────────────────────
+
+test('distributeBuildingFaithIncome distributes faith to eligible clergy', async () => {
+  const mock = createMockFirestore({
+    'religions/rel1': { name: 'Tyr', buildingLevel: 'chapel' }, // chapel gives 5 passive faith
+    'clergy/c1': { faith: 0, faithMax: 0, religion: { __path: 'religions/rel1', __type: 'doc' } },
+  });
+
+  await distributeBuildingFaithIncome('cycle-1', {
+    ...mock.firebase,
+    db: mock.db,
+    rng: () => 0,
+  });
+
+  const clergy = mock.get('clergy/c1');
+  assert.ok(clergy.faith > 0, 'faith should increase');
+
+  const logs = Object.values(mock.list('clergy/c1/logs'));
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].cycleId, 'cycle-1');
+  assert.equal(logs[0].user, 'Система');
+});
+
+test('distributeBuildingFaithIncome skips religions with no building', async () => {
+  const mock = createMockFirestore({
+    'religions/rel1': { name: 'Tyr', buildingLevel: 'none' },
+    'clergy/c1': { faith: 0, faithMax: 0, religion: { __path: 'religions/rel1', __type: 'doc' } },
+  });
+
+  await distributeBuildingFaithIncome('cycle-1', { ...mock.firebase, db: mock.db, rng: () => 0 });
+
+  assert.equal(mock.get('clergy/c1').faith, 0);
+});
+
+test('distributeBuildingFaithIncome skips clergy with passiveOVInactive hero', async () => {
+  const mock = createMockFirestore({
+    'religions/rel1': { name: 'Tyr', buildingLevel: 'chapel' },
+    'heroes/h1': { passiveOVInactive: true },
+    'clergy/c1': {
+      faith: 0, faithMax: 0,
+      religion: { __path: 'religions/rel1', __type: 'doc' },
+      hero: { __path: 'heroes/h1', __type: 'doc' },
+    },
+  });
+
+  await distributeBuildingFaithIncome('cycle-1', { ...mock.firebase, db: mock.db, rng: () => 0 });
+
+  assert.equal(mock.get('clergy/c1').faith, 0);
+});
+
+// ─── createNewCycleWithEffects ───────────────────────────────────────────────
+
+test('createNewCycleWithEffects creates cycle doc with startedAt', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  const result = await createNewCycleWithEffects(
+    { startedDate: '1 Hammer 1490', islandId: 'island_rock' },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  assert.ok(result.id, 'should return cycle id');
+  assert.ok(result.startedAt, 'should return startedAt');
+
+  const cycles = Object.values(mock.list('cycles'));
+  assert.equal(cycles.length, 1);
+  assert.ok(cycles[0].startedAt);
+});
+
+test('createNewCycleWithEffects closes open previous cycle', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Uktar 1489', createdAt: 'old' },
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await createNewCycleWithEffects(
+    { startedDate: '1 Hammer 1490', islandId: 'island_rock' },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      getDocs: async (q) => {
+        // Return prev cycle for the "last cycle" query
+        if (q.__colPath === 'cycles') {
+          return {
+            docs: [{ id: 'prev', data: () => mock.get('cycles/prev'), ref: { __path: 'cycles/prev', __type: 'doc', id: 'prev' } }],
+            empty: false,
+          };
+        }
+        return mock.firebase.getDocs(q);
+      },
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  assert.ok(mock.get('cycles/prev').finishedAt, 'previous cycle should be closed');
+});
+
+test('createNewCycleWithEffects throws on invalid date', async () => {
+  const mock = createMockFirestore({});
+
+  await assert.rejects(
+    () => createNewCycleWithEffects({ startedDate: 'not-a-date' }, {
+      ...mock.firebase,
+      db: mock.db,
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    }),
+    /INVALID_START_DATE/,
+  );
+});
+
+test('createNewCycleWithEffects writes religionAction doc', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await createNewCycleWithEffects(
+    { startedDate: '1 Hammer 1490', notes: 'Test cycle' },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  const actions = Object.values(mock.list('religion-actions'));
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].notes, 'Test cycle');
+  assert.equal(actions[0].convertedFollowers, 0);
+});

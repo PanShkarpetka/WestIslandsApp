@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore'
-import { db } from '@/services/firebase'
+import { db } from './firebase.js'
 import {
   applySpellPriceDelta,
   buildSpellRequestDrafts,
@@ -22,7 +22,7 @@ import {
   getSpellPrice,
   getSpellTier,
   normalizeSpellLevel,
-} from '@/utils/mageGuildRequests'
+} from '../utils/mageGuildRequests.js'
 
 const SPELL_REQUEST_CONFIG_ID = 'spell-request-prices'
 const HERO_COLLECTION = 'heroes'
@@ -140,7 +140,7 @@ async function resolvePopulation(islandId, fallbackPopulation) {
 }
 
 export function subscribeSpellRequests(callback, onError) {
-  const q = query(collection(db, 'spellRequests'), orderBy('createdAt', 'desc'))
+  const q = query(collection(db, 'spell-requests'), orderBy('createdAt', 'desc'))
   const cycleCache = new Map()
 
   return onSnapshot(q, async (snapshot) => {
@@ -210,7 +210,7 @@ export async function fetchLatestCycle() {
 export async function settlePreviousSpellRequests() {
   const [config, spellRequestsSnapshot, spellsSnapshot] = await Promise.all([
     fetchMageGuildConfig(),
-    getDocs(collection(db, 'spellRequests')),
+    getDocs(collection(db, 'spell-requests')),
     getDocs(collection(db, 'spells')),
   ])
 
@@ -311,7 +311,7 @@ export async function generateSpellRequestsForCycle({
     spells,
   })
 
-  const spellRequestsRef = collection(db, 'spellRequests')
+  const spellRequestsRef = collection(db, 'spell-requests')
   const spellRequestDoc = await addDoc(spellRequestsRef, {
     cycle: cycleRef,
     cycleId,
@@ -335,7 +335,7 @@ export async function generateSpellRequestsForCycle({
 
 export async function ensureCurrentCycleSpellRequests({ islandId, population, createdBy = '' }) {
   const latestCycle = await fetchLatestCycle()
-  const requestSnapshot = await getDocs(collection(db, 'spellRequests'))
+  const requestSnapshot = await getDocs(collection(db, 'spell-requests'))
   const existingDoc = requestSnapshot.docs.find((docSnap) => {
     const data = docSnap.data() || {}
     return !data.isTest && data.cycleId === latestCycle.id
@@ -378,7 +378,7 @@ export async function fulfillSpellRequest({
   if (!requestId) throw new Error('Не вказано заявку.')
   if (!heroId) throw new Error('Оберіть героя.')
 
-  const requestRef = doc(db, 'spellRequests', spellRequestId)
+  const requestRef = doc(db, 'spell-requests', spellRequestId)
   const heroRef = doc(db, HERO_COLLECTION, heroId)
 
   await runTransaction(db, async (transaction) => {

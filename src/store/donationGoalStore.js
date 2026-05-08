@@ -14,14 +14,14 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 
-export const useDonationGoalStore = defineStore('donationGoals', () => {
+export const useDonationGoalStore = defineStore('donation-goals', () => {
     const goals = ref([])
     let _unsub = null
 
     // === Realtime goals ===
     function subscribeToGoals() {
         if (_unsub) return _unsub
-        const colRef = collection(db, 'donationGoals')
+        const colRef = collection(db, 'donation-goals')
         _unsub = onSnapshot(colRef, (snapshot) => {
             goals.value = snapshot.docs.map(d => {
                 const data = d.data()
@@ -63,18 +63,18 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
         }
 
         if (goal.id) {
-            await updateDoc(doc(db, 'donationGoals', goal.id), data)
+            await updateDoc(doc(db, 'donation-goals', goal.id), data)
         } else {
-            await addDoc(collection(db, 'donationGoals'), data)
+            await addDoc(collection(db, 'donation-goals'), data)
         }
     }
 
     async function deleteGoal(id) {
-        await deleteDoc(doc(db, 'donationGoals', id))
+        await deleteDoc(doc(db, 'donation-goals', id))
     }
 
     async function toggleVisibility(goal) {
-        const refDoc = doc(db, 'donationGoals', goal.id)
+        const refDoc = doc(db, 'donation-goals', goal.id)
         await updateDoc(refDoc, { visible: !goal.visible })
     }
 
@@ -93,7 +93,7 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
         if (!goalId) throw new Error('goalId is required')
         if (!amount || amount <= 0) throw new Error('Некоректна сума')
 
-        const goalRef = doc(db, 'donationGoals', goalId)
+        const goalRef = doc(db, 'donation-goals', goalId)
         const goalSnap = await getDoc(goalRef)
         if (!goalSnap.exists()) throw new Error('Ціль не знайдено')
 
@@ -131,7 +131,7 @@ export const useDonationGoalStore = defineStore('donationGoals', () => {
 
     async function toggleLockGoal(id, status) {
         if (!id) throw new Error('id is required')
-        await updateDoc(doc(db, 'donationGoals', id), { status })
+        await updateDoc(doc(db, 'donation-goals', id), { status })
     }
 
     return {

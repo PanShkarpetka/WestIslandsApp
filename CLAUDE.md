@@ -57,6 +57,12 @@ The fishing game uses D20 rolls + modifiers vs. a DC, bait selection, optional g
 - **Crafting** — discount formulas by category/subcategory/specialization; progress per hero; item slugs as identifiers
 - **Fishing bot** — Telegram-driven mini-game with dice mechanics, bait, and daily resets
 
+## Firestore Schema
+
+All Firestore collection and document shapes are defined as JSDoc typedefs in [`src/types/firestore.js`](src/types/firestore.js).
+
+**This file is the source of truth for the database schema.** Whenever you add, rename, or remove a field in any Firestore collection — in a store, service, or Cloud Function — you must update the corresponding typedef in `src/types/firestore.js` in the same change. Never leave the typedefs stale.
+
 ## Conventions
 
 - Vue files: `PascalCase` (e.g., `IslandInfoPage.vue`, `TreasuryChestCard.vue`)

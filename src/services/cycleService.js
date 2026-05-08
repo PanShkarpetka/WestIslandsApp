@@ -14,11 +14,17 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
-import { diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from 'faerun-date'
-import { db } from '@/services/firebase'
-import { BUILDING_LEVEL_BONUSES } from '@/store/religionStore'
-import { formatAmount } from '@/utils/formatters'
-import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from '@/services/mageGuildService'
+import { diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from '../utils/faerun-date.js'
+import { db } from './firebase.js'
+import { formatAmount } from '../utils/formatters.js'
+import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from './mageGuildService.js'
+
+const BUILDING_LEVEL_BONUSES = {
+  none: { passiveFaith: 0 },
+  chapel: { passiveFaith: 20 },
+  temple: { passiveFaith: 40 },
+  cathedral: { passiveFaith: 60 },
+}
 
 function normalizeAmount(value) {
   const parsed = Number(value)
@@ -43,19 +49,31 @@ function getBuildingFaithIncome(level) {
   return BUILDING_LEVEL_BONUSES[level]?.passiveFaith || 0
 }
 
-async function resetReligionsSvTemp() {
-  const religionsRef = collection(db, 'religions')
-  const religionsSnapshot = await getDocs(religionsRef)
+export async function resetReligionsSvTemp({
+  collection: collectionFn = collection,
+  getDocs: getDocsFn = getDocs,
+  writeBatch: writeBatchFn = writeBatch,
+  db: firestoreDb = db,
+} = {}) {
+  const religionsRef = collectionFn(firestoreDb, 'religions')
+  const religionsSnapshot = await getDocsFn(religionsRef)
   if (religionsSnapshot.empty) return
 
-  const batch = writeBatch(db)
-  religionsSnapshot.forEach((docSnap) => {
+  const batch = writeBatchFn(firestoreDb)
+  religionsSnapshot.docs.forEach((docSnap) => {
     batch.update(docSnap.ref, { svTemp: 0 })
   })
   await batch.commit()
 }
 
-async function loadManufacturesByIds(ids) {
+export async function loadManufacturesByIds(ids, {
+  collection: collectionFn = collection,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  where: whereFn = where,
+  documentId: documentIdFn = documentId,
+  db: firestoreDb = db,
+} = {}) {
   if (!Array.isArray(ids) || ids.length === 0) return []
 
   const chunks = []
@@ -63,8 +81,8 @@ async function loadManufacturesByIds(ids) {
 
   const results = []
   for (const chunk of chunks) {
-    const q = query(collection(db, 'manufactures'), where(documentId(), 'in', chunk))
-    const snapshot = await getDocs(q)
+    const q = queryFn(collectionFn(firestoreDb, 'manufactures'), whereFn(documentIdFn(), 'in', chunk))
+    const snapshot = await getDocsFn(q)
     snapshot.docs.forEach((docSnap) => {
       const data = docSnap.data() || {}
       results.push({
@@ -82,12 +100,24 @@ async function loadManufacturesByIds(ids) {
   return results
 }
 
-async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islandId, populationItems) {
-  const islandSnap = await getDoc(doc(db, 'islands', islandId || 'island_rock'))
+export async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islandId, populationItems, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  where: whereFn = where,
+  documentId: documentIdFn = documentId,
+  runTransaction: runTransactionFn = runTransaction,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+} = {}) {
+  const islandSnap = await getDocFn(docFn(firestoreDb, 'islands', islandId || 'island_rock'))
   if (!islandSnap.exists()) return
 
   const manufactureIds = Array.isArray(islandSnap.data()?.manufactures) ? islandSnap.data().manufactures : []
-  const entries = (await loadManufacturesByIds(manufactureIds)).filter((item) => item.income !== 0)
+  const loadDeps = { collection: collectionFn, getDocs: getDocsFn, query: queryFn, where: whereFn, documentId: documentIdFn, db: firestoreDb }
+  const entries = (await loadManufacturesByIds(manufactureIds, loadDeps)).filter((item) => item.income !== 0)
   const populationEntries = (populationItems || [])
     .map((group) => {
       const count = Number(group.count ?? group.amount ?? 0)
@@ -107,21 +137,21 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islan
   const combinedEntries = [...entries.map((item) => ({ ...item, type: 'manufacture' })), ...populationEntries]
   if (!combinedEntries.length) return
 
-  const metaRef = doc(db, 'treasury/meta')
-  const txCol = collection(db, 'treasuryTransactions')
+  const metaRef = docFn(firestoreDb, 'treasury/meta')
+  const txCol = collectionFn(firestoreDb, 'treasury-transactions')
   const cycleLabel = formatCycleLabel(startedAt, finishedAt)
   const treasuryEntries = combinedEntries.filter((item) => item.type !== 'manufacture' || !item.incomeDestination?.startsWith('guild:'))
   const totalIncome = treasuryEntries.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
   const totalOutcome = treasuryEntries.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
 
-  await runTransaction(db, async (transaction) => {
+  await runTransactionFn(firestoreDb, async (transaction) => {
     const metaSnap = await transaction.get(metaRef)
     let currentBalance = metaSnap.exists() ? metaSnap.data()?.balance || 0 : 0
     const guildBalances = new Map()
     const guildIds = [...new Set(combinedEntries.filter((item) => item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:')).map((item) => item.incomeDestination.slice('guild:'.length)).filter(Boolean))]
 
     await Promise.all(guildIds.map(async (guildId) => {
-      const guildRef = doc(db, 'guilds', guildId)
+      const guildRef = docFn(firestoreDb, 'guilds', guildId)
       const guildSnap = await transaction.get(guildRef)
       guildBalances.set(guildId, Number(guildSnap.exists() ? guildSnap.data()?.treasure || 0 : 0))
     }))
@@ -131,18 +161,18 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islan
       const guildId = isGuildDestination ? item.incomeDestination.slice('guild:'.length) : null
 
       if (isGuildDestination && guildId) {
-        const guildRef = doc(db, 'guilds', guildId)
-        const guildLogsRef = collection(db, 'guilds', guildId, 'logs')
+        const guildRef = docFn(firestoreDb, 'guilds', guildId)
+        const guildLogsRef = collectionFn(firestoreDb, 'guilds', guildId, 'logs')
         const guildCurrent = Number(guildBalances.get(guildId) || 0)
         const guildNext = normalizeAmount(guildCurrent + item.income)
         guildBalances.set(guildId, guildNext)
-        transaction.set(guildRef, { treasure: guildNext, updatedAt: serverTimestamp() }, { merge: true })
-        transaction.set(doc(guildLogsRef), {
+        transaction.set(guildRef, { treasure: guildNext, updatedAt: serverTimestampFn() }, { merge: true })
+        transaction.set(docFn(guildLogsRef), {
           amount: item.income,
           type: item.income >= 0 ? 'deposit' : 'withdraw',
           comment: `Автооперація з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`.slice(0, 500),
           userNickname: 'Система',
-          createdAt: serverTimestamp(),
+          createdAt: serverTimestampFn(),
           treasureAfter: guildNext,
         })
         continue
@@ -156,13 +186,13 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islan
       if (item.type === 'manufacture' && item.description) commentParts.push(item.description)
       commentParts.push(`за цикл ${cycleLabel}.`)
 
-      transaction.set(doc(txCol), {
+      transaction.set(docFn(txCol), {
         amount: item.income,
         type: item.income >= 0 ? 'deposit' : 'withdraw',
         comment: commentParts.join(' ').slice(0, 500),
         userId: 'system',
         nickname: 'Система',
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestampFn(),
         balanceAfter: currentBalance,
         cycleId,
         cycleStartedAt: startedAt,
@@ -174,13 +204,25 @@ async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islan
       balance: currentBalance,
       totalIncome: normalizeAmount(totalIncome),
       totalOutcome: normalizeAmount(totalOutcome),
-      updatedAt: serverTimestamp(),
+      updatedAt: serverTimestampFn(),
     }, { merge: true })
   })
 }
 
-async function distributeBuildingFaithIncome(cycleId) {
-  const religionsSnapshot = await getDocs(collection(db, 'religions'))
+export async function distributeBuildingFaithIncome(cycleId, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  where: whereFn = where,
+  addDoc: addDocFn = addDoc,
+  updateDoc: updateDocFn = updateDoc,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+  rng = Math.random,
+} = {}) {
+  const religionsSnapshot = await getDocsFn(collectionFn(firestoreDb, 'religions'))
   const religionsWithIncome = religionsSnapshot.docs
     .map((docSnap) => {
       const data = docSnap.data() || {}
@@ -190,7 +232,7 @@ async function distributeBuildingFaithIncome(cycleId) {
     .filter((religion) => religion.passiveFaith > 0)
 
   for (const religion of religionsWithIncome) {
-    const clergySnapshot = await getDocs(query(collection(db, 'clergy'), where('religion', '==', religion.ref)))
+    const clergySnapshot = await getDocsFn(queryFn(collectionFn(firestoreDb, 'clergy'), whereFn('religion', '==', religion.ref)))
     if (clergySnapshot.empty) continue
     const eligibilityChecks = await Promise.all(clergySnapshot.docs.map(async (docSnap) => {
       const data = docSnap.data() || {}
@@ -198,7 +240,7 @@ async function distributeBuildingFaithIncome(cycleId) {
       if (!heroRef) return { docSnap, eligible: true }
 
       try {
-        const heroSnap = await getDoc(heroRef)
+        const heroSnap = await getDocFn(heroRef)
         const heroData = heroSnap.exists() ? heroSnap.data() || {} : {}
         return { docSnap, eligible: heroData.passiveOVInactive !== true }
       } catch (error) {
@@ -211,7 +253,7 @@ async function distributeBuildingFaithIncome(cycleId) {
     if (!heroCount) continue
     const baseShare = Math.floor(religion.passiveFaith / heroCount)
     const remainder = religion.passiveFaith - baseShare * heroCount
-    const remainderIndex = remainder > 0 ? Math.floor(Math.random() * heroCount) : -1
+    const remainderIndex = remainder > 0 ? Math.floor(rng() * heroCount) : -1
 
     await Promise.all(eligible.map(async (docSnap, index) => {
       const bonus = baseShare + (index === remainderIndex ? remainder : 0)
@@ -220,15 +262,15 @@ async function distributeBuildingFaithIncome(cycleId) {
       const newFaith = Number(data.faith ?? 0) + bonus
       const updates = { faith: newFaith }
       if (Number(data.faithMax ?? 0) < newFaith) updates.faithMax = newFaith
-      await updateDoc(docSnap.ref, updates)
-      await addDoc(collection(docSnap.ref, 'logs'), {
+      await updateDocFn(docSnap.ref, updates)
+      await addDocFn(collectionFn(docSnap.ref, 'logs'), {
         delta: bonus,
         message: `Пасивний дохід від споруди (${religion.buildingLevel}) за цикл ${cycleId}.`,
         user: 'Система',
         cycleId,
         religionId: religion.id,
         religionName: religion.name,
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestampFn(),
       })
     }))
   }
@@ -240,15 +282,34 @@ export async function createNewCycleWithEffects({
   islandId = 'island_rock',
   population = 0,
   populationItems = [],
-}) {
-  const normalizedStart = normalizeFaerunDate(startedDate)
+}, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  getDocs: getDocsFn = getDocs,
+  addDoc: addDocFn = addDoc,
+  updateDoc: updateDocFn = updateDoc,
+  query: queryFn = query,
+  where: whereFn = where,
+  orderBy: orderByFn = orderBy,
+  limit: limitFn = limit,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+  rng = Math.random,
+  settlePreviousSpellRequestsFn = settlePreviousSpellRequests,
+  generateSpellRequestsForCycleFn = generateSpellRequestsForCycle,
+} = {}) {
+  const parsed = typeof startedDate === 'string' ? parseFaerunDate(startedDate) : startedDate
+  const normalizedStart = parsed ? normalizeFaerunDate(parsed) : null
   if (!normalizedStart) throw new Error('INVALID_START_DATE')
 
-  const cyclesRef = collection(db, 'cycles')
-  const lastCycleSnapshot = await getDocs(query(cyclesRef, orderBy('createdAt', 'desc'), limit(1)))
+  const sharedDeps = { collection: collectionFn, doc: docFn, getDoc: getDocFn, getDocs: getDocsFn, addDoc: addDocFn, updateDoc: updateDocFn, query: queryFn, where: whereFn, serverTimestamp: serverTimestampFn, db: firestoreDb, rng }
+
+  const cyclesRef = collectionFn(firestoreDb, 'cycles')
+  const lastCycleSnapshot = await getDocsFn(queryFn(cyclesRef, orderByFn('createdAt', 'desc'), limitFn(1)))
   const lastCycleDoc = lastCycleSnapshot.docs[0]
   const startedAt = formatFaerunDate(normalizedStart)
-  const cycleDoc = await addDoc(cyclesRef, { startedAt, createdAt: serverTimestamp() })
+  const cycleDoc = await addDocFn(cyclesRef, { startedAt, createdAt: serverTimestampFn() })
 
   if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
     const previousCycle = lastCycleDoc.data()
@@ -261,22 +322,22 @@ export async function createNewCycleWithEffects({
     }
     const previousUpdate = { finishedAt: formatFaerunDate(previousFinishedDate) }
     if (previousDuration && previousDuration > 0) previousUpdate.duration = previousDuration
-    await updateDoc(lastCycleDoc.ref, previousUpdate)
+    await updateDocFn(lastCycleDoc.ref, previousUpdate)
   }
 
-  await resetReligionsSvTemp()
-  await addDoc(collection(db, 'religionActions'), {
-    actionType: doc(db, 'religionActionTypes', 'cycleStart'),
+  await resetReligionsSvTemp(sharedDeps)
+  await addDocFn(collectionFn(firestoreDb, 'religion-actions'), {
+    actionType: docFn(firestoreDb, 'religion-action-types', 'cycleStart'),
     cycleId: cycleDoc.id,
     notes: notes?.trim() || '',
-    createdAt: serverTimestamp(),
+    createdAt: serverTimestampFn(),
     convertedFollowers: 0,
     result: 0,
   })
-  await distributeBuildingFaithIncome(cycleDoc.id)
-  await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems)
-  await settlePreviousSpellRequests()
-  await generateSpellRequestsForCycle({
+  await distributeBuildingFaithIncome(cycleDoc.id, sharedDeps)
+  await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems, sharedDeps)
+  await settlePreviousSpellRequestsFn()
+  await generateSpellRequestsForCycleFn({
     cycleRef: cycleDoc,
     cycleId: cycleDoc.id,
     islandId,

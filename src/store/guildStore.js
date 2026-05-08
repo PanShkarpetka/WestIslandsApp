@@ -13,6 +13,45 @@ import {
   setDoc,
 } from 'firebase/firestore';
 
+// Exported for testing. Applies a guild deposit or withdrawal atomically.
+export async function applyGuildTransaction(
+  { guildId, amount, comment, actor, type },
+  {
+    runTransactionFn = runTransaction,
+    docFn = doc,
+    collectionFn = collection,
+    serverTimestampFn = serverTimestamp,
+    db: firestoreDb,
+  } = {},
+) {
+  const db = firestoreDb ?? getFirestore();
+  const guildRef = docFn(db, 'guilds', guildId);
+  const logsRef = collectionFn(db, 'guilds', guildId, 'logs');
+
+  await runTransactionFn(db, async (t) => {
+    const guildSnap = await t.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+
+    const guildData = guildSnap.data() || {};
+    const currentTreasure = Number(guildData.treasure || 0);
+    const nextTreasure = roundAmount(currentTreasure + amount);
+
+    if (nextTreasure < 0) throw new Error('Not enough guild treasure for this withdrawal.');
+
+    t.set(guildRef, { treasure: nextTreasure, updatedAt: serverTimestampFn() }, { merge: true });
+
+    const logRef = docFn(logsRef);
+    t.set(logRef, {
+      amount,
+      type,
+      comment: (comment || '').slice(0, 500),
+      userNickname: (actor?.nickname || 'Unknown').slice(0, 80),
+      createdAt: serverTimestampFn(),
+      treasureAfter: nextTreasure,
+    });
+  });
+}
+
 export const useGuildStore = defineStore('guilds', {
   state: () => ({
     guilds: [],
@@ -99,43 +138,7 @@ export const useGuildStore = defineStore('guilds', {
     },
 
     async _applyTransaction({ guildId, amount, comment, actor, type }) {
-      const db = getFirestore();
-      const guildRef = doc(db, 'guilds', guildId);
-      const logsRef = collection(db, 'guilds', guildId, 'logs');
-
-      await runTransaction(db, async (t) => {
-        const guildSnap = await t.get(guildRef);
-        if (!guildSnap.exists()) {
-          throw new Error('Guild not found.');
-        }
-
-        const guildData = guildSnap.data() || {};
-        const currentTreasure = Number(guildData.treasure || 0);
-        const nextTreasure = roundAmount(currentTreasure + amount);
-
-        if (nextTreasure < 0) {
-          throw new Error('Not enough guild treasure for this withdrawal.');
-        }
-
-        t.set(
-          guildRef,
-          {
-            treasure: nextTreasure,
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
-        );
-
-        const logRef = doc(logsRef);
-        t.set(logRef, {
-          amount,
-          type,
-          comment: (comment || '').slice(0, 500),
-          userNickname: (actor?.nickname || 'Unknown').slice(0, 80),
-          createdAt: serverTimestamp(),
-          treasureAfter: nextTreasure,
-        });
-      });
+      await applyGuildTransaction({ guildId, amount, comment, actor, type });
     },
   },
 });
