@@ -17,20 +17,10 @@ import {
 import { diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from '../utils/faerun-date.js'
 import { db } from './firebase.js'
 import { formatAmount } from '../utils/formatters.js'
+import { normalizeAmount } from '../utils/numbers.js'
+import { BUILDING_LEVEL_BONUSES } from '../config/religion.js'
+import { DEFAULT_ISLAND_ID } from '../config/constants.js'
 import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from './mageGuildService.js'
-
-const BUILDING_LEVEL_BONUSES = {
-  none: { passiveFaith: 0 },
-  chapel: { passiveFaith: 20 },
-  temple: { passiveFaith: 40 },
-  cathedral: { passiveFaith: 60 },
-}
-
-function normalizeAmount(value) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 0
-  return Math.round(parsed * 100) / 100
-}
 
 function normalizeIncomeDestination(value) {
   if (typeof value !== 'string') return 'treasury'
@@ -112,7 +102,7 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   serverTimestamp: serverTimestampFn = serverTimestamp,
   db: firestoreDb = db,
 } = {}) {
-  const islandSnap = await getDocFn(docFn(firestoreDb, 'islands', islandId || 'island_rock'))
+  const islandSnap = await getDocFn(docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID))
   if (!islandSnap.exists()) return
 
   const manufactureIds = Array.isArray(islandSnap.data()?.manufactures) ? islandSnap.data().manufactures : []
@@ -120,8 +110,8 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   const entries = (await loadManufacturesByIds(manufactureIds, loadDeps)).filter((item) => item.income !== 0)
   const populationEntries = (populationItems || [])
     .map((group) => {
-      const count = Number(group.count ?? group.amount ?? 0)
-      const incomePerPerson = normalizeAmount(group.incomePerPerson ?? group.income ?? group.incomePer ?? 0)
+      const count = Number(group.count ?? 0)
+      const incomePerPerson = normalizeAmount(group.incomePerPerson ?? 0)
       return {
         id: group.id,
         name: group.name || 'Невідома група',
@@ -279,7 +269,7 @@ export async function distributeBuildingFaithIncome(cycleId, {
 export async function createNewCycleWithEffects({
   startedDate,
   notes = '',
-  islandId = 'island_rock',
+  islandId = DEFAULT_ISLAND_ID,
   population = 0,
   populationItems = [],
 }, {

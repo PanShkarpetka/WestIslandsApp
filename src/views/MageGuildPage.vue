@@ -343,7 +343,7 @@ watch(() => store.requestDocuments, (docs) => {
 watch(
   () => islandStore.currentId,
   async (id) => {
-    populationStore.startListener(id)
+    populationStore.startListening(id)
     await ensureCurrentCycleRequests()
   },
   { immediate: true },
@@ -355,7 +355,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   store.stopListening()
-  populationStore.stopListener()
+  populationStore.stopListening()
 })
 </script>
 

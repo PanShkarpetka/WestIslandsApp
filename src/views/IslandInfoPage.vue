@@ -42,7 +42,7 @@ const form = reactive({
 })
 
 onMounted(() => {
-  islandStore.subscribe('island_rock')
+  islandStore.subscribe()
 })
 onUnmounted(() => {
   islandStore.stop()

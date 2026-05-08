@@ -4,6 +4,7 @@ import { reactive, computed, toRefs } from 'vue'
 import {
     getFirestore, collection, query, orderBy, onSnapshot, doc, updateDoc
 } from 'firebase/firestore'
+import { normalizeAmount } from '@/utils/numbers.js'
 
 export const usePopulationStore = defineStore('population', () => {
     const state = reactive({
@@ -16,13 +17,13 @@ export const usePopulationStore = defineStore('population', () => {
         islandId: null,
     })
 
-    function stopListener() {
+    function stopListening() {
         if (state._unsubGroups) { state._unsubGroups(); state._unsubGroups = null }
         if (state._unsubIsland) { state._unsubIsland(); state._unsubIsland = null }
     }
 
-    function startListener(islandId) {
-        stopListener()
+    function startListening(islandId) {
+        stopListening()
         state.loading = true
         state.error = null
         state.islandId = islandId || null
@@ -39,8 +40,7 @@ export const usePopulationStore = defineStore('population', () => {
                     return {
                         id: d.id,
                         ...data,
-                        // Перекладаємо поле amount => count для графіка
-                        count: data.count ?? data.amount ?? 0,
+                        count: Number(data.count ?? 0),
                     }
                 })
                 // Підтримка острівних даних, але не ховаємо глобальні записи без islandId
@@ -60,7 +60,7 @@ export const usePopulationStore = defineStore('population', () => {
             const islandRef = doc(db, 'islands', islandId)
             state._unsubIsland = onSnapshot(islandRef, (snap) => {
                 const data = snap.data() || {}
-                const pop = data.population ?? data.populationCount ?? data.people ?? 0
+                const pop = data.population ?? 0
                 state.totalPopulation = Number(pop) || 0
             }, (err) => {
                 console.error('[population] island error:', err)
@@ -75,21 +75,15 @@ export const usePopulationStore = defineStore('population', () => {
         if (!id) throw new Error('id is required')
         const value = Math.max(0, Number(count) || 0)
         const ref = doc(getFirestore(), 'population', id)
-        await updateDoc(ref, { count: value, amount: value })
+        await updateDoc(ref, { count: value })
     }
 
     const totalCountFromGroups = computed(() =>
         state.items.reduce((s, g) => s + (g.count || 0), 0)
     )
 
-    const normalizeIncome = (value) => {
-        const parsed = Number(value)
-        if (!Number.isFinite(parsed)) return 0
-        return Math.round(parsed * 100) / 100
-    }
-
-    const groupIncomePerPerson = (group) => normalizeIncome(
-        group?.incomePerPerson ?? group?.income ?? group?.incomePer ?? 0
+    const groupIncomePerPerson = (group) => normalizeAmount(
+        group?.incomePerPerson ?? 0
     )
 
     // Беремо total з islands; якщо 0 — fallback на суму груп
@@ -102,7 +96,7 @@ export const usePopulationStore = defineStore('population', () => {
             const count = Number(group.count || 0)
             return sum + groupIncomePerPerson(group) * count
         }, 0)
-        return normalizeIncome(total)
+        return normalizeAmount(total)
     })
 
     // Збагачені елементи: percent + votes (із 10)
@@ -112,7 +106,7 @@ export const usePopulationStore = defineStore('population', () => {
             const percent = (g.count || 0) / total * 100
             const votes   = (percent / 100) * 10
             const incomePerPerson = groupIncomePerPerson(g)
-            const incomeTotal = normalizeIncome(incomePerPerson * (g.count || 0))
+            const incomeTotal = normalizeAmount(incomePerPerson * (g.count || 0))
             return {
                 ...g,
                 percent,                        // напр. 50.0
@@ -127,8 +121,8 @@ export const usePopulationStore = defineStore('population', () => {
 
     return {
         ...toRefs(state),
-        startListener,
-        stopListener,
+        startListening,
+        stopListening,
         totalPopulation,
         totalCountFromGroups,
         populationIncomeTotal,

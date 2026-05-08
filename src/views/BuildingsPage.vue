@@ -36,8 +36,9 @@ import { useDonationGoalStore } from '@/store/donationGoalStore'
 import { useUserStore } from '@/store/userStore.js'
 import IslandBuildingDialog from "@/components/IslandBuildingDialog.vue";
 import {storeToRefs} from "pinia";
+import { DEFAULT_ISLAND_ID } from '@/config/constants.js';
 
-const islandImg = '/images/island/island_rock.jpg'
+const islandImg = `/images/island/${DEFAULT_ISLAND_ID}.jpg`
 const pins = [
   { id: 'arcaneStudy',   top: 307, left:  73 },
   { id: 'armory',        top: 280, left: 480 },
@@ -71,7 +72,7 @@ const { data: island } = storeToRefs(islandStore)
 const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 onMounted(() => {
-  islandStore.subscribe('island_rock')
+  islandStore.subscribe()
   buildingStore.subscribe()
   donationStore.subscribeToGoals?.() // існуючий listener для донатів
 })

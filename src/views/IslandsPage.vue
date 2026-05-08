@@ -87,7 +87,7 @@ const { data: island } = storeToRefs(islandStore)
 const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 onMounted(() => {
-  islandStore.subscribe('island_rock')
+  islandStore.subscribe()
   buildingStore.subscribe()
   donationStore.subscribeToGoals?.() // існуючий listener для донатів
 })

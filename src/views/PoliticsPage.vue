@@ -228,7 +228,7 @@ let unsubProposals, unsubInterests;
 // =================== SUBSCRIPTIONS ============
 onMounted(() => {
   // Groups (наприклад: sailors/peasants/workers)
-  interestGroupStore.startListener();
+  interestGroupStore.startListening();
 
   // Proposals
   const base = collection(db, 'proposals');
@@ -253,7 +253,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unsubProposals && unsubProposals();
   unsubInterests && unsubInterests();
-  interestGroupStore.stopListener();
+  interestGroupStore.stopListening();
 });
 
 // =================== HELPERS ==================

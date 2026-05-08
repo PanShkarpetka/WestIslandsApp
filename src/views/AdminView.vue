@@ -390,6 +390,7 @@ import { usePopulationStore } from '@/store/populationStore';
 import { createNewCycleWithEffects } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import { loadCraftItems } from '@/services/craftingService';
+import { DEFAULT_ISLAND_ID } from '@/config/constants.js';
 
 const logEntries = ref([]);
 const cycleSaving = ref(false);
@@ -654,7 +655,7 @@ async function createCycle() {
     await createNewCycleWithEffects({
       startedDate: cycleForm.startedDate,
       notes: cycleForm.notes,
-      islandId: islandStore.currentId || 'island_rock',
+      islandId: islandStore.currentId || DEFAULT_ISLAND_ID,
       population: populationStore.totalPopulation,
       populationItems: populationStore.items || [],
     });
@@ -1112,7 +1113,7 @@ watch(heroRows, (rows) => {
 }, { immediate: true });
 
 onMounted(async () => {
-  populationStore.startListener(islandStore.currentId || 'island_rock');
+  populationStore.startListening(islandStore.currentId || DEFAULT_ISLAND_ID);
   const q = query(collection(db, 'logs'), orderBy('timestamp', 'desc'));
   const snapshot = await getDocs(q);
   logEntries.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1123,7 +1124,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  populationStore.stopListener();
+  populationStore.stopListening();
   stopHeroes?.();
   stopReligions?.();
   stopClergy?.();

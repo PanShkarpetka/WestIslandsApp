@@ -92,7 +92,7 @@ async function loadManufactureTotals(ids) {
 
 onMounted(() => {
   loadManufactureTotals(island.value?.manufactures)
-  populationStore.startListener(islandStore.currentId)
+  populationStore.startListening(islandStore.currentId)
 })
 
 watch(
@@ -106,11 +106,11 @@ watch(
 watch(
   () => islandStore.currentId,
   (id) => {
-    populationStore.startListener(id)
+    populationStore.startListening(id)
   },
 )
 
-onBeforeUnmount(() => populationStore.stopListener())
+onBeforeUnmount(() => populationStore.stopListening())
 </script>
 
 <style scoped>

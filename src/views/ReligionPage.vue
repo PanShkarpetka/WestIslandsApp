@@ -281,6 +281,7 @@ import ReligionAbilitiesTable from '@/components/ReligionAbilitiesTable.vue'
 import ReligionTable from '@/components/ReligionTable.vue'
 import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
+import { PSEUDO_RELIGION_ID } from '@/config/constants.js'
 import { formatAmount } from '@/utils/formatters'
 import { parseFaerunDate } from '@/utils/faerun-date'
 
@@ -345,20 +346,22 @@ function bonusTooltip(bonus) {
   if (bonus?.active === false) parts.push(bonus.hint || 'Бонус неактивний')
   return parts.join(' • ')
 }
+const RELIGION_META = {
+  Панцуріель:    { imageKey: 'Panzuriel',     color: '#000000', hasIcon: true  },
+  Амберлі:       { imageKey: 'Umberlee',       color: '#1e3a8a', hasIcon: true  },
+  Ашкарот:       { imageKey: 'Ashkarot',       color: null,      hasIcon: true  },
+  Девіл:         { imageKey: 'Devil',          color: '#8b0000', hasIcon: true  },
+  Блібдулпулп:   { imageKey: 'Blibdoolpoolp',  color: '#e8a77b', hasIcon: true  },
+  Істишія:       { imageKey: 'Istishia',       color: '#45d1ca', hasIcon: true  },
+  Трійка:        { imageKey: 'trio',           color: '#6a80d9', hasIcon: true  },
+  Четвірка:      { imageKey: 'quadro',         color: '#090070', hasIcon: true  },
+  'Не визначено': { imageKey: 'Unknown',        color: '#7e8694', hasIcon: false },
+  Відсутність:   { imageKey: 'Godless',        color: null,      hasIcon: false },
+  Атеїзм:        { imageKey: null,             color: '#fafcfc', hasIcon: false },
+}
+
 function hasIcon(name) {
-  switch (name) {
-    case 'Амберлі':
-    case 'Блібдулпулп':
-    case 'Панцуріель':
-    case 'Істишія':
-    case 'Девіл':
-    case 'Ашкарот':
-    case 'Трійка':
-    case 'Четвірка':
-      return true
-    default:
-      return false
-  }
+  return RELIGION_META[name]?.hasIcon ?? false
 }
 
 function getIconImage(name) {
@@ -370,21 +373,8 @@ function getIconImage(name) {
   return iconCache.get(name)
 }
 
-const religionImages = {
-  Панцуріель: 'Panzuriel',
-  Амберлі: 'Umberlee',
-  Ашкарот: 'Ashkarot',
-  Девіл: 'Devil',
-  'Не визначено': 'Unknown',
-  Відсутність: 'Godless',
-  Трійка: 'trio',
-  Четвірка: 'quadro',
-  Блібдулпулп: 'Blibdoolpoolp',
-  Істишія: 'Istishia'
-}
-
 function getCenterImage(name) {
-  return name ? religionImages[name] : 'Unknown';
+  return name ? (RELIGION_META[name]?.imageKey ?? 'Unknown') : 'Unknown'
 }
 
 const religionIconPlugin = {
@@ -439,14 +429,14 @@ onMounted(() => religionStore.startListening())
 onBeforeUnmount(() => religionStore.stopListening())
 
 onMounted(() => {
-  populationStore.startListener(islandStore.currentId)
+  populationStore.startListening(islandStore.currentId)
 })
 
-onBeforeUnmount(() => populationStore.stopListener())
+onBeforeUnmount(() => populationStore.stopListening())
 
 onMounted(loadLatestCycle)
 onMounted(() => {
-  const devaCustomRef = doc(db, 'religions', 'psevdo', 'customs', 'Deva')
+  const devaCustomRef = doc(db, 'religions', PSEUDO_RELIGION_ID, 'customs', 'Deva')
   devaCustomUnsubscribe = onSnapshot(devaCustomRef, (snap) => {
     devaCustom.value = snap.data() || {}
   })
@@ -739,23 +729,12 @@ const totalFollowersLabel = computed(() => {
 })
 
 const totalPopulationLabel = computed(() => (totalPopulation.value || 0).toLocaleString('uk-UA'))
-const religionColors = {
-  Панцуріель: '#000000',
-  Амберлі: '#1e3a8a',
-  Девіл: '#8b0000',
-  'Не визначено': '#7e8694',
-  Атеїзм: '#fafcfc',
-  Трійка: '#6a80d9',
-  Четвірка: '#090070',
-  Блібдулпулп: '#e8a77b',
-  Істишія: '#45d1ca'
-}
-
 const fallbackPalette = ['#c7d2fe', '#fbbf24', '#34d399', '#f472b6', '#60a5fa', '#f87171', '#a78bfa']
 const colorCache = new Map()
 
 function getReligionColor(name) {
-  if (religionColors[name]) return religionColors[name]
+  const meta = RELIGION_META[name]
+  if (meta?.color) return meta.color
 
   if (!colorCache.has(name)) {
     const index = colorCache.size % fallbackPalette.length
@@ -1020,7 +999,7 @@ const spreadReligionDisabled = computed(
 watch(
   () => islandStore.currentId,
   (id) => {
-    populationStore.startListener(id)
+    populationStore.startListening(id)
   },
 )
 
@@ -1268,7 +1247,7 @@ async function handleCycleDevaConsumption() {
   if (!current || !previous) return
   if (current.day !== 1 || (current.month === previous.month && current.year === previous.year)) return
 
-  const devaRef = doc(db, 'religions', 'psevdo', 'customs', 'Deva')
+  const devaRef = doc(db, 'religions', PSEUDO_RELIGION_ID, 'customs', 'Deva')
 
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(devaRef)
@@ -1505,7 +1484,6 @@ async function saveDowntimeAvailability() {
 
   try {
     await updateDoc(heroRefValue, { downtimeAvailable: downtimeAvailable.value })
-    religionStore.setDowntimeAvailability(activeClergy.value.id, downtimeAvailable.value)
     downtimeUpdateSuccess.value = true
   } catch (e) {
     downtimeUpdateError.value = e?.message || 'Не вдалося оновити статус даутайму.'
@@ -1821,8 +1799,6 @@ async function applySpreadReligion() {
       }),
     ])
 
-    religionStore.setDowntimeAvailability(activeClergy.value.id, false)
-
     spreadReligionForm.roll = null
     spreadReligionForm.dmMod = 0
     spreadReligionForm.notes = ''
@@ -1974,8 +1950,6 @@ async function applyActiveFaithFarm() {
       }),
     ])
 
-    religionStore.setDowntimeAvailability(activeClergy.value.id, false)
-
     activeFaithFarmForm.roll = null
     activeFaithFarmForm.notes = ''
     activeFaithFarmForm.dmMod = 0
@@ -2001,7 +1975,7 @@ async function applyCelestialTransfer() {
   celestialTransferError.value = ''
   try {
     const clergyRef = doc(db, 'clergy', activeClergy.value.id)
-    const devaRef = doc(db, 'religions', 'psevdo', 'customs', 'Deva')
+    const devaRef = doc(db, 'religions', PSEUDO_RELIGION_ID, 'customs', 'Deva')
     await runTransaction(db, async (transaction) => {
       const clergySnapshot = await transaction.get(clergyRef)
       const devaSnapshot = await transaction.get(devaRef)
