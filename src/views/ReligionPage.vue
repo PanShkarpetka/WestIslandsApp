@@ -1673,6 +1673,7 @@ async function applyClergyDefense() {
         result,
         bonus,
         shieldApplied: bonus > 0,
+        cycleId: latestCycle.value?.id || null,
         user: userStore.nickname || 'Адміністратор',
         createdAt: serverTimestamp(),
       }),

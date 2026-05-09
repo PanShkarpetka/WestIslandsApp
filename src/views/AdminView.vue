@@ -34,6 +34,16 @@
         <v-btn color="primary" prepend-icon="mdi-play-circle-outline" :loading="cycleSaving" @click="createCycle">
           Почати новий цикл
         </v-btn>
+        <v-btn
+          color="secondary"
+          prepend-icon="mdi-telegram"
+          :loading="religionSummaryLoading"
+          :disabled="!previousCompletedCycle"
+          class="ml-3"
+          @click="generateReligionCycleSummary"
+        >
+          Підсумок релігій
+        </v-btn>
       </v-form>
 
       <v-divider class="my-4" />
@@ -364,6 +374,31 @@
       </v-data-table>
     </v-card>
   </v-container>
+
+  <v-dialog v-model="showReligionSummaryDialog" max-width="620">
+    <v-card>
+      <div class="pa-4" style="border-bottom: 1px solid var(--wi-border)">
+        <span class="wi-heading text-h6">Підсумок релігійних дій циклу</span>
+      </div>
+      <v-card-text class="pt-4">
+        <v-textarea
+          v-model="religionSummaryText"
+          rows="14"
+          auto-grow
+          variant="outlined"
+          hide-details
+        />
+      </v-card-text>
+      <v-divider />
+      <v-card-actions>
+        <v-spacer />
+        <v-btn prepend-icon="mdi-content-copy" color="primary" @click="copyReligionSummary">
+          {{ religionSummaryCopied ? 'Скопійовано!' : 'Копіювати' }}
+        </v-btn>
+        <v-btn @click="showReligionSummaryDialog = false">Закрити</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
@@ -381,6 +416,7 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { DEFAULT_YEAR, diffInDays, normalizeFaerunDate, parseFaerunDate } from 'faerun-date';
 import { db } from '../services/firebase';
@@ -397,6 +433,11 @@ const cycleSaving = ref(false);
 const cycleError = ref('');
 const cycleSuccess = ref('');
 const latestCycle = ref(null);
+const previousCompletedCycle = ref(null);
+const religionSummaryText = ref('');
+const showReligionSummaryDialog = ref(false);
+const religionSummaryLoading = ref(false);
+const religionSummaryCopied = ref(false);
 const islandStore = useIslandStore();
 const populationStore = usePopulationStore();
 const cycleForm = reactive({
@@ -615,9 +656,10 @@ const cycleDurationLabel = computed(() => {
 
 async function loadLatestCycle() {
   const cyclesRef = collection(db, 'cycles');
-  const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1));
+  const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(2));
   const snapshot = await getDocs(latestCycleQuery);
   latestCycle.value = snapshot.docs[0] ? { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } : null;
+  previousCompletedCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null;
 }
 
 function suggestNextCycleDate() {
@@ -669,6 +711,121 @@ async function createCycle() {
   } finally {
     cycleSaving.value = false;
   }
+}
+
+async function generateReligionCycleSummary() {
+  if (!previousCompletedCycle.value) return;
+
+  religionSummaryLoading.value = true;
+  try {
+    const heroNameById = new Map(heroes.value.map((h) => [h.id, h.name]));
+    const religionNameById = new Map(religions.value.map((r) => [r.id, r.name]));
+    const cycleId = previousCompletedCycle.value.id;
+
+    const actionsSnap = await getDocs(
+      query(collection(db, 'religion-actions'), where('cycleId', '==', cycleId))
+    );
+
+    const faithByHero = new Map();
+    const followersByReligion = new Map();
+    const shieldDefenses = [];
+    const shieldsBrokenNames = [];
+
+    for (const docSnap of actionsSnap.docs) {
+      const data = docSnap.data();
+      const actionTypeId = data.actionType?.id;
+
+      if (actionTypeId === 'generate') {
+        const heroId = data.heroId;
+        const gained = Number(data.faithGained ?? 0);
+        if (gained <= 0 || !heroId) continue;
+        const heroName = heroNameById.get(heroId) || heroId;
+        if (!faithByHero.has(heroId)) faithByHero.set(heroId, { faith: 0, celestial: 0, name: heroName });
+        const entry = faithByHero.get(heroId);
+        if (data.farmTarget === 'celestial') entry.celestial += gained;
+        else entry.faith += gained;
+      }
+
+      if (actionTypeId === 'influence') {
+        const religionId = data.religion?.id;
+        const targetReligionId = data.targetReligion?.id;
+        const converted = Number(data.convertedFollowers ?? 0);
+        if (converted > 0 && religionId) {
+          const name = religionNameById.get(religionId) || religionId;
+          const attackerName = religionNameById.get(targetReligionId) || targetReligionId || '?';
+          if (!followersByReligion.has(religionId)) {
+            followersByReligion.set(religionId, { gained: 0, name, attackerName });
+          }
+          followersByReligion.get(religionId).gained += converted;
+        }
+        if (data.shieldBroken && targetReligionId) {
+          const targetName = religionNameById.get(targetReligionId) || targetReligionId;
+          if (!shieldsBrokenNames.includes(targetName)) shieldsBrokenNames.push(targetName);
+        }
+      }
+
+      if (actionTypeId === 'shield') {
+        const bonus = Number(data.bonus ?? 0);
+        const religionId = data.religion?.id;
+        if (bonus > 0 && religionId) {
+          const name = religionNameById.get(religionId) || religionId;
+          shieldDefenses.push({ name, bonus });
+        }
+      }
+    }
+
+    const lines = [];
+
+    const faithEntries = [...faithByHero.values()].filter((e) => e.faith > 0);
+    const celestialOnlyEntries = [...faithByHero.values()].filter((e) => e.faith === 0 && e.celestial > 0);
+
+    for (const entry of faithEntries) {
+      const parts = [`+${entry.faith} 🙏`];
+      if (entry.celestial > 0) parts.push(`+${entry.celestial} віри в небожителя`);
+      lines.push(`${entry.name} ${parts.join(' та ')}`);
+    }
+
+    if (faithEntries.length > 0 && celestialOnlyEntries.length > 0) lines.push('');
+
+    for (const entry of celestialOnlyEntries) {
+      lines.push(`${entry.name} +${entry.celestial} віри в небожителя`);
+    }
+
+    if ((faithEntries.length > 0 || celestialOnlyEntries.length > 0) && followersByReligion.size > 0) lines.push('');
+
+    for (const entry of followersByReligion.values()) {
+      lines.push(`Конфесія ${entry.name} +${entry.gained} послідовників1⃣ (від ${entry.attackerName})`);
+    }
+
+    if (shieldDefenses.length > 0) {
+      if (lines.length > 0) lines.push('');
+      for (const defense of shieldDefenses) {
+        lines.push(`Захист віри конфесія ${defense.name} +${defense.bonus} до стійкості 🧘`);
+      }
+    }
+
+    if (shieldsBrokenNames.length > 0) {
+      if (lines.length > 0) lines.push('');
+      lines.push(`Захисти спали у: ${shieldsBrokenNames.join(' та ')}.`);
+    }
+
+    if (lines.length > 0) lines.push('');
+    lines.push(`Розпочався новий цикл ${latestCycle.value?.startedAt || ''} — триває`);
+
+    religionSummaryText.value = lines.join('\n');
+    showReligionSummaryDialog.value = true;
+  } catch (e) {
+    console.error('[admin] Failed to generate religion summary', e);
+  } finally {
+    religionSummaryLoading.value = false;
+  }
+}
+
+async function copyReligionSummary() {
+  if (!religionSummaryText.value) return;
+  await navigator.clipboard.writeText(religionSummaryText.value);
+  religionSummaryCopied.value = true;
+  setTimeout(() => { religionSummaryCopied.value = false; }, 2000);
 }
 
 function subscribeHeroData() {
