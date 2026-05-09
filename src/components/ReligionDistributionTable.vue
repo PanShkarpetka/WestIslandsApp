@@ -123,58 +123,57 @@ function formatShield(item) {
 <style scoped>
 .distribution-table-wrapper {
   margin-top: 12px;
-  background-color: #fff;
-  border-radius: 12px;
+  border-radius: 6px;
   overflow: hidden;
+  overflow-x: auto;
 }
 
-.distribution-table {
-  min-width: 960px;
+.distribution-table-wrapper :deep(.v-table__wrapper) {
+  overflow: visible;
 }
 
-.distribution-table-wrapper-hovered {
-  opacity: 0.5;
+.distribution-table { min-width: 960px; }
+.distribution-table-wrapper-hovered { opacity: 0.5; }
+
+.distribution-table :deep(thead tr th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase;
+  color: var(--wi-text-muted) !important;
+  background: #1a1108 !important;
+  border-bottom: 1px solid var(--wi-border) !important;
+  white-space: nowrap;
 }
 
-.distribution-table th {
-  background-color: #fff;
-  font-weight: 700;
+.distribution-table :deep(tbody tr td) {
+  color: var(--wi-text);
+  font-family: var(--wi-font-body);
+  border-bottom: 1px solid rgba(90, 62, 32, 0.25) !important;
+  white-space: nowrap;
 }
 
-.distribution-table td {
-  background-color: transparent;
-}
+:deep(.v-table__wrapper > table > tbody > tr > td) { border-bottom: none; }
 
-.distribution-row {
-  transition: background-color 0.2s ease, transform 0.2s ease;
-  border-radius: 8px;
-}
-
-.distribution-row:hover,
-.distribution-row:focus-visible {
-  background-color: color-mix(in srgb, var(rgba(0, 0, 0, 0.08)) 20%, transparent);
-}
-
-.distribution-table tbody tr:not(:last-child) {
-  border-bottom: 1px solid #e8eaed;
-}
-
-:deep(.v-table__wrapper > table > tbody > tr > td) {
-  border-bottom: none;
-}
+.distribution-row { transition: background-color 0.2s ease; }
+.distribution-row:hover :deep(td),
+.distribution-row:focus-visible :deep(td) { background: rgba(200,150,42,0.07) !important; }
 
 .distribution-name {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 600;
+  font-family: var(--wi-font-heading);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
 }
 
 .color-bullet {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   display: inline-block;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
 }
 </style>

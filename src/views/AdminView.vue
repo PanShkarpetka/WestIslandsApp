@@ -1,7 +1,7 @@
 <template>
-  <v-container>
-    <v-card class="pa-6" elevation="2">
-      <v-card-title class="text-h5">Адмін панель</v-card-title>
+  <v-container class="admin-page pb-8">
+    <v-card class="admin-card pa-6" elevation="0">
+      <v-card-title class="admin-title text-h5">Адмін панель</v-card-title>
 
       <v-divider class="my-4" />
 
@@ -1157,7 +1157,110 @@ function buildSnapshotGroupKey(timestamp, source) {
 </script>
 
 <style scoped>
-.snapshot-history-table {
-  overflow-x: auto;
+/* ── Main card ───────────────────────────────────────────────── */
+.admin-card {
+  background: linear-gradient(135deg, rgba(14,9,4,0.9), rgba(26,17,8,0.85)) !important;
+  border: 1px solid var(--wi-border) !important;
+}
+
+/* ── Titles ──────────────────────────────────────────────────── */
+.admin-title {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 1.3rem !important;
+  color: var(--wi-gold) !important;
+  letter-spacing: 0.04em;
+  padding-bottom: 4px;
+}
+
+.admin-card :deep(.v-card-title.text-h6) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: var(--wi-text-muted) !important;
+  padding-top: 4px;
+}
+
+/* ── Dividers ────────────────────────────────────────────────── */
+.admin-card :deep(.v-divider) {
+  border-color: var(--wi-border) !important;
+  opacity: 1;
+}
+
+/* ── Inner cards (outlined / tonal) ─────────────────────────── */
+.admin-card :deep(.v-card[class*="pa-"]:not(.admin-card)),
+.admin-card :deep(.v-card--variant-outlined),
+.admin-card :deep(.v-card--variant-tonal) {
+  background: rgba(6, 4, 1, 0.55) !important;
+  border-color: var(--wi-border) !important;
+}
+
+.admin-card :deep(.v-card .text-subtitle-1),
+.admin-card :deep(.v-card .text-subtitle-2) {
+  font-family: var(--wi-font-heading);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+}
+
+/* ── Data tables ─────────────────────────────────────────────── */
+.admin-card :deep(.v-data-table thead tr th),
+.admin-card :deep(.v-table thead tr th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--wi-text-muted) !important;
+  background: #1a1108 !important;
+  border-bottom: 1px solid var(--wi-border) !important;
+}
+
+.admin-card :deep(.v-data-table tbody tr td),
+.admin-card :deep(.v-table tbody tr td) {
+  color: var(--wi-text) !important;
+  font-family: var(--wi-font-body) !important;
+  border-bottom: 1px solid rgba(90, 62, 32, 0.2) !important;
+  background: transparent !important;
+}
+
+.admin-card :deep(.v-data-table-footer) {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text-muted);
+  border-top: 1px solid var(--wi-border);
+}
+
+/* ── Snapshot history table ──────────────────────────────────── */
+.snapshot-history-table { overflow-x: auto; }
+
+/* ── Dialog card ─────────────────────────────────────────────── */
+:deep(.v-overlay .v-card) {
+  background: linear-gradient(135deg, rgba(14,9,4,0.98), rgba(26,17,8,0.95)) !important;
+  border: 1px solid var(--wi-border) !important;
+}
+
+:deep(.v-overlay .v-card-title) {
+  font-family: var(--wi-font-heading) !important;
+  color: var(--wi-gold) !important;
+  letter-spacing: 0.04em;
+}
+
+/* ── Expansion panels (snapshot import preview) ──────────────── */
+.admin-card :deep(.v-expansion-panels) {
+  border: 1px solid var(--wi-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.admin-card :deep(.v-expansion-panel-title) {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text);
+  background: rgba(10,6,2,0.7);
+}
+
+.admin-card :deep(.v-expansion-panel-text__wrapper) {
+  background: rgba(6,4,1,0.6);
+  font-family: var(--wi-font-body);
+  color: var(--wi-text);
 }
 </style>

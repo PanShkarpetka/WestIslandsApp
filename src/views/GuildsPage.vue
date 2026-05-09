@@ -1,392 +1,601 @@
 <template>
-  <v-container class="py-6">
-    <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="6">
-        <h1 class="text-h5">
-          Гільдії острова
-        </h1>
-      </v-col>
-      <v-btn v-if="user.isAdmin" color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">Добавити гільдію</v-btn>
-    </v-row>
+  <v-container class="guilds-page">
 
-    <v-alert v-if="store.error" type="error" variant="tonal" class="mb-4">{{ store.error }}</v-alert>
+    <!-- Header -->
+    <div class="guilds-header">
+      <div class="guilds-title">
+        <v-icon class="mr-2" size="20">mdi-shield-sword</v-icon>
+        Гільдії острова
+      </div>
+      <v-btn v-if="user.isAdmin" class="add-guild-btn" prepend-icon="mdi-plus" @click="openCreateDialog">Додати гільдію</v-btn>
+    </div>
 
+    <div v-if="store.error" class="guilds-error">
+      <v-icon class="mr-2" size="14">mdi-skull-crossbones</v-icon>{{ store.error }}
+    </div>
+
+    <!-- Guild cards -->
     <v-row>
       <v-col v-for="guild in visibleGuilds" :key="guild.id" cols="12" md="6">
-        <v-card
-          elevation="2"
-          rounded="xl"
+        <div
+          class="guild-card"
           :class="{
             'guild-card-clickable': canViewGuildLogs(guild),
             'guild-card-negative': isNegativeGuild(guild),
           }"
           @click="openGuildLogs(guild)"
         >
-          <v-card-title class="guild-card-title d-flex justify-space-between align-start ga-2">
-            <div class="guild-title-text">
-              <div class="text-h6">{{ guild.name || guild.id }}</div>
-              <div class="text-caption text-medium-emphasis">Лідер: {{ guild.leader || 'Невідомий' }}</div>
-            </div>
-            <v-chip
-              class="guild-balance-chip"
-              :color="isNegativeGuild(guild) ? 'error' : 'amber'"
-              variant="tonal"
-            >
-              {{ formatAmount(guild.treasure || 0) }} 🪙
-            </v-chip>
-          </v-card-title>
+          <!-- Crest circle -->
+          <div class="guild-crest">
+            <v-icon size="22">mdi-shield-sword</v-icon>
+          </div>
 
-          <v-card-text>
-            <div class="text-body-2 mb-2"><b>Коротка назва:</b> {{ guild.shortName || '-' }}</div>
-            <div class="text-body-2"><b>Має доступ:</b> {{ guild.withdrawUsername || '-' }}</div>
-            <div v-if="canViewGuildLogs(guild)" class="text-caption text-medium-emphasis mt-3">
-              Натисніть на картку, щоб переглянути журнал операцій.
+          <!-- Title block -->
+          <div class="guild-info">
+            <div class="guild-name">{{ guild.name || guild.id }}</div>
+            <div class="guild-leader">
+              <v-icon size="12" class="mr-1">mdi-crown</v-icon>
+              {{ guild.leader || 'Невідомий лідер' }}
             </div>
-          </v-card-text>
+            <div v-if="guild.shortName" class="guild-short">{{ guild.shortName }}</div>
+          </div>
 
-          <v-card-actions class="px-4 pb-4">
-            <v-btn color="success" variant="flat" prepend-icon="mdi-cash-plus" @click.stop="openTransaction(guild, 'deposit')">Внести кошти</v-btn>
-            <v-btn color="warning" variant="flat" prepend-icon="mdi-cash-minus" @click.stop="openTransaction(guild, 'withdraw')">Зняти кошти</v-btn>
+          <!-- Balance -->
+          <div class="guild-balance" :class="isNegativeGuild(guild) ? 'balance-negative' : ''">
+            <div class="guild-balance-amount wi-number">{{ formatAmount(guild.treasure || 0) }}</div>
+            <div class="guild-balance-label">золотих монет</div>
+          </div>
+
+          <!-- Footer actions -->
+          <div class="guild-actions" @click.stop>
+            <v-btn class="guild-deposit-btn" size="small" prepend-icon="mdi-tray-arrow-down" @click="openTransaction(guild, 'deposit')">Внести</v-btn>
+            <v-btn v-if="user.isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
             <v-spacer />
-            <v-btn v-if="user.isAdmin" variant="text" prepend-icon="mdi-pencil" @click.stop="openEditDialog(guild)"></v-btn>
-          </v-card-actions>
-        </v-card>
+            <v-btn v-if="user.isAdmin" size="small" variant="text" icon="mdi-feather" class="guild-edit-btn" @click="openEditDialog(guild)" />
+          </div>
+
+          <div v-if="canViewGuildLogs(guild)" class="guild-log-hint">
+            <v-icon size="11" class="mr-1">mdi-scroll-text</v-icon>
+            Натисніть для перегляду журналу
+          </div>
+        </div>
       </v-col>
     </v-row>
 
-    <v-dialog v-model="showGuildDialog" max-width="640">
-      <v-card rounded="xl">
-        <v-card-title>{{ editMode ? 'Змінити гільдію' : 'Створити гільдію' }}</v-card-title>
-        <v-card-text>
-          <v-text-field v-model="guildForm.name" label="Назва гільдії" variant="outlined" class="mb-2" />
-          <v-text-field v-model="guildForm.shortName" label="Коротке ім'я" variant="outlined" class="mb-2" />
-          <v-text-field v-model="guildForm.leader" label="Лідер" variant="outlined" class="mb-2" />
-          <v-checkbox v-model="guildForm.visibleToAll" label="Видима для всіх" density="compact" />
-          <v-text-field v-model="guildForm.withdrawUsername" label="Має доступ" variant="outlined" class="mb-2" />
-          <v-text-field v-model="guildForm.withdrawPassword" label="Пароль для доступу" variant="outlined" type="password" class="mb-2" />
-          <v-text-field v-model.number="guildForm.treasure" type="number" min="0" step="0.01" label="Початковий баланс" variant="outlined" />
-          <v-alert v-if="formError" type="error" density="comfortable" class="mt-3">{{ formError }}</v-alert>
+    <!-- Create/Edit guild dialog -->
+    <v-dialog v-model="showGuildDialog" max-width="560" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-shield-sword</v-icon>
+          {{ editMode ? 'Змінити гільдію' : 'Нова гільдія' }}
+        </div>
+        <v-card-text class="guild-dialog-body">
+          <v-text-field v-model="guildForm.name" label="Назва гільдії" variant="outlined" density="compact" hide-details="auto" class="mb-3" />
+          <v-text-field v-model="guildForm.shortName" label="Коротке ім'я" variant="outlined" density="compact" hide-details="auto" class="mb-3" />
+          <v-text-field v-model="guildForm.leader" label="Лідер" variant="outlined" density="compact" hide-details="auto" class="mb-3" />
+          <v-checkbox v-model="guildForm.visibleToAll" label="Видима для всіх" density="compact" hide-details class="mb-2" />
+          <v-text-field v-model="guildForm.withdrawUsername" label="Має доступ (нікнейм)" variant="outlined" density="compact" hide-details="auto" class="mb-3" />
+          <v-text-field v-model="guildForm.withdrawPassword" label="Пароль для доступу" variant="outlined" density="compact" hide-details="auto" type="password" class="mb-3" />
+          <v-text-field v-model.number="guildForm.treasure" type="number" min="0" step="0.01" label="Початковий баланс (зм)" variant="outlined" density="compact" hide-details="auto" />
+          <div v-if="formError" class="guild-dialog-error mt-3">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ formError }}
+          </div>
         </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" @click="saveGuild">Save</v-btn>
-          <v-btn variant="text" @click="showGuildDialog = false">Cancel</v-btn>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="showGuildDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <v-btn class="save-btn" prepend-icon="mdi-feather" @click="saveGuild">Зберегти</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="showTxDialog" max-width="560">
-      <v-card rounded="xl">
-        <v-card-title>{{ txMode === 'deposit' ? 'Внести кошти' : 'Зняти кошти' }} · {{ selectedGuild?.name }}</v-card-title>
-        <v-card-text>
-          <v-text-field v-model.number="txAmount" label="Баланс золота" type="number" min="0.01" step="0.01" variant="outlined" class="mb-2" />
-          <v-textarea v-model="txComment" label="Коментар" rows="2" auto-grow variant="outlined" class="mb-2" />
+    <!-- Transaction dialog -->
+    <v-dialog v-model="showTxDialog" max-width="480" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">{{ txMode === 'deposit' ? 'mdi-tray-arrow-down' : 'mdi-tray-arrow-up' }}</v-icon>
+          {{ txMode === 'deposit' ? 'Внести кошти' : 'Зняти кошти' }} · {{ selectedGuild?.name }}
+        </div>
+        <v-card-text class="guild-dialog-body">
+          <v-text-field v-model.number="txAmount" label="Сума (золото)" type="number" min="0.01" step="0.01" variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-gold" />
+          <v-textarea v-model="txComment" label="Коментар" rows="2" auto-grow variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-feather" />
           <v-text-field
             v-if="txMode === 'withdraw' && !user.isAdmin"
             v-model="txPassword"
             label="Пароль гільдії"
             type="password"
             variant="outlined"
+            density="compact"
+            hide-details="auto"
           />
-          <v-alert v-if="txError" type="error" density="comfortable" class="mt-3">{{ txError }}</v-alert>
+          <div v-if="txError" class="guild-dialog-error mt-3">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ txError }}
+          </div>
         </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" :loading="txLoading" @click="submitTransaction">Прийняти</v-btn>
-          <v-btn variant="text" @click="showTxDialog = false">Відмінити</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-dialog v-model="showLogsDialog" max-width="860">
-      <v-card rounded="xl">
-        <v-card-title class="d-flex align-center justify-space-between ga-3">
-          <div>Журнал операцій · {{ logsGuild?.name || logsGuild?.id }}</div>
-          <v-btn variant="text" prepend-icon="mdi-refresh" :loading="logsLoading" @click="reloadGuildLogs">Оновити</v-btn>
-        </v-card-title>
-        <v-card-text>
-          <v-alert v-if="logsError" type="error" density="comfortable" class="mb-3">{{ logsError }}</v-alert>
-
-          <v-table v-if="guildLogs.length" density="comfortable">
-            <thead>
-              <tr>
-                <th>Коли</th>
-                <th>Хто</th>
-                <th>Тип</th>
-                <th class="text-right">Сума</th>
-                <th>Коментар</th>
-                <th class="text-right">Баланс після</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="log in guildLogs" :key="log.id">
-                <td>{{ formatDate(log.createdAt) }}</td>
-                <td>{{ log.userNickname || 'Невідомий' }}</td>
-                <td>
-                  <v-chip :color="log.type === 'deposit' ? 'green' : 'red'" size="small" variant="flat">
-                    {{ log.type === 'deposit' ? 'Внесок' : 'Зняття' }}
-                  </v-chip>
-                </td>
-                <td class="text-right">
-                  <span :class="log.amount >= 0 ? 'text-green-600' : 'text-red-600'">
-                    {{ log.amount >= 0 ? '+' : '' }}{{ formatAmount(log.amount || 0) }}
-                  </span>
-                </td>
-                <td class="text-truncate" style="max-width: 280px" :title="log.comment">{{ log.comment || '—' }}</td>
-                <td class="text-right">{{ formatAmount(log.treasureAfter || 0) }}</td>
-              </tr>
-            </tbody>
-          </v-table>
-
-          <div v-else-if="!logsLoading" class="text-medium-emphasis">Журнал поки що порожній.</div>
-        </v-card-text>
-        <v-card-actions>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="showTxDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn variant="text" @click="showLogsDialog = false">Закрити</v-btn>
+          <v-btn class="save-btn" :loading="txLoading" @click="submitTransaction">Підтвердити</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Logs dialog -->
+    <v-dialog v-model="showLogsDialog" max-width="860" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog guild-logs-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-scroll-text</v-icon>
+          Журнал операцій · {{ logsGuild?.name || logsGuild?.id }}
+          <v-spacer />
+          <v-btn variant="text" size="small" prepend-icon="mdi-refresh" :loading="logsLoading" @click="reloadGuildLogs" class="cancel-btn" style="font-size: 0.72rem !important">Оновити</v-btn>
+        </div>
+        <v-card-text class="pa-0">
+          <div v-if="logsError" class="guild-dialog-error" style="margin: 16px 20px">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ logsError }}
+          </div>
+
+          <div v-if="guildLogs.length" class="guild-ledger-wrap">
+            <v-table class="guild-ledger-table" density="comfortable">
+              <thead>
+                <tr>
+                  <th>Коли</th>
+                  <th>Хто</th>
+                  <th>Тип</th>
+                  <th class="text-right">Сума</th>
+                  <th>Коментар</th>
+                  <th class="text-right">Баланс після</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="log in guildLogs" :key="log.id" class="ledger-row">
+                  <td class="ledger-date">{{ formatDate(log.createdAt) }}</td>
+                  <td class="ledger-who">{{ log.userNickname || 'Невідомий' }}</td>
+                  <td>
+                    <span class="tx-type" :class="log.type === 'deposit' ? 'tx-deposit' : 'tx-withdraw'">
+                      <v-icon size="12" class="mr-1">{{ log.type === 'deposit' ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold' }}</v-icon>
+                      {{ log.type === 'deposit' ? 'Внесок' : 'Зняття' }}
+                    </span>
+                  </td>
+                  <td class="text-right">
+                    <span :class="log.amount >= 0 ? 'amount-positive' : 'amount-negative'">
+                      {{ log.amount >= 0 ? '+' : '' }}{{ formatAmount(log.amount || 0) }}
+                    </span>
+                  </td>
+                  <td class="ledger-comment">
+                    <v-tooltip location="top" max-width="320">
+                      <template #activator="{ props }">
+                        <span v-bind="props" class="comment-truncated">{{ log.comment || '—' }}</span>
+                      </template>
+                      {{ log.comment || '—' }}
+                    </v-tooltip>
+                  </td>
+                  <td class="text-right ledger-balance-after">{{ formatAmount(log.treasureAfter || 0) }}</td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
+          <div v-else-if="!logsLoading" class="guild-logs-empty">
+            <v-icon class="mr-2" size="14">mdi-anchor</v-icon>
+            Журнал поки що порожній.
+          </div>
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-spacer />
+          <v-btn variant="text" class="cancel-btn" @click="showLogsDialog = false">Закрити</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </v-container>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Timestamp } from 'firebase/firestore';
-import { useGuildStore } from '@/store/guildStore';
-import { useUserStore } from '@/store/userStore';
-import { formatAmount } from '@/utils/formatters';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Timestamp } from 'firebase/firestore'
+import { useGuildStore } from '@/store/guildStore'
+import { useUserStore } from '@/store/userStore'
+import { formatAmount } from '@/utils/formatters'
 
-const store = useGuildStore();
-const user = useUserStore();
+const store = useGuildStore()
+const user = useUserStore()
 
-const showGuildDialog = ref(false);
-const showTxDialog = ref(false);
-const showLogsDialog = ref(false);
-const editMode = ref(false);
-const editingGuildId = ref('');
-const formError = ref('');
+const showGuildDialog = ref(false)
+const showTxDialog = ref(false)
+const showLogsDialog = ref(false)
+const editMode = ref(false)
+const editingGuildId = ref('')
+const formError = ref('')
+const guildForm = ref(defaultGuildForm())
 
-const guildForm = ref(defaultGuildForm());
+const selectedGuild = ref(null)
+const txMode = ref('deposit')
+const txAmount = ref(null)
+const txComment = ref('')
+const txPassword = ref('')
+const txError = ref('')
+const txLoading = ref(false)
 
-const selectedGuild = ref(null);
-const txMode = ref('deposit');
-const txAmount = ref(null);
-const txComment = ref('');
-const txPassword = ref('');
-const txError = ref('');
-const txLoading = ref(false);
-
-const logsGuild = ref(null);
-const guildLogs = ref([]);
-const logsLoading = ref(false);
-const logsError = ref('');
+const logsGuild = ref(null)
+const guildLogs = ref([])
+const logsLoading = ref(false)
+const logsError = ref('')
 
 const visibleGuilds = computed(() =>
   store.guilds.filter((guild) => {
-    if (user.isAdmin) return true;
-    if (guild.visibleToAll) return true;
-    return user.canAccessGuild(guild.id);
-  }),
-);
+    if (user.isAdmin) return true
+    if (guild.visibleToAll) return true
+    return user.canAccessGuild(guild.id)
+  })
+)
 
 function canViewGuildLogs(guild) {
-  if (!guild) return false;
-  if (user.isAdmin) return true;
-  return user.canAccessGuild(guild.id);
+  if (!guild) return false
+  if (user.isAdmin) return true
+  return user.canAccessGuild(guild.id)
 }
 
-function isNegativeGuild(guild) {
-  return Number(guild?.treasure || 0) < 0;
-}
+function isNegativeGuild(guild) { return Number(guild?.treasure || 0) < 0 }
 
 async function openGuildLogs(guild) {
-  if (!canViewGuildLogs(guild)) return;
-
-  logsGuild.value = guild;
-  guildLogs.value = [];
-  logsError.value = '';
-  showLogsDialog.value = true;
-  await reloadGuildLogs();
+  if (!canViewGuildLogs(guild)) return
+  logsGuild.value = guild
+  guildLogs.value = []
+  logsError.value = ''
+  showLogsDialog.value = true
+  await reloadGuildLogs()
 }
 
 async function reloadGuildLogs() {
-  if (!logsGuild.value?.id) return;
-
-  logsLoading.value = true;
-  logsError.value = '';
-  try {
-    guildLogs.value = await store.getGuildLogs(logsGuild.value.id);
-  } catch (error) {
-    logsError.value = error?.message || String(error);
-  } finally {
-    logsLoading.value = false;
-  }
+  if (!logsGuild.value?.id) return
+  logsLoading.value = true
+  logsError.value = ''
+  try { guildLogs.value = await store.getGuildLogs(logsGuild.value.id) }
+  catch (error) { logsError.value = error?.message || String(error) }
+  finally { logsLoading.value = false }
 }
 
 function openCreateDialog() {
-  editMode.value = false;
-  editingGuildId.value = '';
-  guildForm.value = defaultGuildForm();
-  formError.value = '';
-  showGuildDialog.value = true;
+  editMode.value = false; editingGuildId.value = ''; guildForm.value = defaultGuildForm(); formError.value = ''; showGuildDialog.value = true
 }
 
 function openEditDialog(guild) {
-  editMode.value = true;
-  editingGuildId.value = guild.id;
+  editMode.value = true
+  editingGuildId.value = guild.id
   guildForm.value = {
-    name: guild.name || '',
-    shortName: guild.shortName || '',
-    leader: guild.leader || '',
-    treasure: guild.treasure || 0,
-    visibleToAll: guild.visibleToAll !== false,
-    withdrawUsername: guild.withdrawUsername || '',
-    withdrawPassword: guild.withdrawPassword || '',
-  };
-  formError.value = '';
-  showGuildDialog.value = true;
+    name: guild.name || '', shortName: guild.shortName || '', leader: guild.leader || '',
+    treasure: guild.treasure || 0, visibleToAll: guild.visibleToAll !== false,
+    withdrawUsername: guild.withdrawUsername || '', withdrawPassword: guild.withdrawPassword || '',
+  }
+  formError.value = ''; showGuildDialog.value = true
 }
 
 async function saveGuild() {
-  formError.value = '';
-  if (!guildForm.value.name.trim()) {
-    formError.value = `Назва гільдії обов'язкова`;
-    return;
-  }
-
+  formError.value = ''
+  if (!guildForm.value.name.trim()) { formError.value = `Назва гільдії обов'язкова`; return }
   try {
-    if (editMode.value) {
-      await store.updateGuild(editingGuildId.value, guildForm.value);
-    } else {
-      await store.addGuild(guildForm.value);
-    }
-    showGuildDialog.value = false;
-  } catch (error) {
-    formError.value = error?.message || String(error);
-  }
+    if (editMode.value) await store.updateGuild(editingGuildId.value, guildForm.value)
+    else await store.addGuild(guildForm.value)
+    showGuildDialog.value = false
+  } catch (error) { formError.value = error?.message || String(error) }
 }
 
 function openTransaction(guild, mode) {
-  selectedGuild.value = guild;
-  txMode.value = mode;
-  txAmount.value = null;
-  txComment.value = '';
-  txPassword.value = '';
-  txError.value = '';
-  showTxDialog.value = true;
+  selectedGuild.value = guild; txMode.value = mode; txAmount.value = null
+  txComment.value = ''; txPassword.value = ''; txError.value = ''; showTxDialog.value = true
 }
 
 async function submitTransaction() {
-  txError.value = '';
-  if (!user.isLoggedIn) {
-    txError.value = 'Спершу потрібно авторизуватися';
-    return;
-  }
-
-  const amount = Number(txAmount.value);
-  if (!amount || amount <= 0) {
-    txError.value = 'Число має бути більший нуля.';
-    return;
-  }
-
-  if (txMode.value === 'withdraw' && !hasWithdrawAccess(selectedGuild.value, txPassword.value)) {
-    txError.value = `Хибне ім'я користувача.`;
-    return;
-  }
-
-  txLoading.value = true;
+  txError.value = ''
+  if (!user.isLoggedIn) { txError.value = 'Спершу потрібно авторизуватися'; return }
+  const amount = Number(txAmount.value)
+  if (!amount || amount <= 0) { txError.value = 'Число має бути більше нуля.'; return }
+  if (txMode.value === 'withdraw' && !hasWithdrawAccess(selectedGuild.value, txPassword.value)) { txError.value = `Хибне ім'я або пароль.`; return }
+  txLoading.value = true
   try {
-    if (txMode.value === 'withdraw') {
-      await store.withdraw({
-        guildId: selectedGuild.value.id,
-        amount,
-        comment: txComment.value,
-        actor: { nickname: user.nickname },
-      });
-    } else {
-      await store.deposit({
-        guildId: selectedGuild.value.id,
-        amount,
-        comment: txComment.value,
-        actor: { nickname: user.nickname },
-      });
-    }
-
-    showTxDialog.value = false;
-  } catch (error) {
-    txError.value = error?.message || String(error);
-  } finally {
-    txLoading.value = false;
-  }
+    if (txMode.value === 'withdraw') await store.withdraw({ guildId: selectedGuild.value.id, amount, comment: txComment.value, actor: { nickname: user.nickname } })
+    else await store.deposit({ guildId: selectedGuild.value.id, amount, comment: txComment.value, actor: { nickname: user.nickname } })
+    showTxDialog.value = false
+  } catch (error) { txError.value = error?.message || String(error) }
+  finally { txLoading.value = false }
 }
 
 function hasWithdrawAccess(guild, password) {
-  if (user.isAdmin) return true;
-  const username = guild?.withdrawUsername || '';
-  const guildPassword = guild?.withdrawPassword || '';
-  return user.nickname === username && password === guildPassword;
+  if (user.isAdmin) return true
+  return user.nickname === (guild?.withdrawUsername || '') && password === (guild?.withdrawPassword || '')
 }
 
 function defaultGuildForm() {
-  return {
-    name: '',
-    shortName: '',
-    leader: '',
-    treasure: 0,
-    visibleToAll: true,
-    withdrawUsername: '',
-    withdrawPassword: '',
-  };
+  return { name: '', shortName: '', leader: '', treasure: 0, visibleToAll: true, withdrawUsername: '', withdrawPassword: '' }
 }
 
 function formatDate(value) {
-  if (!value) return '—';
-  const date = value instanceof Timestamp ? value.toDate() : value;
-  return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+  if (!value) return '—'
+  const date = value instanceof Timestamp ? value.toDate() : value
+  return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
 
-onMounted(async () => {
-  store.subscribeGuilds();
-});
-
-onBeforeUnmount(() => {
-  store.unsubscribeGuilds();
-});
+onMounted(() => store.subscribeGuilds())
+onBeforeUnmount(() => store.unsubscribeGuilds())
 </script>
 
 <style scoped>
-.guild-card-clickable {
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.guilds-page { padding-bottom: 16px; }
+
+.guilds-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
 }
 
-.guild-card-clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+.guilds-title {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  color: var(--wi-gold);
 }
 
-.guild-card-title {
-  flex-wrap: wrap;
+.add-guild-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+  font-size: 0.8rem !important;
+}
+.add-guild-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
+
+.guilds-error {
+  display: flex;
+  align-items: center;
+  color: var(--wi-danger);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
 }
 
-.guild-title-text {
-  min-width: 0;
-  flex: 1 1 220px;
+/* ── Guild card ─────────────────────────────────────────────── */
+.guild-card {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%);
+  border: 1px solid var(--wi-border);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  grid-template-rows: auto auto auto auto;
+  gap: 0 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.guild-balance-chip {
-  margin-left: auto;
-  max-width: 100%;
+.guild-card:hover {
+  border-color: rgba(200, 150, 42, 0.4);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.4);
 }
 
-.guild-card-negative {
-  border: 1px solid #d32f2f;
+.guild-card-clickable { cursor: pointer; }
+.guild-card-negative { border-color: rgba(139, 42, 42, 0.5) !important; }
+
+.guild-crest {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(200, 150, 42, 0.08);
+  border: 1px solid rgba(200, 150, 42, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wi-gold);
+  flex-shrink: 0;
+  align-self: center;
 }
 
-.guild-card-negative :deep(.v-card-title),
-.guild-card-negative :deep(.v-card-text),
-.guild-card-negative :deep(.v-card-title .text-medium-emphasis),
-.guild-card-negative :deep(.v-card-text .text-medium-emphasis),
-.guild-card-negative :deep(.v-card-text .text-body-2),
-.guild-card-negative :deep(.v-card-text b) {
-  color: #d32f2f !important;
+.guild-info { grid-column: 2; grid-row: 1; min-width: 0; }
+
+.guild-name {
+  font-family: var(--wi-font-heading);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: var(--wi-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guild-leader {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--wi-text-muted);
+  margin-top: 2px;
+}
+.guild-leader .v-icon { color: var(--wi-gold) !important; opacity: 0.6; }
+
+.guild-short {
+  font-family: var(--wi-font-heading);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--wi-text-muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.guild-balance { grid-column: 3; grid-row: 1 / 3; text-align: right; flex-shrink: 0; }
+
+.guild-balance-amount {
+  font-size: 1.3rem;
+  color: var(--wi-gold);
+  text-shadow: 0 0 10px rgba(200,150,42,0.3);
+  line-height: 1.1;
+}
+
+.balance-negative .guild-balance-amount { color: var(--wi-danger); text-shadow: none; }
+
+.guild-balance-label {
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  font-size: 0.7rem;
+  color: var(--wi-text-muted);
+}
+
+.guild-actions {
+  grid-column: 1 / 4;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(90, 62, 32, 0.35);
+}
+
+.guild-deposit-btn {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.05em !important;
+  background: rgba(90, 138, 60, 0.15) !important;
+  color: var(--wi-success) !important;
+  border: 1px solid rgba(90, 138, 60, 0.3) !important;
+}
+.guild-deposit-btn :deep(.v-btn__overlay) { background-color: var(--wi-success) !important; opacity: 0; }
+.guild-deposit-btn:hover :deep(.v-btn__overlay) { opacity: 0.08 !important; }
+
+.guild-withdraw-btn {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.05em !important;
+  color: var(--wi-danger) !important;
+  border: 1px solid rgba(139, 42, 42, 0.3) !important;
+}
+.guild-withdraw-btn :deep(.v-btn__overlay) { background-color: var(--wi-danger) !important; opacity: 0; }
+.guild-withdraw-btn:hover :deep(.v-btn__overlay) { opacity: 0.08 !important; }
+
+.guild-edit-btn { color: var(--wi-text-muted) !important; }
+.guild-edit-btn :deep(.v-btn__overlay) { background-color: var(--wi-gold) !important; }
+
+.guild-log-hint {
+  grid-column: 1 / 4;
+  grid-row: 4;
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.guild-card-clickable:hover .guild-log-hint { opacity: 1; }
+
+/* ── Shared dialogs ─────────────────────────────────────────── */
+.guild-dialog {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
+}
+
+.guild-dialog-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 1rem;
+  color: var(--wi-gold);
+  letter-spacing: 0.06em;
+}
+
+.guild-dialog-body { padding: 20px !important; }
+
+.guild-dialog-error {
+  display: flex;
+  align-items: center;
+  color: var(--wi-danger);
+  font-size: 0.85rem;
+}
+
+.guild-dialog-actions { padding: 12px 20px !important; }
+
+.cancel-btn {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.06em !important;
+}
+
+.save-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+}
+.save-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
+
+/* ── Ledger ─────────────────────────────────────────────────── */
+.guild-ledger-wrap { overflow-x: auto; }
+.guild-ledger-table { background: transparent !important; }
+
+.guild-ledger-table :deep(thead tr th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--wi-text-muted) !important;
+  border-bottom: 1px solid var(--wi-border) !important;
+  background: #1a1108 !important;
+  white-space: nowrap;
+  padding: 10px 14px !important;
+}
+
+.ledger-row td {
+  font-family: var(--wi-font-body);
+  font-size: 0.85rem;
+  color: var(--wi-text);
+  border-bottom: 1px solid rgba(90, 62, 32, 0.4) !important;
+  padding: 9px 14px !important;
+  vertical-align: middle;
+}
+
+.ledger-row:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.ledger-row:hover td { background: rgba(200,150,42,0.05) !important; }
+
+.ledger-date { white-space: nowrap; color: var(--wi-text-muted) !important; font-size: 0.78rem !important; }
+.ledger-who { font-style: italic; color: var(--wi-text-muted) !important; }
+
+.tx-type {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.tx-deposit { color: var(--wi-success); background: rgba(90, 138, 60, 0.15); border: 1px solid rgba(90, 138, 60, 0.3); }
+.tx-withdraw { color: var(--wi-danger); background: rgba(139, 42, 42, 0.15); border: 1px solid rgba(139, 42, 42, 0.3); }
+.amount-positive { color: var(--wi-success); font-weight: bold; }
+.amount-negative { color: var(--wi-danger); font-weight: bold; }
+
+.ledger-comment { max-width: 240px; color: var(--wi-text-muted) !important; font-style: italic; }
+.comment-truncated { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
+.ledger-balance-after { font-family: var(--wi-font-number); font-size: 0.8rem; color: var(--wi-gold) !important; white-space: nowrap; }
+
+.guild-logs-empty {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  padding: 20px;
 }
 </style>

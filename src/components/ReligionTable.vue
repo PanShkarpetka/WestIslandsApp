@@ -60,45 +60,58 @@
         >
           <td>{{ record.heroName }}</td>
           <td>{{ record.religionName }}</td>
-          <td class="faith-cell">
-            <v-icon v-if="hasIcon(record.religionName)">
-              <img
-                :src="`/images/religions/${record.religionName}.png`"
-                alt="Faith Icon"
-                width="32"
-                height="32"
-              />
-            </v-icon>
-            <v-icon v-else>
-              mdi-dharmachakra
-            </v-icon>
-            <span>{{ record.faith }}</span>
+          <td>
+            <div class="faith-cell">
+              <v-icon v-if="hasIcon(record.religionName)">
+                <img
+                  :src="`/images/religions/${record.religionName}.png`"
+                  alt="Faith Icon"
+                  width="32"
+                  height="32"
+                />
+              </v-icon>
+              <v-icon v-else>
+                mdi-dharmachakra
+              </v-icon>
+              <span>{{ record.faith }}</span>
+            </div>
           </td>
           <td>{{ record.faithMax ?? '—' }}</td>
-          <td class="downtime-cell">
-            <v-icon v-if="record.downtimeAvailable === false" color="success">
-              mdi-check-circle
-            </v-icon>
-            <v-icon v-else color="warning">
-              mdi-progress-clock
-            </v-icon>
-            <span class="downtime-label">
-              {{ record.downtimeAvailable === false ? 'Дію виконано' : 'Дію не виконано' }}
-            </span>
+          <td>
+            <div class="downtime-cell">
+              <v-icon v-if="record.downtimeAvailable === false" color="success">
+                mdi-check-circle
+              </v-icon>
+              <v-icon v-else color="warning">
+                mdi-progress-clock
+              </v-icon>
+              <span class="downtime-label">
+                {{ record.downtimeAvailable === false ? 'Дію виконано' : 'Дію не виконано' }}
+              </span>
+            </div>
           </td>
           <td class="bonuses-cell">
             <template v-if="record.activeBonuses?.length">
-              <v-chip
+              <v-tooltip
                 v-for="(bonus, index) in record.activeBonuses"
                 :key="`${record.id}-${bonus.id || bonus.name || index}`"
-                :color="record.religionColor || 'primary'"
-                variant="flat"
-                :class="['mr-2', 'mb-2', { 'bonus-chip--inactive': bonus.active === false }]"
-                :title="bonusTooltip(bonus)"
-                size="small"
+                location="top"
+                :text="bonusTooltip(bonus)"
+                :disabled="!bonusTooltip(bonus)"
               >
-                {{ bonus.name }}
-              </v-chip>
+                <template #activator="{ props: tooltipProps }">
+                  <v-chip
+                    v-bind="tooltipProps"
+                    :color="record.religionColor || 'primary'"
+                    variant="flat"
+                    :class="['mr-2', 'mb-2', bonus.active === false ? 'bonus-chip--inactive' : 'bonus-chip--active']"
+                    :style="bonus.active !== false ? { '--chip-glow': record.religionColor || '#c8962a' } : {}"
+                    size="small"
+                  >
+                    {{ bonus.name }}
+                  </v-chip>
+                </template>
+              </v-tooltip>
             </template>
             <span v-else class="text-medium-emphasis">—</span>
           </td>
@@ -145,72 +158,69 @@ function bonusTooltip(bonus) {
   padding-bottom: 8px;
 }
 
-.religion-table {
-  background-color: rgba(255, 255, 255, 0.62);
-  color: #0f172a;
-  min-width: 540px;
+.table-scroll :deep(.v-table__wrapper) {
+  overflow: visible;
 }
 
-.religion-table td {
-  background-color: transparent;
+.religion-table { min-width: 540px; }
+
+.religion-table :deep(thead tr th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--wi-text-muted) !important;
+  background: #1a1108 !important;
+  border-bottom: 1px solid var(--wi-border) !important;
 }
 
-.religion-table th {
-  font-weight: 600;
-  background-color: rgba(255, 255, 255, 0.82);
+.religion-table :deep(tbody tr td) {
+  color: var(--wi-text);
+  font-family: var(--wi-font-body);
+  border-bottom: 1px solid rgba(90, 62, 32, 0.3) !important;
 }
 
-.bonuses-cell {
-  min-width: 200px;
-}
-
-.religion-table tbody tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.6);
-}
 
 .sort-btn {
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
-  font-weight: 600;
+  font-family: var(--wi-font-heading);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.sort-btn:hover {
-  text-decoration: underline;
+.sort-btn:hover { color: var(--wi-gold); }
+.sort-indicator { font-size: 10px; color: var(--wi-gold); }
+
+.clickable-row { cursor: pointer; transition: background-color 0.18s ease; }
+.clickable-row:hover :deep(td) { background: rgba(200,150,42,0.07) !important; }
+.clickable-row:focus-visible { outline: 2px solid var(--wi-gold); outline-offset: -2px; }
+.bonus-chip--inactive { opacity: 0.5; }
+
+.bonus-chip--active :deep(.v-chip__content) { position: relative; }
+.bonus-chip--active {
+  animation: chip-glow 2.2s ease-in-out infinite;
+  box-shadow: 0 0 6px 1px var(--chip-glow, #c8962a);
 }
 
-.sort-indicator {
-  font-size: 12px;
+@keyframes chip-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px color-mix(in srgb, var(--chip-glow, #c8962a) 55%, transparent); }
+  50%       { box-shadow: 0 0 12px 3px color-mix(in srgb, var(--chip-glow, #c8962a) 90%, transparent); }
 }
 
-.clickable-row {
-  cursor: pointer;
-  transition: background-color 0.18s ease, transform 0.18s ease;
-}
-
-.bonus-chip--inactive {
-  opacity: 0.55;
-}
-
-.clickable-row:hover {
-  background-color: rgba(255, 255, 255, 0.32);
-  transform: translateY(-1px);
-}
-
-.clickable-row:focus-visible {
-  outline: 2px solid #3f51b5;
-  outline-offset: -2px;
-}
+.bonuses-cell { min-width: 200px; }
 
 .faith-cell {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  align-content: center;
   flex-direction: row;
   width: 100px;
 }
@@ -224,17 +234,10 @@ function bonusTooltip(bonus) {
 
 .downtime-label {
   white-space: nowrap;
+  font-family: var(--wi-font-body);
 }
 
 @media (max-width: 600px) {
-  .religion-table {
-    font-size: 14px;
-    min-width: 100%;
-  }
-
-  .faith-cell {
-    gap: 8px;
-    width: auto;
-  }
+  .faith-cell { gap: 8px; width: auto; }
 }
 </style>

@@ -1,30 +1,32 @@
 <template>
-  <v-card class="mb-6 island-params-card custom-bg">
-    <v-card-text class="island-map-wrap">
-      <div class="island-map" style="max-width: 900px;">
-        <img class="map-img" :src="islandImg" alt="Острів" style="width: 800px;">
-        <button
+  <div class="buildings-page">
+    <div class="map-frame">
+      <div class="island-map-wrap">
+        <div class="island-map">
+          <img class="map-img" :src="islandImg" alt="Острів" />
+
+          <button
             v-for="pin in pins"
             :key="pin.id"
             class="building-pin"
             :class="{ built: isBuilt(pin.id) }"
-            :style="{ top: pin.top+'px', left: pin.left+'px', transform: pin.flipX ? 'scaleX(-1)' : undefined }"
+            :style="{ top: pin.top + 'px', left: pin.left + 'px', transform: pin.flipX ? 'scaleX(-1)' : undefined }"
             @click="openBuilding(pin.id)"
-            :title="buildingName(pin.id)"
-        >
-          <img :src="`/images/buildings/${pin.id}.png`" alt="" />
-        </button>
+          >
+            <img :src="`/images/buildings/${pin.id}.png`" :alt="buildingName(pin.id)" />
+            <span class="pin-glow" />
+          </button>
+        </div>
       </div>
-    </v-card-text>
-  </v-card>
+    </div>
+  </div>
 
-  <!-- Діалог будівлі -->
   <IslandBuildingDialog
-      v-if="activeKey"
-      v-model="showDialog"
-      :building-key="activeKey"
-      :nickname="auth.nickname"
-      :is-admin="isAdmin"
+    v-if="activeKey"
+    v-model="showDialog"
+    :building-key="activeKey"
+    :nickname="auth.nickname"
+    :is-admin="isAdmin"
   />
 </template>
 
@@ -34,9 +36,9 @@ import { useIslandStore } from '@/store/islandStore'
 import { useBuildingStore } from '@/store/buildingStore'
 import { useDonationGoalStore } from '@/store/donationGoalStore'
 import { useUserStore } from '@/store/userStore.js'
-import IslandBuildingDialog from "@/components/IslandBuildingDialog.vue";
-import {storeToRefs} from "pinia";
-import { DEFAULT_ISLAND_ID } from '@/config/constants.js';
+import IslandBuildingDialog from "@/components/IslandBuildingDialog.vue"
+import { storeToRefs } from 'pinia'
+import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
 
 const islandImg = `/images/island/${DEFAULT_ISLAND_ID}.jpg`
 const pins = [
@@ -67,60 +69,120 @@ const islandStore = useIslandStore()
 const buildingStore = useBuildingStore()
 const donationStore = useDonationGoalStore()
 const auth = useUserStore()
-
 const { data: island } = storeToRefs(islandStore)
 const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 onMounted(() => {
   islandStore.subscribe()
   buildingStore.subscribe()
-  donationStore.subscribeToGoals?.() // існуючий listener для донатів
+  donationStore.subscribeToGoals?.()
 })
 onUnmounted(() => {
   islandStore.stop()
   buildingStore.stop()
   donationStore.stop?.()
 })
+
 const showDialog = ref(false)
 const activeKey = ref(null)
 const builtMap = computed(() => ({ ...(island.value?.buildings || {}) }))
 
-function isBuilt (key) { return !!builtMap.value[key]?.built }
-
-function buildingName (key) {
-  return buildingStore.byId.get(key)?.name || key
-}
-function openBuilding (key) {
-  activeKey.value = key
-  showDialog.value = true
-}
+function isBuilt(key) { return !!builtMap.value[key]?.built }
+function buildingName(key) { return buildingStore.byId.get(key)?.name || key }
+function openBuilding(key) { activeKey.value = key; showDialog.value = true }
 </script>
+
 <style scoped>
-.island-map-wrap{
-  display:flex;
-  justify-content:center;
+.buildings-page {
+  padding-bottom: 16px;
 }
-.island-map{
-  position:relative;
-  width: 800px;             /* base width you used for pin coordinates */
-  max-width: 100%;
-  margin: 0 auto;           /* ensure centered if parent isn't flex */
+
+/* ── Map frame ──────────────────────────────────────────────── */
+.map-frame {
+  border: 2px solid var(--wi-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.3);
+  background: #0a1a10;
 }
-.map-img{
-  display:block;
-  width:100%;
-  height:auto;
-  border-radius: 12px;
+
+.island-map-wrap {
+  overflow: auto;
+  display: flex;
+  justify-content: center;
 }
-.building-pin{
-  position:absolute; width:80px; height:80px; border:2px solid rgba(0,0,0,.3);
-  border-radius:6px; background:rgba(255,255,255,.2); opacity:.55; padding:2px;
-  display:flex; align-items:center; justify-content:center; transition:.15s;
+
+.island-map {
+  position: relative;
+  width: 800px;
+  flex-shrink: 0;
 }
-.building-pin img{width:100%; height:100%; object-fit:contain}
-.building-pin:hover{transform:scale(2.05); outline:2px solid #42a5f5}
-.building-pin.built{opacity:1}
-.custom-bg {
-  background: #0d3d59;
+
+.map-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+  /* Slight aged-map filter */
+  filter: sepia(15%) contrast(105%) brightness(92%);
+}
+
+/* ── Building pins ──────────────────────────────────────────── */
+.building-pin {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  /* Unbuilt: rusted grey */
+  background: rgba(30, 20, 10, 0.55);
+  border: 2px solid rgba(90, 62, 32, 0.5);
+  opacity: 0.55;
+  filter: grayscale(60%) brightness(0.7);
+}
+
+.building-pin img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Built: gold lantern glow */
+.building-pin.built {
+  opacity: 1;
+  filter: none;
+  background: rgba(20, 12, 4, 0.4);
+  border: 2px solid rgba(200, 150, 42, 0.6);
+  box-shadow: 0 0 10px rgba(200, 150, 42, 0.3), 0 0 4px rgba(200, 150, 42, 0.2);
+}
+
+.building-pin:hover {
+  transform: scale(2.1);
+  z-index: 10;
+  border-color: var(--wi-gold) !important;
+  box-shadow: 0 0 16px rgba(200, 150, 42, 0.6), 0 4px 12px rgba(0,0,0,0.6) !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Subtle pulse on built pins */
+.building-pin.built .pin-glow {
+  position: absolute;
+  inset: -4px;
+  border-radius: 8px;
+  border: 1px solid rgba(200, 150, 42, 0.2);
+  animation: lantern-pulse 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes lantern-pulse {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 0.8; }
 }
 </style>

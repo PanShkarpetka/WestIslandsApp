@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOT_CONFIG_DOC, COLLECTIONS, COMMANDS, SESSION_STEPS } from '../src/config/constants.js';
 import { handleTelegramMessage } from '../src/telegram/handlers.js';
+import { getDailyResetKeyNoonUtc } from '../src/services/firestoreService.js';
 
 function createMockDb(seed = {}) {
   const collections = new Map();
@@ -468,14 +469,15 @@ test('accepts admin command with bot mention', async () => {
   const db = createMockDb({
     [COLLECTIONS.BOT_CONFIGS]: {
       [BOT_CONFIG_DOC]: {
-        fishingState: { lastResetDateKey: new Date().toISOString().slice(0, 10) }
+        fishingState: { lastResetDateKey: getDailyResetKeyNoonUtc() }
       }
     },
     [COLLECTIONS.FISHES]: {
       'fish-1': {
         fishName: 'Test Fish',
         fishCodeNumber: { min: 36, max: 36 },
-        fishAmountAvailableNow: 2
+        fishAmountAvailableNow: 2,
+        fishAmountDaily: 2,
       }
     }
   });

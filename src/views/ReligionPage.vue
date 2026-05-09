@@ -2,7 +2,8 @@
   <v-container>
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12" sm="6">
-        <h1 class="text-h5">
+        <h1 class="wi-heading" style="display:flex;align-items:center;gap:8px;font-size:1.4rem">
+          <v-icon color="primary" size="22">mdi-candle</v-icon>
           Релігії острова
         </h1>
       </v-col>
@@ -85,14 +86,39 @@
               <template v-else-if="viewMode === 'celestial'">
                 <div class="deva-panel mb-4">
                   <div class="deva-gauge-wrapper">
-                    <div class="deva-gauge">
+                    <div class="deva-gauge" :class="[`deva-cracks--${deathMarkers}`, { 'deva-empty': devaFaith === 0 && deathMarkers < 3 }]" :style="gaugeStyle">
                       <div class="deva-liquid" :style="{ height: `${devaFaithVisualPercent}%` }">
-                        <div class="deva-liquid-sheen"></div>
-                        <div class="deva-surface"></div>
                         <div class="deva-wave"></div>
                         <div class="deva-wave deva-wave--alt"></div>
+                        <div class="deva-liquid-sheen"></div>
                       </div>
-                      <div class="deva-overlay">Deva</div>
+                      <div class="deva-glass-highlight"></div>
+
+                      <!-- Crack 1 -->
+                      <svg v-if="deathMarkers >= 1" class="deva-crack-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M72 18 L90 55 L70 78 L98 122 L84 158" stroke="rgba(200,225,255,0.82)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M90 55 L76 62" stroke="rgba(200,225,255,0.45)" stroke-width="1" fill="none" stroke-linecap="round"/>
+                      </svg>
+
+                      <!-- Crack 2 -->
+                      <svg v-if="deathMarkers >= 2" class="deva-crack-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M148 22 L128 52 L155 76 L120 120 L138 158" stroke="rgba(200,225,255,0.82)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M155 76 L168 82" stroke="rgba(200,225,255,0.45)" stroke-width="1" fill="none" stroke-linecap="round"/>
+                      </svg>
+
+                      <!-- Shattered (3 markers) -->
+                      <svg v-if="deathMarkers >= 3" class="deva-crack-svg deva-shattered" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M110 110 L36 42 M110 110 L188 36 M110 110 L210 118 M110 110 L178 198 M110 110 L52 208 M110 110 L16 158 M110 110 L20 70"
+                              stroke="rgba(220,200,180,0.88)" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+                        <circle cx="110" cy="110" r="107" fill="rgba(180,80,40,0.06)" stroke="none"/>
+                      </svg>
+
+                      <div class="deva-overlay">
+                        <span class="deva-label">{{ deathMarkers >= 3 ? '☠' : 'Deva' }}</span>
+                        <span v-if="deathMarkers > 0" class="deva-death-markers">
+                          <v-icon v-for="i in deathMarkers" :key="i" size="12" class="deva-skull">mdi-skull</v-icon>
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div class="deva-bottom-labels">
@@ -110,17 +136,25 @@
                 >
                   <template #item.bonuses="{ item }">
                     <div class="bonuses-cell">
-                      <v-chip
+                      <v-tooltip
                         v-for="(bonus, index) in item.bonuses"
                         :key="`${item.heroName}-${bonus.id}-${index}`"
-                        size="small"
-                        color="primary"
-                        class="mr-2 mb-2"
-                        :variant="bonus.active ? 'flat' : 'tonal'"
-                        :title="bonusTooltip(bonus)"
+                        location="top"
+                        :text="bonusTooltip(bonus)"
+                        :disabled="!bonusTooltip(bonus)"
                       >
-                        {{ bonus.name }}
-                      </v-chip>
+                        <template #activator="{ props: tooltipProps }">
+                          <v-chip
+                            v-bind="tooltipProps"
+                            size="small"
+                            color="primary"
+                            :variant="bonus.active ? 'flat' : 'tonal'"
+                            :class="['mr-2', 'mb-2', bonus.active ? 'celestial-chip--active' : 'celestial-chip--inactive']"
+                          >
+                            {{ bonus.name }}
+                          </v-chip>
+                        </template>
+                      </v-tooltip>
                     </div>
                   </template>
                 </v-data-table>
@@ -704,7 +738,18 @@ const devaFaith = computed(() => Number(devaCustom.value?.devaFaith ?? 0))
 const devaFaithPerDay = computed(() => Number(devaCustom.value?.devaFaithPerDay ?? 1))
 const devaFaithPerMonth = computed(() => devaFaithPerDay.value * 30)
 const devaFaithFillPercent = computed(() => Math.min(100, Math.max(0, devaFaith.value)))
-const devaFaithVisualPercent = computed(() => Math.min(100, devaFaithFillPercent.value + 6))
+const devaFaithVisualPercent = computed(() => {
+  if (devaFaithFillPercent.value === 0) return 0
+  return Math.min(100, devaFaithFillPercent.value + 6)
+})
+const deathMarkers = computed(() => Math.min(3, Math.max(0, Number(devaCustom.value?.deathMarkers ?? 0))))
+
+const gaugeStyle = computed(() => {
+  const f = devaFaithFillPercent.value
+  const duration = (0.45 + (f / 100) * 2.8).toFixed(2)   // 0.45s panicked → 3.25s calm
+  const amplitude = Math.round(6 + (1 - f / 100) * 26)    // 6px calm → 32px panicked
+  return { '--wave-duration': `${duration}s`, '--wave-amplitude': `${amplitude}px` }
+})
 
 const followersSliderCeiling = computed(() => {
   const base = totalPopulation.value || 0
@@ -1254,10 +1299,18 @@ async function handleCycleDevaConsumption() {
     const data = snap.data() || {}
     if (data.lastConsumedCycleId === latestCycle.value.id) return
 
-    transaction.update(devaRef, {
-      devaFaith: Math.max(0, Number(data.devaFaith ?? 0) - devaFaithPerMonth.value),
-      lastConsumedCycleId: latestCycle.value.id,
-    })
+    const currentFaith = Number(data.devaFaith ?? 0)
+    const newFaith = currentFaith - devaFaithPerMonth.value
+    const updates = { lastConsumedCycleId: latestCycle.value.id }
+
+    if (newFaith < 0) {
+      updates.devaFaith = 0
+      updates.deathMarkers = Math.min(3, Number(data.deathMarkers ?? 0) + 1)
+    } else {
+      updates.devaFaith = newFaith
+    }
+
+    transaction.update(devaRef, updates)
   })
 }
 
@@ -2006,30 +2059,26 @@ const celestialBonusOptions = computed(() => {
 
 </script>
 <style scoped>
+/* ── Page header ────────────────────────────────────────────── */
+.religion-page-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
 .error {
-  color: #dc2626;
-  font-size: 15px;
+  color: var(--wi-danger);
+  font-family: var(--wi-font-body);
+  font-size: 0.9rem;
   margin-top: 8px;
 }
 
-.view-toggle {
-  margin-left: 0;
-}
-
-.view-toggle__btn {
-  white-space: nowrap;
-}
-
-.toggle-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
+/* ── Outer card ─────────────────────────────────────────────── */
 .religion-card {
   position: relative;
   overflow: hidden;
-  background-color: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(160deg, #2c1e0f 0%, #1a1108 100%) !important;
+  border: 1px solid var(--wi-border) !important;
 }
 
 .card-overlay {
@@ -2039,16 +2088,8 @@ const celestialBonusOptions = computed(() => {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 1;
+  opacity: 0.08;
   z-index: 0;
-}
-
-.section-overlay {
-  inset: 0;
-  z-index: 0;
-  background-repeat: no-repeat !important;
-  background-position: center !important;
-  background-size: 55% !important;
 }
 
 .religion-card .v-card-text {
@@ -2056,10 +2097,18 @@ const celestialBonusOptions = computed(() => {
   z-index: 1;
 }
 
+/* ── Distribution section ───────────────────────────────────── */
 .distribution-section {
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  border: 1px solid rgba(90, 62, 32, 0.4);
   padding: 16px 16px 0;
+}
+
+.section-overlay {
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 55% !important;
 }
 
 .distribution-header {
@@ -2068,7 +2117,13 @@ const celestialBonusOptions = computed(() => {
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+  margin-bottom: 12px;
 }
+
+.distribution-header p { margin: 0; }
+.distribution-header .text-sm { font-family: var(--wi-font-body); font-style: italic; color: var(--wi-text-muted); font-size: 0.8rem; }
+.distribution-header .text-h6 { font-family: var(--wi-font-heading); color: var(--wi-gold); font-size: 1.05rem; letter-spacing: 0.04em; }
+.distribution-header .text-caption { font-family: var(--wi-font-body); font-style: italic; color: var(--wi-text-muted); font-size: 0.78rem; }
 
 .distribution-actions {
   display: flex;
@@ -2077,137 +2132,249 @@ const celestialBonusOptions = computed(() => {
   margin-left: auto;
 }
 
+/* ── View toggle ────────────────────────────────────────────── */
+.view-toggle { margin-left: 0; }
+.view-toggle__btn { white-space: nowrap; }
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Gold active state for the view toggle */
+.view-toggle :deep(.v-btn--active) {
+  background: rgba(200,150,42,0.2) !important;
+  color: var(--wi-gold) !important;
+}
+.view-toggle :deep(.v-btn--active .v-btn__overlay) { opacity: 0 !important; }
+.view-toggle :deep(.v-btn__overlay) { background-color: var(--wi-gold) !important; }
+
+/* ── Confessions chip ───────────────────────────────────────── */
 .chart-chip {
-  font-weight: 600;
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.06em !important;
+  background: rgba(200,150,42,0.12) !important;
+  border: 1px solid rgba(200,150,42,0.3) !important;
+  color: var(--wi-gold) !important;
 }
 
+/* ── Deva gauge (celestial view) ────────────────────────────── */
+.deva-gauge-wrapper { display: flex; justify-content: center; align-items: center; }
 
+.deva-side-label {
+  font-family: var(--wi-font-heading);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--wi-text);
+  background: rgba(30, 60, 120, 0.35);
+  border: 1px solid rgba(60, 100, 200, 0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+/* Glass sphere */
+.deva-gauge {
+  position: relative;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 38% 34%, rgba(60,100,210,0.28) 0%, rgba(8,16,52,0.98) 68%);
+  border: 2px solid rgba(100,150,255,0.45);
+  box-shadow:
+    inset 0 0 40px rgba(0,0,55,0.8),
+    inset 0 -10px 24px rgba(20,55,180,0.18),
+    0 0 28px rgba(40,80,200,0.18),
+    0 6px 28px rgba(0,0,45,0.65);
+  transition: border-color 0.8s ease, box-shadow 0.8s ease;
+}
+
+/* Primary glass highlight — key to the glass sphere illusion */
+.deva-glass-highlight {
+  position: absolute;
+  width: 68px; height: 52px;
+  top: 22px; left: 32px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.34) 0%, transparent 72%);
+  transform: rotate(-28deg);
+  pointer-events: none;
+  z-index: 6;
+  mix-blend-mode: screen;
+}
+.deva-glass-highlight::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 12px;
+  bottom: -28px; right: -8px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.16) 0%, transparent 70%);
+}
+
+.deva-liquid {
+  position: absolute;
+  inset: auto 0 0 0;
+  width: 100%;
+  overflow: visible;
+  background: linear-gradient(180deg, rgba(55,118,255,0.62), rgba(14,48,155,0.9));
+  transition: height 1.2s cubic-bezier(.22,.61,.36,1);
+  z-index: 1;
+}
+
+.deva-liquid-sheen {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, rgba(255,255,255,0.13), rgba(255,255,255,0) 48%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.deva-wave {
+  position: absolute;
+  top: -20px; left: -40%;
+  width: 180%; height: 36px;
+  border-radius: 999px;
+  background: rgba(80,145,255,0.3);
+  animation: deva-wave-slosh var(--wave-duration, 2s) ease-in-out infinite alternate;
+}
+.deva-wave--alt {
+  top: -14px; left: -35%;
+  opacity: 0.48;
+  animation-duration: calc(var(--wave-duration, 2s) * 1.28);
+  animation-direction: alternate-reverse;
+}
+
+@keyframes deva-wave-slosh {
+  0%   { transform: translateX(calc(-1 * var(--wave-amplitude, 12px))) scaleX(1.04); }
+  100% { transform: translateX(var(--wave-amplitude, 12px)) scaleX(0.97); }
+}
+
+/* Crack SVG overlays */
+.deva-crack-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 0 2.5px rgba(160,200,255,0.75));
+}
+.deva-shattered {
+  filter: drop-shadow(0 0 4px rgba(220,190,160,0.9));
+}
+
+/* Gauge state by death markers */
+.deva-cracks--1 { border-color: rgba(110,155,255,0.42); }
+.deva-cracks--2 {
+  border-color: rgba(160,120,220,0.52);
+  box-shadow:
+    inset 0 0 40px rgba(0,0,55,0.8),
+    0 0 28px rgba(110,55,200,0.28),
+    0 6px 28px rgba(0,0,45,0.65);
+}
+.deva-cracks--3 {
+  border-color: rgba(190,90,65,0.65);
+  box-shadow:
+    inset 0 0 40px rgba(40,5,0,0.85),
+    0 0 36px rgba(190,70,40,0.38),
+    0 6px 28px rgba(0,0,45,0.65);
+  animation: deva-shatter-pulse 2.2s ease-in-out infinite;
+}
+@keyframes deva-shatter-pulse {
+  0%, 100% { box-shadow: inset 0 0 40px rgba(40,5,0,0.85), 0 0 36px rgba(190,70,40,0.38), 0 6px 28px rgba(0,0,45,0.65); }
+  50%       { box-shadow: inset 0 0 40px rgba(40,5,0,0.85), 0 0 54px rgba(190,70,40,0.58), 0 6px 28px rgba(0,0,45,0.65); }
+}
+
+/* Tremor when faith hits zero */
+.deva-empty {
+  animation: deva-tremor 0.22s ease-in-out infinite;
+}
+@keyframes deva-tremor {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  18%  { transform: translate(-2px, 1px) rotate(-0.4deg); }
+  36%  { transform: translate(2px, -1px) rotate(0.3deg); }
+  54%  { transform: translate(-1px, 2px) rotate(-0.2deg); }
+  72%  { transform: translate(2px, -2px) rotate(0.4deg); }
+  90%  { transform: translate(-2px, 1px) rotate(-0.3deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* Overlay label */
+.deva-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 16px;
+  z-index: 5;
+  pointer-events: none;
+}
+.deva-label {
+  font-family: var(--wi-font-heading);
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--wi-text);
+  text-shadow: 0 0 14px rgba(100,155,255,0.9), 0 1px 4px rgba(0,0,0,0.95);
+}
+.deva-death-markers { display: flex; gap: 3px; margin-top: 4px; }
+.deva-skull { color: rgba(220,130,100,0.9) !important; filter: drop-shadow(0 0 3px rgba(200,80,40,0.7)); }
+
+.deva-bottom-labels { margin-top: 12px; display: flex; justify-content: center; gap: 10px; }
+
+.bonuses-cell { display: flex; flex-wrap: wrap; }
+
+.celestial-chip--inactive { opacity: 0.5; }
+
+.celestial-chip--active {
+  animation: celestial-chip-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes celestial-chip-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(99, 160, 255, 0.5); }
+  50%       { box-shadow: 0 0 12px 3px rgba(99, 160, 255, 0.9); }
+}
+
+/* ── Celestial characters table ─────────────────────────────── */
+.characters-table {
+  background: linear-gradient(135deg, rgba(8,14,40,0.94), rgba(12,24,60,0.92)),
+              url('@/images/religions/Deva.png') center / contain no-repeat !important;
+}
+
+.characters-table :deep(.v-data-table__th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--wi-text-muted) !important;
+  background: rgba(10,20,60,0.7) !important;
+  border-bottom: 1px solid rgba(60,100,200,0.3) !important;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 960px) {
-  .distribution-section {
-    padding: 12px 12px 0;
-  }
-
-  .distribution-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .section-overlay {
-    background-size: 65% !important;
-  }
-}
-
-@media (max-width: 520px) {
-  .distribution-actions {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-  }
-
-  .distribution-actions > .v-btn {
-    width: 100%;
-  }
-
-  .view-toggle {
-    width: 100%;
-  }
-
-  .view-toggle__btn {
-    flex: 1;
-    min-width: 0;
-    padding-inline: 10px;
-    justify-content: center;
-  }
-
-  .view-toggle__btn .v-btn__prepend {
-    margin-inline-end: 0;
-  }
-
-  .toggle-label {
-    display: none;
-  }
+  .distribution-section { padding: 12px 12px 0; }
+  .distribution-header { flex-direction: column; align-items: flex-start; }
+  .section-overlay { background-size: 65% !important; }
 }
 
 @media (max-width: 600px) {
-  .section-overlay {
-    background-size: 80% !important;
-  }
+  .section-overlay { background-size: 80% !important; }
 }
 
-.deva-gauge-wrapper { display:flex; justify-content:center; align-items:center; }
-.deva-side-label { color:#155e75; font-weight:700; background:rgba(224,247,250,.75); padding:8px 12px; border-radius:10px; }
-.deva-gauge {
-  position:relative;
-  width:220px;
-  height:220px;
-  border-radius:50%;
-  overflow:hidden;
-  background: radial-gradient(circle at center, rgba(224,247,250,.95), rgba(125,211,252,.9));
-  border:2px solid rgba(125,211,252,.8);
-  box-shadow: inset 0 0 28px rgba(8, 51, 68, 0.22);
+@media (max-width: 520px) {
+  .distribution-actions { flex-direction: column; align-items: stretch; width: 100%; }
+  .distribution-actions > .v-btn { width: 100%; }
+  .view-toggle { width: 100%; }
+  .view-toggle__btn { flex: 1; min-width: 0; padding-inline: 10px; justify-content: center; }
+  .view-toggle__btn .v-btn__prepend { margin-inline-end: 0; }
+  .toggle-label { display: none; }
 }
-.deva-liquid {
-  position:absolute;
-  inset:auto 0 0 0;
-  width:100%;
-  overflow:visible;
-  background: linear-gradient(180deg, rgba(125,211,252,.78), rgba(14,116,144,.88));
-  transition: height 1s cubic-bezier(.22,.61,.36,1);
-}
-.deva-surface {
-  position: absolute;
-  top: -16px;
-  left: -40%;
-  width: 180%;
-  height: 28px;
-  background: radial-gradient(35px 12px at 20px 18px, rgba(186,230,253,.95) 55%, rgba(186,230,253,0) 57%) repeat-x;
-  background-size: 70px 28px;
-  animation: deva-surface-bounce 2.8s ease-in-out infinite alternate;
-}
-.deva-liquid-sheen {
-  position:absolute;
-  inset:0;
-  background: linear-gradient(120deg, rgba(255,255,255,.22), rgba(255,255,255,0) 45%);
-  mix-blend-mode: screen;
-}
-.deva-wave {
-  position: absolute;
-  top: -22px;
-  left: -35%;
-  width: 170%;
-  height: 38px;
-  border-radius: 999px;
-  background: rgba(186,230,253,.28);
-  animation: deva-wave-slosh 2.9s ease-in-out infinite alternate;
-}
-.deva-wave--alt {
-  top: -18px;
-  left: -30%;
-  opacity: 0.45;
-  animation-duration: 3.6s;
-  animation-direction: alternate-reverse;
-}
-.deva-overlay { position:absolute; inset:auto 0 14px 0; text-align:center; color:#083344; font-weight:800; text-shadow:0 1px 2px rgba(255,255,255,.7); z-index:4; }
-.bonuses-cell { display:flex; flex-wrap:wrap; }
-.deva-bottom-labels { margin-top: 10px; display:flex; justify-content:center; gap:10px; }
+
 @keyframes deva-wave-slosh {
   0% { transform: translateX(-10%) translateY(2px) scaleX(1.02); }
   50% { transform: translateX(0) translateY(-2px) scaleX(1); }
   100% { transform: translateX(10%) translateY(2px) scaleX(1.02); }
-}
-
-@keyframes deva-surface-bounce {
-  0% { transform: translateX(-28px); }
-  100% { transform: translateX(28px); }
-}
-.characters-table {
-  background:
-      linear-gradient(135deg, rgba(240, 249, 255, 0.86), rgba(224, 242, 254, 0.66)),
-      url('@/images/religions/Deva.png') center no-repeat;
-  background-size: contain;
-  .v-data-table__th {
-    font-weight: 600;
-  }
 }
 
 </style>

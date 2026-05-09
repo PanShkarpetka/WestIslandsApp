@@ -14,6 +14,10 @@ export default defineConfig({
     server: {
         port: 5173,
         open: false,
+        fs: {
+            // worktree node_modules resolve to the parent project — allow @fs access there
+            allow: ['..', '../..', '../../..', '../../../..'],
+        },
     },
     resolve: {
         alias: {

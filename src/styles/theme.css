@@ -1,0 +1,328 @@
+/* ============================================================
+   West Islands — Pirate Fantasy Theme
+   ============================================================ */
+
+/* ── CSS Variables ─────────────────────────────────────────── */
+:root {
+  --wi-bg:            #1a1209;
+  --wi-surface:       #2c1e0f;
+  --wi-surface-hi:    #3d2a14;
+  --wi-gold:          #c8962a;
+  --wi-gold-light:    #e8b84b;
+  --wi-copper:        #7b4f2e;
+  --wi-text:          #f0ddb0;
+  --wi-text-muted:    #a8896a;
+  --wi-border:        #5a3e20;
+  --wi-success:       #5a8a3c;
+  --wi-danger:        #8b2a2a;
+  --wi-sea:           #3a6080;
+
+  --wi-font-heading:  'Cinzel', serif;
+  --wi-font-body:     'IM Fell English', serif;
+  --wi-font-number:   'Cinzel Decorative', serif;
+  --wi-font-mono:     'Special Elite', cursive;
+
+  --wi-shadow:        0 4px 24px rgba(0, 0, 0, 0.6);
+  --wi-shadow-gold:   0 0 12px rgba(200, 150, 42, 0.25);
+  --wi-radius:        6px;
+  --wi-border-style:  1px solid var(--wi-border);
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+html {
+  font-size: 17px !important; /* bumped from browser default 16px — scales all rem values up ~6% */
+}
+
+html, body {
+  background-color: var(--wi-bg) !important;
+  color: var(--wi-text) !important;
+  font-family: var(--wi-font-body) !important;
+}
+
+/* Parchment grain overlay on the whole page */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: 0.5;
+}
+
+/* ── Typography ────────────────────────────────────────────── */
+h1, h2, h3, h4,
+.v-toolbar__title,
+.wi-heading {
+  font-family: var(--wi-font-heading) !important;
+  color: var(--wi-gold) !important;
+  letter-spacing: 0.04em;
+}
+
+.wi-number {
+  font-family: var(--wi-font-number) !important;
+  color: var(--wi-gold);
+}
+
+.wi-mono {
+  font-family: var(--wi-font-mono) !important;
+}
+
+/* ── App bar ───────────────────────────────────────────────── */
+.v-app-bar {
+  background: linear-gradient(180deg, #0f0a04 0%, #1f1409 100%) !important;
+  border-bottom: 2px solid var(--wi-border) !important;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.7) !important;
+}
+
+.v-app-bar .v-toolbar__title {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 1.3rem !important;
+  letter-spacing: 0.08em;
+  color: var(--wi-gold) !important;
+  text-shadow: 0 0 10px rgba(200, 150, 42, 0.5);
+}
+
+/* ── Navigation drawer (mobile) ────────────────────────────── */
+.v-navigation-drawer {
+  background: linear-gradient(180deg, #0f0a04 0%, #1a1209 100%) !important;
+  border-right: var(--wi-border-style) !important;
+}
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.v-card {
+  background: var(--wi-surface) !important;
+  border: var(--wi-border-style) !important;
+  border-radius: var(--wi-radius) !important;
+  box-shadow: var(--wi-shadow) !important;
+  color: var(--wi-text) !important;
+}
+
+.v-card-title {
+  font-family: var(--wi-font-heading) !important;
+  color: var(--wi-gold) !important;
+  letter-spacing: 0.04em;
+  font-size: 1.1rem !important;
+}
+
+.v-card-subtitle {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-body) !important;
+}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.v-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+}
+
+.v-btn--variant-elevated {
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 3px 8px rgba(0,0,0,0.5) !important;
+}
+
+.v-btn--variant-elevated:hover {
+  background: linear-gradient(180deg, #e8b84b 0%, #b88030 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 12px rgba(200,150,42,0.4) !important;
+}
+
+.v-btn--variant-text,
+.v-btn--variant-plain {
+  color: var(--wi-gold) !important;
+}
+
+.v-btn--variant-outlined {
+  border-color: var(--wi-border) !important;
+  color: var(--wi-text) !important;
+}
+
+/* ── Text fields & inputs ──────────────────────────────────── */
+.v-field {
+  background: #1f1508 !important;
+  border-color: var(--wi-border) !important;
+  color: var(--wi-text) !important;
+  font-family: var(--wi-font-body) !important;
+}
+
+.v-field--focused {
+  border-color: var(--wi-gold) !important;
+  box-shadow: 0 0 0 1px var(--wi-gold) !important;
+}
+
+.v-label {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-body) !important;
+}
+
+.v-field__input {
+  color: var(--wi-text) !important;
+}
+
+/* ── Dialogs ───────────────────────────────────────────────── */
+.v-dialog .v-card,
+.v-overlay__content .v-card {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.8), var(--wi-shadow-gold) !important;
+}
+
+.v-dialog .v-card-title {
+  border-bottom: 1px solid var(--wi-border);
+  padding-bottom: 12px;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────── */
+.v-tabs {
+  background: #0f0a04 !important;
+  border-bottom: 2px solid var(--wi-border) !important;
+}
+
+.v-tab {
+  font-family: var(--wi-font-heading) !important;
+  color: var(--wi-text-muted) !important;
+  letter-spacing: 0.05em !important;
+}
+
+.v-tab--selected {
+  color: var(--wi-gold) !important;
+}
+
+.v-tabs .v-tabs-bar__line,
+.v-slider-track__fill {
+  background: var(--wi-gold) !important;
+}
+
+/* ── Tables ────────────────────────────────────────────────── */
+.v-table {
+  background: var(--wi-surface) !important;
+  color: var(--wi-text) !important;
+  font-family: var(--wi-font-body) !important;
+}
+
+.v-table th {
+  font-family: var(--wi-font-heading) !important;
+  color: var(--wi-gold) !important;
+  border-bottom: 1px solid var(--wi-border) !important;
+  background: #1f1508 !important;
+}
+
+.v-table tr:nth-child(even) td {
+  background: rgba(255,255,255,0.02);
+}
+
+.v-table tr:hover td {
+  background: rgba(200, 150, 42, 0.07) !important;
+}
+
+/* ── Lists ─────────────────────────────────────────────────── */
+.v-list {
+  background: var(--wi-surface) !important;
+}
+
+.v-list-item {
+  color: var(--wi-text) !important;
+}
+
+.v-list-item:hover {
+  background: rgba(200, 150, 42, 0.08) !important;
+}
+
+.v-list-item-title {
+  font-family: var(--wi-font-body) !important;
+}
+
+/* ── Chips ─────────────────────────────────────────────────── */
+.v-chip {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.04em;
+}
+
+.v-chip--variant-elevated {
+  background: var(--wi-surface-hi) !important;
+  border: 1px solid var(--wi-border) !important;
+  color: var(--wi-text) !important;
+}
+
+/* ── Progress bars ─────────────────────────────────────────── */
+.v-progress-linear__background {
+  background: var(--wi-surface-hi) !important;
+}
+
+.v-progress-linear__determinate {
+  background: linear-gradient(90deg, var(--wi-copper), var(--wi-gold)) !important;
+}
+
+/* ── Expansion panels ──────────────────────────────────────── */
+.v-expansion-panels {
+  background: transparent !important;
+}
+
+.v-expansion-panel {
+  background: var(--wi-surface) !important;
+  border: var(--wi-border-style) !important;
+  color: var(--wi-text) !important;
+  margin-bottom: 4px;
+}
+
+.v-expansion-panel-title {
+  font-family: var(--wi-font-heading) !important;
+  color: var(--wi-gold) !important;
+}
+
+/* ── Tooltips ──────────────────────────────────────────────── */
+.v-tooltip .v-overlay__content {
+  background: #0f0a04 !important;
+  color: var(--wi-text) !important;
+  border: 1px solid var(--wi-border) !important;
+  font-family: var(--wi-font-body) !important;
+  font-size: 0.8rem !important;
+  padding: 4px 10px !important;
+}
+
+/* ── Select / Autocomplete dropdowns ──────────────────────── */
+.v-menu > .v-overlay__content > .v-list {
+  background: #1f1508 !important;
+  border: var(--wi-border-style) !important;
+}
+
+/* ── Dividers ──────────────────────────────────────────────── */
+.v-divider {
+  border-color: var(--wi-border) !important;
+  opacity: 1 !important;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--wi-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--wi-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--wi-copper);
+}
+
+/* ── Utility classes ───────────────────────────────────────── */
+.wi-parchment {
+  background: linear-gradient(135deg, #2c1e0f 0%, #3d2a14 50%, #2c1e0f 100%) !important;
+  border: 1px solid var(--wi-border) !important;
+}
+
+.wi-gold-text   { color: var(--wi-gold) !important; }
+.wi-muted-text  { color: var(--wi-text-muted) !important; }
+.wi-sea-text    { color: var(--wi-sea) !important; }
+.wi-danger-text { color: var(--wi-danger) !important; }
+.wi-success-text{ color: var(--wi-success) !important; }
+
+/* Keep old custom-v-field-background working under new theme */
+.custom-v-field-background .v-input__control {
+  background: linear-gradient(90deg, rgba(200,150,42,.15), rgba(200,150,42,.02)) !important;
+}

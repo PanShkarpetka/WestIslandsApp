@@ -1,8 +1,8 @@
 <template>
   <v-row class="my-4">
     <v-col cols="12">
-      <v-card class="pa-6" elevation="4">
-        <v-card-title class="text-h6">Калькулятор подорожі кораблем</v-card-title>
+      <v-card class="pa-6 ship-card" elevation="0">
+        <v-card-title class="voyage-title">Калькулятор подорожі кораблем</v-card-title>
         <v-card-text>
           <v-row>
             <v-col cols="12" md="6">
@@ -45,32 +45,32 @@
             </v-col>
           </v-row>
 
-          <v-divider class="my-4" />
+          <div class="wave-divider"></div>
 
           <v-row>
             <v-col cols="12" md="4">
-              <div class="text-subtitle-2 text-grey">Швидкість за годину (поточна зміна)</div>
-              <div class="text-h6">{{ formattedSpeedPerHour }}</div>
+              <div class="result-label">Швидкість за годину (поточна зміна)</div>
+              <div class="result-value">{{ formattedSpeedPerHour }}</div>
             </v-col>
             <v-col cols="12" md="4">
-              <div class="text-subtitle-2 text-grey">Час в один бік</div>
-              <div class="text-h6">{{ formattedOneWayTime }}</div>
+              <div class="result-label">Час в один бік</div>
+              <div class="result-value">{{ formattedOneWayTime }}</div>
             </v-col>
             <v-col cols="12" md="4">
-              <div class="text-subtitle-2 text-grey">Час туди й назад</div>
-              <div class="text-h6">{{ formattedRoundTripTime }}</div>
+              <div class="result-label">Час туди й назад</div>
+              <div class="result-value">{{ formattedRoundTripTime }}</div>
             </v-col>
             <v-col cols="12" md="4">
-              <div class="text-subtitle-2 text-grey">Вартість (в один бік)</div>
-              <div class="text-h6">{{ formattedCostOneWay }}</div>
+              <div class="result-label">Вартість (в один бік)</div>
+              <div class="result-value">{{ formattedCostOneWay }}</div>
             </v-col>
             <v-col cols="12" md="4">
-              <div class="text-subtitle-2 text-grey">Вартість (туди й назад)</div>
-              <div class="text-h6">{{ formattedCostRoundTrip }}</div>
+              <div class="result-label">Вартість (туди й назад)</div>
+              <div class="result-value">{{ formattedCostRoundTrip }}</div>
             </v-col>
             <v-col cols="12" md="4">
-              <div class="text-subtitle-2 text-grey">Годин плавання на добу</div>
-              <div class="text-h6">{{ formattedSailingHoursPerDay }}</div>
+              <div class="result-label">Годин плавання на добу</div>
+              <div class="result-value">{{ formattedSailingHoursPerDay }}</div>
             </v-col>
           </v-row>
 
@@ -96,8 +96,8 @@
                   />
                 </v-col>
                 <v-col cols="12">
-                  <v-card class="pa-4" variant="outlined">
-                    <div class="text-subtitle-2 text-grey">Ризик подорожі (Шанс небезпеки)</div>
+                  <v-card class="pa-4 danger-card" variant="outlined">
+                    <div class="danger-title">Ризик подорожі (Шанс небезпеки)</div>
                     <div v-if="dangerArea" class="text-body-1 mt-1">
                       Зона небезпеки: {{ dangerArea.area }} (мін. ШБ {{ formatPercent(dangerArea.min) }})
                     </div>
@@ -116,7 +116,7 @@
                         <v-list-item-title>Озброєння: {{ formatSignedPercent(-weaponReduction) }}</v-list-item-title>
                       </v-list-item>
                     </v-list>
-                    <div class="text-h6 mt-3">Фінальний шанс небезпеки: {{ formattedFinalChance }}</div>
+                    <div class="danger-final mt-3">Фінальний шанс небезпеки: {{ formattedFinalChance }}</div>
                   </v-card>
                 </v-col>
               </v-row>
@@ -253,3 +253,64 @@ function formatSignedPercent(value) {
 
 const formattedFinalChance = computed(() => (finalChance.value === null ? '—' : formatPercent(finalChance.value)))
 </script>
+
+<style scoped>
+.ship-card {
+  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
+  border: 1px solid var(--wi-border) !important;
+  border-radius: 16px !important;
+}
+
+.voyage-title {
+  font-family: var(--wi-font-heading);
+  text-transform: uppercase;
+  color: var(--wi-gold);
+  font-size: 0.88rem !important;
+  letter-spacing: 0.06em;
+  padding-bottom: 8px;
+}
+
+.result-label {
+  font-family: var(--wi-font-heading);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.result-value {
+  font-family: var(--wi-font-heading);
+  color: var(--wi-gold);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.wave-divider {
+  width: 100%;
+  height: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 28' preserveAspectRatio='none'%3E%3Cpath d='M0,14 C150,28 350,0 600,14 C850,28 1050,0 1200,14 L1200,28 L0,28 Z' fill='rgba(90,62,32,0.18)'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  margin: 8px 0 16px;
+}
+
+.danger-card {
+  background: rgba(40, 8, 8, 0.7) !important;
+  border: 1px solid rgba(180, 60, 60, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.danger-title {
+  font-family: var(--wi-font-heading);
+  text-transform: uppercase;
+  color: #e05555;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+.danger-final {
+  color: var(--wi-gold);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+</style>

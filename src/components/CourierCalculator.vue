@@ -1,10 +1,10 @@
 <template>
   <v-row justify="space-between" align="center" class="my-4">
     <v-col cols="12">
-      <v-card class="pa-6" elevation="4" width="100%">
-        <v-card-title class="text-h6">
-          Чи долетів кур’єр?
-          <span :hidden="!success" class="text-h6 text-green">ТАК!</span>
+      <v-card class="pa-6 courier-card" elevation="0" width="100%">
+        <v-card-title class="courier-title">
+          Чи долетів кур'єр?
+          <v-chip v-if="success" color="success" variant="flat" size="small" class="success-badge ml-3">✓ ТАК!</v-chip>
         </v-card-title>
         <v-card-text>
           <v-text-field v-model.number="distanceToTravel" type="number" label="Відстань, милі" :rules="[v => v > 0 || 'Вкажіть відстань більше нуля']"
@@ -13,13 +13,13 @@
           <v-text-field v-model.number="conSaveMod" label="Модифікатор Con Save. Наприклад: (1, 2, 3, -1, -2)" step="1" outlined dense />
           <v-text-field v-model.number="dangerChance" type="number" label="Шанс небезпеки, %. За замовчуванням: 1%" outlined dense :rules="[v => v > 0 || 'Вкажіть не від\'ємний шанс']" />
         </v-card-text>
-        <p v-if="error" class="error">{{ error }}</p>
+        <p v-if="error" class="error-msg">{{ error }}</p>
         <v-card-actions class="justify-end">
-          <v-btn color="secondary" @click="() => handleSend(false)">Потестувати</v-btn>
+          <v-btn color="secondary" class="theme-btn" @click="() => handleSend(false)">Потестувати</v-btn>
           <v-tooltip :disabled="!!isLoggedIn" location="top center">
             <template v-slot:activator="{ props }">
               <div v-bind="props" class="d-inline-block">
-                <v-btn color="primary" :disabled="!isLoggedIn" @click="() => handleSend(true)">
+                <v-btn color="primary" class="theme-btn theme-btn--primary" :disabled="!isLoggedIn" @click="() => handleSend(true)">
                   Відправити
                 </v-btn>
               </div>
@@ -32,7 +32,8 @@
   </v-row>
   <v-row justify="space-between" align="center" class="my-4">
     <v-col cols="12">
-      <v-card class="pa-6" elevation="4" width="100%">
+      <div class="log-label mb-2">Хроніка подорожі</div>
+      <v-card class="pa-6 courier-card courier-log" elevation="0" width="100%">
         <v-textarea
             v-model="cardLogger"
             label="Історія подорожі"
@@ -102,5 +103,64 @@ function handleSend(save = false) {
 </script>
 
 <style scoped>
-.error{ color:#dc2626; font-size: 15px; margin-top: 8px; }
+.courier-card {
+  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
+  border: 1px solid var(--wi-border) !important;
+  border-radius: 16px !important;
+}
+
+.courier-title {
+  font-family: var(--wi-font-heading);
+  text-transform: uppercase;
+  color: var(--wi-gold);
+  font-size: 0.88rem !important;
+  letter-spacing: 0.06em;
+  padding-bottom: 8px;
+}
+
+.log-label {
+  font-family: var(--wi-font-heading);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--wi-text-muted);
+  letter-spacing: 0.08em;
+}
+
+.courier-log :deep(.v-textarea textarea) {
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: var(--wi-text-muted);
+  background: rgba(4, 3, 2, 0.6) !important;
+  line-height: 1.6;
+}
+
+.error-msg {
+  color: #ef4444;
+  font-style: italic;
+  font-family: var(--wi-font-body);
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  margin: 0;
+}
+
+.success-badge {
+  animation: pulse-success 1.4s ease-in-out 3;
+}
+
+@keyframes pulse-success {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+.theme-btn {
+  font-family: var(--wi-font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+}
+
+.theme-btn--primary {
+  background-color: var(--wi-gold) !important;
+  color: #0e0904 !important;
+}
 </style>

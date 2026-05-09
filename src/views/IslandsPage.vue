@@ -1,71 +1,38 @@
 <template>
-  <v-container>
-    <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="6">
-        <h1 class="text-h5">Острів Камінь</h1>
-      </v-col>
-    </v-row>
+  <v-container class="island-container">
 
-    <div class="p-6">
-      <!-- MATERIAL TABS -->
-      <nav class="tabs-md mb-2">
-        <div class="tabs-row">
-          <!-- Інфо -->
-          <RouterLink :to="`/islands/${islandName}`" custom v-slot="{ href, navigate, isExactActive }">
-            <a :href="href"
-               @click="navigate"
-               class="tab"
-               :data-active="isExactActive"
-               :aria-current="isExactActive ? 'page' : null"
-            >ℹ️ Інфо</a>
-          </RouterLink>
-
-          <!-- Будівлі -->
-          <RouterLink :to="`/islands/${islandName}/buildings`" custom v-slot="{ href, navigate, isExactActive }">
-            <a :href="href"
-               @click="navigate"
-               class="tab"
-               :data-active="isExactActive"
-               :aria-current="isExactActive ? 'page' : null"
-            >🏗️ Будівлі</a>
-          </RouterLink>
-
-          <!-- Населення -->
-          <RouterLink :to="`/islands/${islandName}/population`" custom v-slot="{ href, navigate, isExactActive }">
-            <a :href="href"
-               @click="navigate"
-               class="tab"
-               :data-active="isExactActive"
-               :aria-current="isExactActive ? 'page' : null"
-            >👥 Населення</a>
-          </RouterLink>
-
-          <!-- Казна -->
-          <RouterLink :to="`/islands/${islandName}/treasury`" custom v-slot="{ href, navigate, isExactActive }">
-            <a :href="href"
-               @click="navigate"
-               class="tab"
-               :data-active="isExactActive"
-               :aria-current="isExactActive ? 'page' : null"
-            >🪙 Скарбниця</a>
-          </RouterLink>
-
-          <!-- Мануфактури -->
-          <RouterLink :to="`/islands/${islandName}/manufactures`" custom v-slot="{ href, navigate, isExactActive }">
-            <a :href="href"
-               @click="navigate"
-               class="tab"
-               :data-active="isExactActive"
-               :aria-current="isExactActive ? 'page' : null"
-            >🏭 Мануфактури</a>
-          </RouterLink>
-        </div>
-      </nav>
-
-      <section class="pt-2">
-        <RouterView />
-      </section>
+    <!-- Island heading -->
+    <div class="island-heading">
+      <v-icon class="mr-2" color="primary">mdi-island</v-icon>
+      <h1 class="wi-heading">Острів Камінь</h1>
     </div>
+
+    <!-- Plank tab bar -->
+    <nav class="plank-tabs">
+      <RouterLink
+        v-for="tab in tabs"
+        :key="tab.to"
+        :to="tab.to"
+        custom
+        v-slot="{ href, navigate, isExactActive }"
+      >
+        <a
+          :href="href"
+          @click="navigate"
+          class="plank-tab"
+          :class="{ 'plank-tab--active': isExactActive }"
+          :aria-current="isExactActive ? 'page' : null"
+        >
+          <v-icon size="15" class="plank-tab-icon">{{ tab.icon }}</v-icon>
+          <span>{{ tab.label }}</span>
+        </a>
+      </RouterLink>
+    </nav>
+
+    <section class="island-content">
+      <RouterView />
+    </section>
+
   </v-container>
 </template>
 
@@ -78,87 +45,110 @@ import { useDonationGoalStore } from '@/store/donationGoalStore'
 import { useUserStore } from '@/store/userStore.js'
 
 const islandName = 'Камінь'
+
+const tabs = [
+  { to: `/islands/${islandName}`,              icon: 'mdi-information-outline', label: 'Інфо' },
+  { to: `/islands/${islandName}/buildings`,    icon: 'mdi-chess-rook',          label: 'Будівлі' },
+  { to: `/islands/${islandName}/population`,   icon: 'mdi-account-group',       label: 'Населення' },
+  { to: `/islands/${islandName}/treasury`,     icon: 'mdi-treasure-chest',      label: 'Скарбниця' },
+  { to: `/islands/${islandName}/manufactures`, icon: 'mdi-factory',             label: 'Мануфактури' },
+]
+
 const islandStore = useIslandStore()
 const buildingStore = useBuildingStore()
 const donationStore = useDonationGoalStore()
 const auth = useUserStore()
-
 const { data: island } = storeToRefs(islandStore)
 const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 onMounted(() => {
   islandStore.subscribe()
   buildingStore.subscribe()
-  donationStore.subscribeToGoals?.() // існуючий listener для донатів
+  donationStore.subscribeToGoals?.()
 })
 onUnmounted(() => {
   islandStore.stop()
   buildingStore.stop()
   donationStore.stop?.()
 })
-
-/* -------- заголовок + знижка -------- */
-
-/* -------- форма редагування острова -------- */
-
-/* -------- інтеракція з мапою -------- */
-
 </script>
 
 <style scoped>
-.tabs-md {
-  border-bottom: 1px solid #e5e7eb; /* gray-200 */
+.island-container {
+  padding-top: 20px;
 }
 
-/* Горизонтальний ряд (без <ul>/<li>) */
-.tabs-row {
+/* ── Island heading ─────────────────────────────────────────── */
+.island-heading {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-/* Базовий вигляд таба */
-.tab {
+/* ── Plank tabs ─────────────────────────────────────────────── */
+.plank-tabs {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--wi-border);
+  margin-bottom: 0;
+}
+
+.plank-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: .5rem;
-  padding: .75rem 1rem;            /* py-3 px-4 */
-  text-decoration: none;           /* прибрати синє підкреслення */
-  color: #6b7280;                  /* gray-600 */
-  font: 500 0.875rem/1.25rem system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  letter-spacing: .02em;           /* легкий tracking */
+  gap: 6px;
+  padding: 10px 16px;
+  text-decoration: none;
+  font-family: var(--wi-font-heading);
+  font-size: 0.78rem;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  transition: color .2s ease;
+  color: var(--wi-text-muted);
+  background: linear-gradient(180deg, #1a1108 0%, #150e05 100%);
+  border: 1px solid var(--wi-border);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  transition: color 0.2s, background 0.2s;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.tab:hover { color: #111827; }     /* gray-900 */
-
-/* Активний таб */
-.tab[data-active="true"] {
-  color: #2563eb;                  /* blue-600 */
-  font-weight: 600;
+.plank-tab:hover {
+  color: var(--wi-text);
+  background: linear-gradient(180deg, #2c1e0f 0%, #1f1508 100%);
 }
 
-/* Індикатор під активним табом */
-.tab::after {
-  content: "";
-  position: absolute;
-  left: 12px;                      /* вирівняти з текстом */
-  right: 12px;
-  bottom: -1px;
-  height: 2px;
-  background: transparent;
-  border-radius: 9999px;
-  transition: background-color .2s ease;
-}
-.tab[data-active="true"]::after {
-  background: #2563eb;             /* blue-600 */
+.plank-tab--active {
+  color: var(--wi-gold) !important;
+  background: linear-gradient(180deg, #3d2a14 0%, #2c1e0f 100%) !important;
+  border-color: var(--wi-gold) !important;
+  border-bottom: 2px solid var(--wi-surface) !important;
+  margin-bottom: -2px;
+  z-index: 1;
 }
 
-/* Доступність: фокус */
-.tab:focus-visible {
-  outline: 2px solid #93c5fd;      /* blue-300 */
-  outline-offset: 2px;
-  border-radius: 8px;
+.plank-tab-icon {
+  color: inherit !important;
+  opacity: 0.8;
+}
+
+.plank-tab--active .plank-tab-icon {
+  opacity: 1;
+}
+
+/* ── Content ────────────────────────────────────────────────── */
+.island-content {
+  padding-top: 20px;
+}
+
+/* ── Mobile ─────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .plank-tab {
+    padding: 8px 10px;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+  }
 }
 </style>

@@ -111,7 +111,7 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   const populationEntries = (populationItems || [])
     .map((group) => {
       const count = Number(group.count ?? 0)
-      const incomePerPerson = normalizeAmount(group.incomePerPerson ?? 0)
+      const incomePerPerson = normalizeAmount(group.incomePerPerson ?? group.income ?? group.incomePer ?? 0)
       return {
         id: group.id,
         name: group.name || 'Невідома група',

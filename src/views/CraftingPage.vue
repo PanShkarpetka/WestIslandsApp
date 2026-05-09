@@ -23,7 +23,7 @@
       </div>
     </v-sheet>
 
-    <v-row dense class="mb-4">
+    <v-row dense class="mb-5">
       <v-col cols="12" md="6" lg="4">
         <v-select
             v-model="selectedHeroId"
@@ -51,21 +51,21 @@
       </v-col>
     </v-row>
 
-    <v-row class="mb-2" dense>
+    <v-row class="mb-5" dense>
       <v-col cols="12" md="6" lg="3" v-for="card in summaryCards" :key="card.label">
-        <v-card class="metric-card" rounded="xl" variant="tonal">
+        <v-card class="metric-card" rounded="lg">
           <v-card-text>
-            <div class="text-caption text-medium-emphasis">{{ card.label }}</div>
-            <div class="text-h4 font-weight-bold my-1">{{ card.value }}</div>
-            <div class="text-caption">{{ card.subtext }}</div>
+            <div class="metric-label">{{ card.label }}</div>
+            <div class="metric-value">{{ card.value }}</div>
+            <div class="metric-subtext">{{ card.subtext }}</div>
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
 
-    <v-row dense>
+    <v-row dense class="mb-5">
       <v-col cols="12" lg="7">
-        <v-card rounded="xl" class="panel-card mb-4" elevation="2">
+        <v-card rounded="xl" class="panel-card mb-5" elevation="2">
           <v-card-title class="d-flex justify-space-between align-center">
             <span>Прогрес крафту персонажа</span>
             <v-chip color="success" variant="tonal">
@@ -102,7 +102,7 @@
       </v-col>
 
       <v-col cols="12" lg="5">
-        <v-card rounded="xl" class="panel-card mb-4" elevation="2">
+        <v-card rounded="xl" class="panel-card mb-5" elevation="2">
           <v-card-title>Найпопулярніші вироби</v-card-title>
           <v-divider />
           <v-list density="comfortable" class="bg-transparent">
@@ -409,28 +409,154 @@ onMounted(loadData);
 </script>
 
 <style scoped>
-.crafting-page {
-  background: radial-gradient(circle at top, rgba(26, 69, 138, 0.25), rgba(6, 12, 32, 0.02) 40%);
-}
+.crafting-page { /* inherits page background from theme */ }
 
+/* ── Hero banner ─────────────────────────────────────────────── */
 .hero-banner {
-  background: linear-gradient(135deg, rgba(7, 12, 33, 0.95) 0%, rgba(14, 29, 68, 0.92) 100%);
-  color: #f5f8ff;
-  border: 1px solid rgba(130, 164, 255, 0.25);
-  box-shadow: 0 16px 40px rgba(8, 19, 56, 0.35);
+  background: linear-gradient(135deg, rgba(12, 8, 4, 0.92) 0%, rgba(30, 18, 6, 0.88) 100%);
+  border: 1px solid var(--wi-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
+.hero-banner h1 {
+  font-family: var(--wi-font-heading);
+  color: var(--wi-gold);
+  letter-spacing: 0.04em;
+}
+
+.hero-banner p {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text-muted);
+}
+
+/* ── Summary metric cards ────────────────────────────────────── */
 .metric-card {
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(100, 125, 255, 0.2);
+  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
+  border: 1px solid var(--wi-border) !important;
 }
 
+.metric-label {
+  font-family: var(--wi-font-heading);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  margin-bottom: 6px;
+}
+
+.metric-value {
+  font-family: var(--wi-font-heading);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--wi-gold);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.metric-subtext {
+  font-family: var(--wi-font-body);
+  font-size: 0.72rem;
+  color: var(--wi-text-muted);
+}
+
+/* ── Panel cards (progress + calculator) ────────────────────── */
 .panel-card {
-  border: 1px solid rgba(130, 164, 255, 0.15);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.98));
+  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
+  border: 1px solid var(--wi-border) !important;
 }
 
-.calc-sheet {
-  background: linear-gradient(180deg, rgba(242, 248, 255, 0.8), rgba(247, 250, 255, 0.95));
+.panel-card :deep(.v-card-title) {
+  font-family: var(--wi-font-heading);
+  font-size: 0.88rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wi-gold);
+  padding-bottom: 12px;
 }
+
+.panel-card :deep(.v-card-subtitle) {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text-muted);
+}
+
+.panel-card :deep(.text-subtitle-1) {
+  font-family: var(--wi-font-heading);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+}
+
+/* ── Calculator result sheet ─────────────────────────────────── */
+.calc-sheet {
+  background: rgba(8, 5, 2, 0.65) !important;
+  border-color: var(--wi-border) !important;
+  font-family: var(--wi-font-body);
+  color: var(--wi-text);
+}
+
+.calc-sheet strong { color: var(--wi-gold); }
+
+.calc-sheet :deep(.v-divider) { border-color: var(--wi-border) !important; }
+
+/* ── Expansion panel (items table) ──────────────────────────── */
+:deep(.v-expansion-panels) {
+  border: 1px solid var(--wi-border);
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+:deep(.v-expansion-panel) {
+  border-radius: 12px !important;
+}
+
+:deep(.v-expansion-panel-title) {
+  font-family: var(--wi-font-heading);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wi-gold);
+  background: rgba(14, 9, 4, 0.9);
+  border-radius: 12px !important;
+  padding: 16px 20px;
+}
+
+:deep(.v-expansion-panel--active .v-expansion-panel-title) {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+:deep(.v-expansion-panel-text__wrapper) {
+  background: rgba(10, 6, 2, 0.85);
+  padding: 16px 20px;
+}
+
+:deep(.v-expansion-panel-text .v-table thead tr th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--wi-text-muted) !important;
+  background: #1a1108 !important;
+  border-bottom: 1px solid var(--wi-border) !important;
+}
+
+:deep(.v-expansion-panel-text .v-table tbody tr td) {
+  color: var(--wi-text);
+  font-family: var(--wi-font-body);
+  border-bottom: 1px solid rgba(90, 62, 32, 0.25) !important;
+  background: transparent !important;
+}
+
+/* ── List (top crafted items) ────────────────────────────────── */
+.panel-card :deep(.v-list-item-title) {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text);
+}
+
+.panel-card :deep(.v-list-item-subtitle) {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text-muted);
+}
+
+.panel-card :deep(.v-divider) { border-color: var(--wi-border) !important; }
 </style>

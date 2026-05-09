@@ -152,6 +152,16 @@
  */
 
 /**
+ * Subcollection: `religions/{PSEUDO_RELIGION_ID}/customs/Deva`
+ * Tracks the celestial (Deva) faith pool shared across all clergy.
+ * @typedef {Object} DevaCustomDoc
+ * @property {number} devaFaith - Current faith level (0–100). Set to 0 when it would go negative.
+ * @property {number} devaFaithPerDay - Faith consumed per in-game day.
+ * @property {number} deathMarkers - Number of times faith dropped below zero during a cycle (0–3). Each marker adds a crack to the gauge.
+ * @property {string} lastConsumedCycleId - ID of the last cycle that triggered faith deduction, used to prevent double-counting.
+ */
+
+/**
  * Collection: `clergy/{clergyId}`
  * @typedef {Object} ClergyDoc
  * @property {string} id

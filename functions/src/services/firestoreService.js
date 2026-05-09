@@ -49,7 +49,7 @@ export async function resetFishAvailabilityToDaily(db) {
   return snapshot.size;
 }
 
-function getDailyResetKeyNoonUtc(date = new Date()) {
+export function getDailyResetKeyNoonUtc(date = new Date()) {
   const current = new Date(date);
   const anchor = new Date(Date.UTC(
     current.getUTCFullYear(),

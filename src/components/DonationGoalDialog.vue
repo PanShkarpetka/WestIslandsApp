@@ -1,42 +1,55 @@
-<!-- components/DonationGoalDialog.vue -->
 <template>
   <teleport to="body">
-    <div v-if="visible" class="overlay" @click.self="close">
-      <div class="modal">
-        <h2 class="modal-title">
-          Пожертва на: <span class="accent">{{ goal?.title }}</span>
-        </h2>
+    <div v-if="visible" class="donate-overlay" @click.self="close">
+      <div class="donate-modal">
+        <div class="donate-header">
+          <v-icon class="mr-2" size="18">mdi-hand-coin</v-icon>
+          Внесок у збір
+        </div>
+        <div class="donate-goal-name">{{ goal?.title }}</div>
 
-        <div class="field">
-          <label>Сума, ₴</label>
-          <input
+        <div class="donate-body">
+          <div class="donate-field">
+            <label class="donate-label">
+              <v-icon size="13" class="mr-1">mdi-gold</v-icon>
+              Сума (золото)
+            </label>
+            <input
               type="number"
               min="1"
               step="1"
               v-model.number="amount"
-              class="input"
+              class="donate-input"
               placeholder="Вкажіть суму"
               @keydown.enter.prevent="saveDonation"
-          />
-        </div>
+            />
+          </div>
 
-        <div v-if="isAdmin" class="field">
-          <label>Нікнейм (від кого донат, опційно)</label>
-          <input
+          <div v-if="isAdmin" class="donate-field">
+            <label class="donate-label">
+              <v-icon size="13" class="mr-1">mdi-account</v-icon>
+              Від кого (опційно)
+            </label>
+            <input
               v-model="character"
-              class="input"
+              class="donate-input"
               placeholder="Напр., Марко / Гільдія Будівничих"
               @keydown.enter.prevent="saveDonation"
-          />
+            />
+          </div>
+
+          <div v-if="error" class="donate-error">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>
+            {{ error }}
+          </div>
         </div>
 
-        <p v-if="error" class="error">{{ error }}</p>
-
-        <div class="actions">
-          <button class="btn primary" :disabled="loading" @click="saveDonation">
+        <div class="donate-actions">
+          <button class="donate-cancel-btn" :disabled="loading" @click="close">Скасувати</button>
+          <button class="donate-confirm-btn" :disabled="loading" @click="saveDonation">
+            <v-icon size="14" class="mr-1">mdi-hand-coin</v-icon>
             {{ loading ? 'Збереження…' : 'Підтвердити' }}
           </button>
-          <button class="btn ghost" :disabled="loading" @click="close">Закрити</button>
         </div>
       </div>
     </div>
@@ -59,18 +72,11 @@ const amount = ref(null)
 const character = ref('')
 const loading = ref(false)
 const error = ref('')
-
 const store = useDonationGoalStore()
 
 watch(() => props.visible, v => {
-  if (v) {
-    amount.value = null
-    character.value = ''
-    error.value = ''
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
+  if (v) { amount.value = null; character.value = ''; error.value = ''; document.body.style.overflow = 'hidden' }
+  else document.body.style.overflow = ''
 })
 onBeforeUnmount(() => { document.body.style.overflow = '' })
 
@@ -79,57 +85,142 @@ async function saveDonation() {
   const goalId = props.goal?.id
   if (!goalId) { error.value = 'Немає ідентифікатора цілі.'; return }
   if (!amount.value || Number(amount.value) <= 0) { error.value = 'Вкажіть коректну суму.'; return }
-
   loading.value = true
   try {
-    await store.donate({
-      goalId,
-      amount: Number(amount.value),
-      character: props.isAdmin ? (character.value?.trim() || null) : props.nickname,
-    })
+    await store.donate({ goalId, amount: Number(amount.value), character: props.isAdmin ? (character.value?.trim() || null) : props.nickname })
     emit('saved')
     close()
   } catch (e) {
-    error.value = e?.message || 'Не вдалося зберегти пожертву'
+    error.value = e?.message || 'Не вдалося зберегти внесок'
   } finally {
-    loading.value = false
-  }
+    loading.value = false }
 }
 
-function close() {
-  if (!loading.value) emit('update:visible', false)
-}
+function close() { if (!loading.value) emit('update:visible', false) }
 </script>
 
 <style scoped>
-.overlay{
-  position: fixed; inset: 0; z-index: 10000;
-  background: rgba(0,0,0,.5);
-  display: flex; align-items: center; justify-content: center;
+.donate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
 }
-.modal{
-  width: min(92vw, 520px);
-  background: #fff; border-radius: 16px; padding: 20px 24px;
-  box-shadow: 0 30px 70px rgba(10,31,68,.25), 0 6px 18px rgba(10,31,68,.15);
+
+.donate-modal {
+  width: min(92vw, 480px);
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%);
+  border: 1px solid var(--wi-gold);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
 }
-.modal-title{ margin: 0 0 12px; font-size: 20px; font-weight: 800; color:#0f172a; }
-.accent{ font-weight: 700; }
 
-.field{ margin-top: 12px; }
-.field label{ display:block; font-size: 13px; color:#475569; margin-bottom:6px; }
-.input{
-  width: 100%; border:1px solid #cbd5e1; border-radius: 12px;
-  padding: 10px 12px; outline: none;
+.donate-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wi-border);
+  background: linear-gradient(180deg, #1f1508, #2c1e0f);
+  font-family: var(--wi-font-heading);
+  font-size: 1rem;
+  color: var(--wi-gold);
+  letter-spacing: 0.06em;
 }
-.input:focus{ border-color:#64748b; }
 
-.error{ color:#dc2626; font-size: 13px; margin-top: 8px; }
+.donate-goal-name {
+  padding: 10px 20px 0;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--wi-text-muted);
+}
 
-.actions{ display:flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
-.btn{ padding:10px 14px; border-radius:12px; font-weight:700; border:0; cursor:pointer; }
-.btn.primary{ background:#059669; color:#fff; }
-.btn.primary:hover{ background:#047857; }
-.btn.ghost{ background:transparent; color:#334155; }
-.btn.ghost:hover{ background:#f1f5f9; }
-.btn[disabled]{ opacity:.6; cursor:not-allowed; }
+.donate-body {
+  padding: 16px 20px;
+}
+
+.donate-field { margin-bottom: 14px; }
+
+.donate-label {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  margin-bottom: 6px;
+}
+
+.donate-label .v-icon { color: var(--wi-gold) !important; opacity: 0.7; }
+
+.donate-input {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--wi-border);
+  border-radius: 4px;
+  padding: 9px 12px;
+  color: var(--wi-text);
+  font-family: var(--wi-font-body);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.donate-input:focus { border-color: var(--wi-gold); }
+
+.donate-error {
+  display: flex;
+  align-items: center;
+  color: var(--wi-danger);
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
+
+.donate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--wi-border);
+  background: #1a1108;
+}
+
+.donate-cancel-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--wi-text-muted);
+  font-family: var(--wi-font-heading);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.donate-cancel-btn:hover { color: var(--wi-text); }
+.donate-cancel-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.donate-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  border: 1px solid var(--wi-gold);
+  border-radius: 4px;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%);
+  color: #1a1209;
+  font-family: var(--wi-font-heading);
+  font-size: 0.75rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.donate-confirm-btn:hover { filter: brightness(1.1); }
+.donate-confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 </style>
