@@ -34,6 +34,16 @@
         <v-btn color="primary" prepend-icon="mdi-play-circle-outline" :loading="cycleSaving" @click="createCycle">
           Почати новий цикл
         </v-btn>
+        <v-btn
+          color="secondary"
+          prepend-icon="mdi-telegram"
+          :loading="religionSummaryLoading"
+          :disabled="!previousCompletedCycle"
+          class="ml-3"
+          @click="generateReligionCycleSummary"
+        >
+          Підсумок релігій
+        </v-btn>
       </v-form>
 
       <v-divider class="my-4" />
@@ -364,6 +374,31 @@
       </v-data-table>
     </v-card>
   </v-container>
+
+  <v-dialog v-model="showReligionSummaryDialog" max-width="620">
+    <v-card>
+      <div class="pa-4" style="border-bottom: 1px solid var(--wi-border)">
+        <span class="wi-heading text-h6">Підсумок релігійних дій циклу</span>
+      </div>
+      <v-card-text class="pt-4">
+        <v-textarea
+          v-model="religionSummaryText"
+          rows="14"
+          auto-grow
+          variant="outlined"
+          hide-details
+        />
+      </v-card-text>
+      <v-divider />
+      <v-card-actions>
+        <v-spacer />
+        <v-btn prepend-icon="mdi-content-copy" color="primary" @click="copyReligionSummary">
+          {{ religionSummaryCopied ? 'Скопійовано!' : 'Копіювати' }}
+        </v-btn>
+        <v-btn @click="showReligionSummaryDialog = false">Закрити</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
@@ -381,6 +416,7 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { DEFAULT_YEAR, diffInDays, normalizeFaerunDate, parseFaerunDate } from 'faerun-date';
 import { db } from '../services/firebase';
@@ -391,12 +427,18 @@ import { createNewCycleWithEffects } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import { loadCraftItems } from '@/services/craftingService';
 import { DEFAULT_ISLAND_ID } from '@/config/constants.js';
+import { aggregateReligionActions, buildReligionSummaryText } from '@/utils/religionSummary.js';
 
 const logEntries = ref([]);
 const cycleSaving = ref(false);
 const cycleError = ref('');
 const cycleSuccess = ref('');
 const latestCycle = ref(null);
+const previousCompletedCycle = ref(null);
+const religionSummaryText = ref('');
+const showReligionSummaryDialog = ref(false);
+const religionSummaryLoading = ref(false);
+const religionSummaryCopied = ref(false);
 const islandStore = useIslandStore();
 const populationStore = usePopulationStore();
 const cycleForm = reactive({
@@ -615,9 +657,10 @@ const cycleDurationLabel = computed(() => {
 
 async function loadLatestCycle() {
   const cyclesRef = collection(db, 'cycles');
-  const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1));
+  const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(2));
   const snapshot = await getDocs(latestCycleQuery);
   latestCycle.value = snapshot.docs[0] ? { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } : null;
+  previousCompletedCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null;
 }
 
 function suggestNextCycleDate() {
@@ -669,6 +712,45 @@ async function createCycle() {
   } finally {
     cycleSaving.value = false;
   }
+}
+
+async function generateReligionCycleSummary() {
+  if (!previousCompletedCycle.value) return;
+
+  religionSummaryLoading.value = true;
+  try {
+    const heroNameById = new Map(heroes.value.map((h) => [h.id, h.name]));
+    const religionNameById = new Map(religions.value.map((r) => [r.id, r.name]));
+    const cycleId = previousCompletedCycle.value.id;
+
+    const actionsSnap = await getDocs(
+      query(collection(db, 'religion-actions'), where('cycleId', '==', cycleId))
+    );
+
+    const actions = actionsSnap.docs.map((docSnap) => docSnap.data());
+    const { faithByHero, followersByReligion, shieldDefenses, shieldsBrokenNames } =
+      aggregateReligionActions(actions, heroNameById, religionNameById);
+
+    religionSummaryText.value = buildReligionSummaryText({
+      faithByHero,
+      followersByReligion,
+      shieldDefenses,
+      shieldsBrokenNames,
+      newCycleDate: latestCycle.value?.startedAt || '',
+    });
+    showReligionSummaryDialog.value = true;
+  } catch (e) {
+    console.error('[admin] Failed to generate religion summary', e);
+  } finally {
+    religionSummaryLoading.value = false;
+  }
+}
+
+async function copyReligionSummary() {
+  if (!religionSummaryText.value) return;
+  await navigator.clipboard.writeText(religionSummaryText.value);
+  religionSummaryCopied.value = true;
+  setTimeout(() => { religionSummaryCopied.value = false; }, 2000);
 }
 
 function subscribeHeroData() {
