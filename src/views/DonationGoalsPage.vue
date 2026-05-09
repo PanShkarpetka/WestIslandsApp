@@ -1,30 +1,31 @@
 <template>
-  <v-container>
-    <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="6">
-        <h1 class="text-h5">Цілі зборів</h1>
-      </v-col>
-      <v-col cols="12" sm="6" class="text-sm-end">
-        <v-btn color="primary" @click="createNewGoal" :disabled="!isLoggedIn">
-          <v-icon start>mdi-plus</v-icon>
-          Додати збір
-        </v-btn>
+  <v-container class="donations-page">
+    <div class="donations-header">
+      <div class="donations-title">
+        <v-icon class="mr-2" size="20">mdi-hand-coin</v-icon>
+        Цілі зборів
+      </div>
+      <v-btn v-if="isLoggedIn" class="add-bounty-btn" prepend-icon="mdi-plus" @click="createNewGoal">
+        Новий збір
+      </v-btn>
+    </div>
+
+    <div v-if="!sortedGoals.length" class="donations-empty">
+      <v-icon class="mr-2" size="16">mdi-anchor</v-icon>
+      Поки що немає цілей…
+    </div>
+
+    <v-row v-else>
+      <v-col v-for="goal in sortedGoals" :key="goal.id" cols="12" md="6" lg="4">
+        <DonationGoalCard
+          :goal="goal"
+          :isAdmin="isAdmin"
+          :isLoggedIn="isLoggedIn"
+          :nickname="nickname"
+          @click="openDonors(goal)"
+        />
       </v-col>
     </v-row>
-
-    <div v-if="!sortedGoals.length">Поки що немає цілей...</div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      <div v-for="goal in sortedGoals" :key="goal.id" class="donation-goal-wrapper">
-        <DonationGoalCard
-            :goal="goal"
-            :isAdmin="isAdmin"
-            :isLoggedIn="isLoggedIn"
-            :nickname="nickname"
-            @click="openDonors(goal)"
-        />
-      </div>
-    </div>
 
   </v-container>
   <DonationsSummaryDialog
@@ -90,7 +91,41 @@ const openDonors = (goal) => {
 }
 </script>
 <style scoped>
-.donation-goal-wrapper {
+.donations-page { padding-bottom: 16px; }
+
+.donations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
+}
+
+.donations-title {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  color: var(--wi-gold);
+}
+
+.add-bounty-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+  font-size: 0.8rem !important;
+}
+
+.add-bounty-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
+
+.donations-empty {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  padding: 24px 0;
 }
 </style>

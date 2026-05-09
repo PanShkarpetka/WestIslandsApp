@@ -14,7 +14,7 @@
           v-for="row in tableRows"
           :key="row.key"
           class="abilities-row"
-          :class="{ 'ability-active': row.isActive }"
+          :class="{ 'ability-active': row.isActive, 'religion-group-start': row.showReligionCell }"
           :style="rowStyle(row.religion)"
         >
           <td v-if="row.showReligionCell" :rowspan="row.rowspan" class="religion-name">
@@ -23,7 +23,10 @@
           </td>
           <td class="milestone" :class="{ 'text-no-abilities': row.isEmpty }">
             <template v-if="row.isEmpty"></template>
-            <template v-else>{{ row.milestoneLabel }}</template>
+            <template v-else>
+              <v-icon v-if="!row.isActive" size="11" class="milestone-lock">mdi-lock</v-icon>
+              {{ row.milestoneLabel }}
+            </template>
           </td>
           <td class="ability-name">
             <template v-if="row.ability">{{ row.ability.name }}</template>
@@ -140,104 +143,121 @@ function isMilestoneActive(item, followersPercent = 0) {
 </script>
 
 <style scoped>
-.abilities-table-wrapper {
-  width: 100%;
-  overflow-x: auto;
+.abilities-table-wrapper { width: 100%; overflow-x: auto; }
+
+.abilities-table { min-width: 640px; }
+
+.abilities-table :deep(thead tr th) {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--wi-text-muted) !important;
+  background: #1a1108 !important;
+  border-bottom: 1px solid var(--wi-border) !important;
 }
 
-.abilities-table {
-  background-color: rgba(255, 255, 255, 0.62);
-  color: #0f172a;
-  min-width: 640px;
-}
-
-.abilities-table th {
-  font-weight: 600;
-  background-color: rgba(255, 255, 255, 0.82);
-}
-
-.abilities-table td {
-  background-color: transparent;
+.abilities-table :deep(tbody tr td) {
+  color: var(--wi-text);
+  font-family: var(--wi-font-body);
+  border-bottom: none !important;
   vertical-align: top;
   padding-left: 16px;
+  background: transparent !important;
 }
 
-.v-table .v-table__wrapper > table > tbody > tr:not(:last-child) > td, .v-table .v-table__wrapper > table > tbody > tr:not(:last-child) > th {
-  /* Avoid double separators with the custom ::after line */
-  border-bottom: none;
-}
-
-.abilities-table td.religion-name {
-  vertical-align: middle;
-}
+.abilities-table :deep(td.religion-name) { vertical-align: middle; }
 
 .abilities-row {
   position: relative;
   transition: background-color 0.2s ease;
 }
-:root {
-  --accent-color: #e5e7eb;
-}
+
 .abilities-row::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
+  left: 0; top: 0; bottom: 0;
   width: 4px;
-  background-color: var(--accent-color, #e5e7eb);
+  background-color: var(--accent-color, var(--wi-border));
 }
 
 .abilities-row::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 0; right: 0; bottom: 0;
   height: 1px;
-  background-color: #e8eaed;
+  background-color: rgba(90, 62, 32, 0.35);
   pointer-events: none;
 }
 
-.abilities-row:hover,
-.abilities-row:focus-visible {
-  background-color: color-mix(in srgb, rgba(0, 0, 0, 0.08) 20%, transparent);
+.religion-group-start:not(:first-child) :deep(td) {
+  border-top: 2px solid var(--wi-border) !important;
 }
 
-.ability-active {
-  background-color: color-mix(in srgb, var(--accent-color, #0ea5e9) 14%, transparent);
+.abilities-row:hover :deep(td),
+.abilities-row:focus-visible :deep(td) { background: rgba(200,150,42,0.07) !important; }
+
+.ability-active { background-color: color-mix(in srgb, var(--accent-color, var(--wi-gold)) 10%, transparent); }
+
+/* Inactive / locked milestone rows — cross-hatch overlay */
+.abilities-row:not(.ability-active) {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(90, 62, 32, 0.38) 0px,
+      rgba(90, 62, 32, 0.38) 1px,
+      transparent 1px,
+      transparent 9px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(90, 62, 32, 0.38) 0px,
+      rgba(90, 62, 32, 0.38) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+}
+
+.milestone-lock {
+  opacity: 0.55;
+  vertical-align: middle;
+  margin-right: 3px;
 }
 
 .religion-name {
-  font-weight: 600;
+  font-family: var(--wi-font-heading);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
   width: 160px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .milestone {
   width: 120px;
-  font-weight: 600;
-  color: var(--accent-color, #0ea5e9);
+  font-family: var(--wi-font-heading);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: var(--accent-color, var(--wi-gold));
 }
-.ability-name {
-  font-family: cursive;
-}
+
+.ability-name { font-family: var(--wi-font-body); color: var(--wi-text); }
 
 .ability-description {
   white-space: pre-line;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
 }
 
-.text-no-abilities {
-  color: #6b7280;
-  font-style: italic;
-}
+.text-no-abilities { color: var(--wi-text-muted); font-style: italic; }
 
 .color-bullet {
-  width: 12px;
-  height: 12px;
+  width: 12px; height: 12px;
   border-radius: 50%;
   display: inline-block;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
 }
 </style>

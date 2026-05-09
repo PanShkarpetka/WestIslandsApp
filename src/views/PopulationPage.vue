@@ -1,119 +1,161 @@
 <template>
-  <section class="space-y-6">
+  <div class="population-page">
 
-    <div v-if="store.loading" class="text-gray-500">Завантаження…</div>
-    <div v-else-if="store.items.length === 0" class="text-gray-500">Немає даних.</div>
+    <div v-if="store.loading" class="pop-state">
+      <v-icon class="mr-2" size="16">mdi-compass</v-icon>
+      Завантаження…
+    </div>
+    <div v-else-if="store.items.length === 0" class="pop-state">
+      <v-icon class="mr-2" size="16">mdi-anchor</v-icon>
+      Немає даних.
+    </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      <!-- Легенда + голоси -->
-      <section class="v-container">
-        <v-container>
-          <v-row class="population-cards">
-            <v-col v-for="g in viewRows" :key="g.id" cols="12" sm="6" md="4" lg="3">
-              <v-card
-                  class="population-card"
-                  :class="{ 'card-clickable': isAdmin }"
-                  :ripple="isAdmin"
-                  @click="openEditor(g)"
-              >
-                <v-img
-                    :src="g.imageUrl"
-                    cover
-                    class="group-image"
-                >
-                  <div class="card-content">
-                    <div class="card-overlay">
-                      <p class="overlay-desc">
-                        {{ g.description || '—' }}
-                      </p>
-                    </div>
-                    <div class="mt-auto text-right group-details">
-                      <div class="text-xl font-bold drop-shadow-sm">{{ g.percentRounded }}%</div>
-                      <div class="text-xs opacity-90 drop-shadow">{{ g.count }} осіб<!-- • {{ g.votesRounded }} голосів--></div>
-                      <div class="text-xs opacity-90 drop-shadow">
-                        З особи: {{ formatAmount(g.incomePerPerson) }} 🪙
-                      </div>
-                    </div>
-                    <div v-if="isAdmin" class="edit-hint">Натисніть, щоб редагувати</div>
-                  </div>
-                </v-img>
-              </v-card>
-            </v-col>
-          </v-row>
-        </v-container>
-      </section>
-      <!-- Pie -->
-      <div class="lg:col-span-3 bg-white rounded-xl border p-4 chart-wrap">
-        <div class="text-sm text-gray-500 pie-title">
-          <div>Разом: <b>{{ totalPopulation }}</b> осіб</div>
-          <div>Дохід від населення: <b>{{ formatAmount(populationIncomeTotal) }}</b> 🪙</div>
+    <div v-else class="pop-layout">
+
+      <!-- Cards column -->
+      <div class="pop-cards-wrap">
+        <v-row class="pop-cards-row">
+          <v-col
+            v-for="g in viewRows"
+            :key="g.id"
+            cols="12"
+            sm="6"
+            xl="3"
+          >
+            <div
+              class="pop-card"
+              :class="{ 'pop-card-admin': isAdmin }"
+              @click="openEditor(g)"
+            >
+              <!-- Background image -->
+              <div class="pop-card-bg" :style="{ backgroundImage: `url(${g.imageUrl})` }" />
+              <!-- Gradient overlay always -->
+              <div class="pop-card-gradient" />
+              <!-- Hover description overlay -->
+              <div class="pop-card-hover-desc">
+                <p class="pop-card-desc-text">{{ g.description || '—' }}</p>
+              </div>
+              <!-- Stats (visible by default, fade on hover) -->
+              <div class="pop-card-stats">
+                <div class="pop-stat-percent wi-number">{{ g.percentRounded }}%</div>
+                <div class="pop-stat-count">{{ g.count }} осіб</div>
+                <div class="pop-stat-income">
+                  <v-icon size="12" class="mr-1">mdi-gold</v-icon>
+                  {{ formatAmount(g.incomePerPerson) }} / особа
+                </div>
+              </div>
+              <!-- Card name badge at bottom -->
+              <div class="pop-card-name">{{ g.name }}</div>
+              <!-- Admin edit hint -->
+              <div v-if="isAdmin" class="pop-card-edit-hint">
+                <v-icon size="12" class="mr-1">mdi-feather</v-icon>
+                Редагувати
+              </div>
+            </div>
+          </v-col>
+        </v-row>
+      </div>
+
+      <!-- Chart column -->
+      <div class="pop-chart-wrap">
+        <div class="pop-chart-card">
+          <div class="pop-chart-header">
+            <v-icon class="mr-2" size="16">mdi-account-group</v-icon>
+            Групи населення
+          </div>
+          <div class="pop-chart-totals">
+            <span class="pop-total-item">
+              <v-icon size="13" class="mr-1">mdi-account-multiple</v-icon>
+              Разом: <strong>{{ totalPopulation }}</strong> осіб
+            </span>
+            <span class="pop-total-item">
+              <v-icon size="13" class="mr-1">mdi-gold</v-icon>
+              Дохід: <strong>{{ formatAmount(populationIncomeTotal) }}</strong> зм
+            </span>
+          </div>
+          <div class="pop-chart-canvas">
+            <Pie :data="chartData" :options="chartOptions" />
+          </div>
         </div>
-        <Pie :data="chartData" :options="chartOptions" />
       </div>
 
     </div>
-    <v-dialog v-model="showEditor" max-width="640">
-      <v-card>
-        <v-card-title class="flex items-center justify-between">
-          <span>Налаштування груп</span>
-          <v-btn icon="mdi-close" variant="text" @click="closeEditor" :disabled="saving" />
-        </v-card-title>
-        <v-card-text v-if="editedGroups.length">
-          <p class="text-sm text-gray-600 mb-4">Змініть кількість для кожної групи. Якщо сума перевищує населення острова, зменшіть інші групи.</p>
+
+    <!-- Edit dialog -->
+    <v-dialog v-model="showEditor" max-width="580" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="pop-dialog">
+        <div class="pop-dialog-header">
+          <v-icon class="mr-2">mdi-account-group</v-icon>
+          Розподіл населення
+        </div>
+        <v-card-text class="pop-dialog-body" v-if="editedGroups.length">
+
+          <p class="pop-dialog-note">Змініть кількість для кожної групи. Сума не має перевищувати загальне населення острова.</p>
 
           <div
-              v-for="g in editedGroups"
-              :key="g.id"
-              class="group-row"
-              :class="{ 'group-selected': selectedGroup?.id === g.id }"
+            v-for="g in editedGroups"
+            :key="g.id"
+            class="pop-group-row"
           >
-            <div class="group-row-header">
-              <div>
-                <div class="text-base font-semibold">{{ g.name }}</div>
-                <div class="text-xs text-gray-500">Було: {{ g.count }} осіб • {{ g.percentRounded }}%</div>
-              </div>
-<!--              <div v-if="selectedGroup?.id === g.id" class="chip">Відкрито</div>-->
+            <div class="pop-group-row-header">
+              <span class="pop-group-name">{{ g.name }}</span>
+              <span class="pop-group-was">було: {{ g.count }} осіб · {{ g.percentRounded }}%</span>
             </div>
-
-            <div class="slider-row">
+            <div class="pop-slider-row">
               <v-slider
-                  v-model.number="g.newCount"
-                  :min="0"
-                  :max="sliderCeiling"
-                  step="1"
-                  color="primary"
-                  thumb-label="always"
-                  hide-details
+                v-model.number="g.newCount"
+                :min="0"
+                :max="sliderCeiling"
+                step="1"
+                color="primary"
+                thumb-label="always"
+                hide-details
+                class="pop-slider"
               />
               <v-text-field
-                  v-model.number="g.newCount"
-                  type="number"
-                  label="Кількість"
-                  density="comfortable"
-                  hide-details
-                  class="count-input"
-                  variant="outlined"
-                  :min="0"
+                v-model.number="g.newCount"
+                type="number"
+                label="Кількість"
+                density="compact"
+                hide-details
+                class="pop-count-input"
+                variant="outlined"
+                :min="0"
               />
             </div>
-
-            <div class="text-xs text-gray-600 mt-1">Буде: <b>{{ g.newCount || 0 }}</b> осіб (≈ {{ percentFor(g.newCount) }}%)</div>
+            <div class="pop-group-will-be">
+              Буде: <strong>{{ g.newCount || 0 }}</strong> осіб (≈ {{ percentFor(g.newCount) }}%)
+            </div>
           </div>
 
-          <div class="mt-4 text-sm text-gray-700">
-            Загалом: <b>{{ editedTotal }}</b> з {{ totalPopulation }} осіб
+          <div class="pop-dialog-totals">
+            Загалом: <strong>{{ editedTotal }}</strong> з {{ totalPopulation }} осіб
+            <span class="pop-remaining" :class="overLimit ? 'remaining-over' : ''">
+              (залишок: {{ remaining }})
+            </span>
           </div>
-          <p v-if="overLimit" class="error-text mt-2">Сума груп перевищує населення острова. Зменште інші значення на {{ Math.abs(remaining) }}.</p>
-          <p v-else class="text-xs text-gray-500 mt-1">Залишок: {{ remaining }} осіб</p>
-          <p v-if="error" class="error-text mt-2">{{ error }}</p>
+          <div v-if="overLimit" class="pop-dialog-error">
+            <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>
+            Сума груп перевищує населення острова. Зменште на {{ Math.abs(remaining) }}.
+          </div>
+          <div v-if="error" class="pop-dialog-error">
+            <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>
+            {{ error }}
+          </div>
+
         </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn variant="text" @click="closeEditor" :disabled="saving">Скасувати</v-btn>
-          <v-btn color="primary" :loading="saving" :disabled="saving || overLimit" @click="saveGroup">Зберегти</v-btn>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="pop-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="closeEditor" :disabled="saving">Скасувати</v-btn>
+          <v-spacer />
+          <v-btn class="save-btn" :loading="saving" :disabled="saving || overLimit" prepend-icon="mdi-feather" @click="saveGroup">
+            Зберегти
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </section>
+
+  </div>
 </template>
 
 <script setup>
@@ -128,36 +170,24 @@ import { formatAmount } from '@/utils/formatters'
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
 
 const store = usePopulationStore()
-window.store = store;
 const islandStore = useIslandStore()
 const userStore = useUserStore()
 
-onMounted(() => {
-  store.startListening(islandStore.currentId)
-  console.log(islandStore.currentId)
-});
+onMounted(() => store.startListening(islandStore.currentId))
 onBeforeUnmount(() => store.stopListening())
-
-watch(() => islandStore.currentId, (id) => {
-  store.startListening(id)
-})
+watch(() => islandStore.currentId, (id) => store.startListening(id))
 
 const totalPopulation = computed(() => store.totalPopulation)
 const populationIncomeTotal = computed(() => store.populationIncomeTotal || 0)
 const isAdmin = computed(() => userStore?.isAdmin ?? false)
 
-const palette = {
-  'Селяни': '#22c55e',
-  'Моряки': '#3b82f6',
-  'Робітники': '#f59e0b',
-  _fallback: ['#60a5fa','#f472b6','#34d399','#fbbf24','#a78bfa','#f87171']
-}
+/* Pirate palette — matches the design system */
+const PALETTE = ['#c8962a', '#7b4f2e', '#3a6080', '#5a8a3c', '#8b6914', '#4a7a6a', '#7a3a3a', '#5a6a3a']
 
 const viewRows = computed(() => {
-  let i = 0
-  return store.groupsAugmented.map(g => ({
+  return store.groupsAugmented.map((g, i) => ({
     ...g,
-    color: palette[g.name] || palette._fallback[i++ % palette._fallback.length]
+    color: PALETTE[i % PALETTE.length],
   }))
 })
 
@@ -166,7 +196,7 @@ const chartData = computed(() => ({
   datasets: [{
     data: viewRows.value.map(g => g.percentRounded),
     backgroundColor: viewRows.value.map(g => g.color),
-    borderColor: '#ffffff',
+    borderColor: '#1a1209',
     borderWidth: 2,
   }]
 }))
@@ -175,13 +205,26 @@ const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { display: true, position: 'bottom' },
-    title: { display: true, text: 'Групи населення' },
+    legend: {
+      display: true,
+      position: 'bottom',
+      labels: {
+        color: '#a8896a',
+        font: { family: 'Cinzel, serif', size: 11 },
+        padding: 12,
+      },
+    },
+    title: { display: false },
     tooltip: {
+      backgroundColor: '#0f0a04',
+      titleColor: '#c8962a',
+      bodyColor: '#f0ddb0',
+      borderColor: '#5a3e20',
+      borderWidth: 1,
       callbacks: {
         label: (ctx) => {
           const g = viewRows.value[ctx.dataIndex]
-          return `${g.name}: ${g.percentRounded}% (${g.count} осіб, ${formatAmount(g.incomePerPerson * g.count)} дохід)`
+          return `${g.name}: ${g.percentRounded}% · ${g.count} осіб · ${formatAmount(g.incomePerPerson * g.count)} зм`
         }
       }
     }
@@ -200,10 +243,7 @@ const sliderCeiling = computed(() => {
   return Math.max(base, maxValue, 100)
 })
 
-const editedTotal = computed(() =>
-  editedGroups.value.reduce((sum, g) => sum + (Number(g.newCount) || 0), 0)
-)
-
+const editedTotal = computed(() => editedGroups.value.reduce((sum, g) => sum + (Number(g.newCount) || 0), 0))
 const remaining = computed(() => (totalPopulation.value || 0) - editedTotal.value)
 const overLimit = computed(() => remaining.value < 0)
 
@@ -215,10 +255,7 @@ function percentFor(value) {
 function openEditor(group) {
   if (!isAdmin.value) return
   selectedGroup.value = group
-  editedGroups.value = store.groupsAugmented.map((g) => ({
-    ...g,
-    newCount: g.count || 0,
-  }))
+  editedGroups.value = store.groupsAugmented.map((g) => ({ ...g, newCount: g.count || 0 }))
   error.value = ''
   showEditor.value = true
 }
@@ -233,8 +270,7 @@ async function saveGroup() {
   saving.value = true
   error.value = ''
   try {
-    const updates = editedGroups.value.map((g) => store.setGroupCount(g.id, g.newCount))
-    await Promise.all(updates)
+    await Promise.all(editedGroups.value.map((g) => store.setGroupCount(g.id, g.newCount)))
     showEditor.value = false
   } catch (e) {
     error.value = e?.message || 'Не вдалося зберегти'
@@ -245,145 +281,372 @@ async function saveGroup() {
 </script>
 
 <style scoped>
-.chart-wrap { height: 380px; }
-.pie-title {
-  margin-left: 15px;
-  margin-top: 15px;
-  position: absolute;
+/* ── Page ───────────────────────────────────────────────────── */
+.population-page {
+  padding-bottom: 16px;
 }
-.v-row {
-  margin: 0;
-}
-.v-card {
-  height: 420px;
-  padding: 0;
-}
-.v-container {
-  padding: 0;
-}
-.group-image {
-  min-height: 300px;
-  max-height: 500px;
-}
-.population-cards {
-  justify-content: space-evenly;
-}
-.population-card {
-  min-height: 300px;
-  max-height: 500px;
+
+.pop-state {
   display: flex;
-  flex-direction: column;
-  background: transparent;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  padding: 24px 0;
 }
-.card-clickable {
+
+.pop-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.pop-cards-wrap {
+  flex: 1 1 520px;
+  min-width: 0;
+}
+
+.pop-cards-row {
+  margin: 0 -8px;
+}
+
+/* ── Population cards ───────────────────────────────────────── */
+.pop-card {
+  position: relative;
+  height: 300px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--wi-border);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pop-card-admin {
   cursor: pointer;
-  transition: transform .12s ease, box-shadow .12s ease;
-}
-.card-clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(0,0,0,.25);
 }
 
-.group-image {
-  flex: 1;
-  background-size: cover;
-  background-position: center;
+.pop-card-admin:hover {
+  border-color: rgba(200, 150, 42, 0.6);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
 }
-.card-content {
-  padding-top: 50px;
-}
-.group-details {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  z-index: 2;
-  text-align: right;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,.6);
-}
-.edit-hint {
-  position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 2;
-  font-size: 12px;
-  color: #e0f2fe;
-  background: rgba(0,0,0,.35);
-  padding: 6px 10px;
-  border-radius: 9999px;
-  backdrop-filter: blur(2px);
-  text-shadow: 0 1px 2px rgba(0,0,0,.5);
-}
-.card-stats .percent { font-weight: 700; font-size: 1.25rem; line-height: 1.2; }
-.card-stats .count   { font-size: .875rem; opacity: .95; }
 
-.card-overlay {
+.pop-card-bg {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: flex-end;          /* опис внизу; поставь center якщо треба по центру */
-  padding: 16px;
-  color: #fff;
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(4px);
-  opacity: 0;
-  transition: opacity .2s ease;
+  background-size: cover;
+  background-position: top center;
+  transition: transform 0.3s ease;
 }
-.population-card:hover .card-overlay { opacity: 1; }
 
-.overlay-desc {
-  font-size: .9rem;
-  line-height: 1.35;
+.pop-card-admin:hover .pop-card-bg {
+  transform: scale(1.04);
+}
+
+.pop-card-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(10, 6, 2, 0.85) 0%, rgba(10, 6, 2, 0.1) 60%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Hover description overlay */
+.pop-card-hover-desc {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 6, 2, 0.82);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  pointer-events: none;
+}
+
+.pop-card:hover .pop-card-hover-desc {
+  opacity: 1;
+}
+
+.pop-card-desc-text {
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--wi-text);
+  line-height: 1.55;
+  text-align: center;
   margin: 0;
 }
-.population-card:hover .group-details {
+
+/* Stats at bottom-right */
+.pop-card-stats {
+  position: absolute;
+  right: 12px;
+  bottom: 36px;
+  text-align: right;
+  transition: opacity 0.2s;
+}
+
+.pop-card:hover .pop-card-stats {
   opacity: 0;
 }
 
-.slider-row {
-  display: grid;
-  grid-template-columns: 1fr 140px;
-  gap: 12px;
+.pop-stat-percent {
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--wi-gold);
+  text-shadow: 0 0 10px rgba(200,150,42,0.5), 0 1px 4px rgba(0,0,0,0.8);
+}
+
+.pop-stat-count {
+  font-family: var(--wi-font-body);
+  font-size: 0.8rem;
+  color: var(--wi-text);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  margin-top: 2px;
+}
+
+.pop-stat-income {
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
+  font-family: var(--wi-font-body);
+  font-size: 0.75rem;
+  color: var(--wi-text-muted);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  margin-top: 2px;
 }
 
-.count-input :deep(input) {
-  text-align: center;
+.pop-stat-income .v-icon {
+  color: var(--wi-gold) !important;
 }
 
-.group-row {
+/* Name badge at very bottom */
+.pop-card-name {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  font-family: var(--wi-font-heading);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+}
+
+/* Edit hint */
+.pop-card-edit-hint {
+  position: absolute;
+  bottom: 10px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.pop-card-admin:hover .pop-card-edit-hint {
+  opacity: 1;
+}
+
+/* ── Chart card ─────────────────────────────────────────────── */
+.pop-chart-wrap {
+  flex: 0 1 320px;
+  min-width: 260px;
+}
+
+.pop-chart-card {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%);
+  border: 1px solid var(--wi-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pop-chart-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #1a1108;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+}
+
+.pop-chart-header .v-icon {
+  color: var(--wi-gold) !important;
+}
+
+.pop-chart-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(90, 62, 32, 0.3);
+}
+
+.pop-total-item {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-size: 0.82rem;
+  color: var(--wi-text-muted);
+}
+
+.pop-total-item strong {
+  color: var(--wi-text);
+  margin: 0 4px;
+}
+
+.pop-total-item .v-icon {
+  color: var(--wi-gold) !important;
+}
+
+.pop-chart-canvas {
+  height: 280px;
+  padding: 12px;
+}
+
+/* ── Edit dialog ────────────────────────────────────────────── */
+.pop-dialog {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
+}
+
+.pop-dialog-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 1rem;
+  color: var(--wi-gold);
+  letter-spacing: 0.06em;
+}
+
+.pop-dialog-body {
+  padding: 20px !important;
+}
+
+.pop-dialog-note {
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--wi-text-muted);
+  margin-bottom: 16px;
+}
+
+/* Group rows */
+.pop-group-row {
   padding: 12px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #f8fafc;
+  border: 1px solid rgba(90, 62, 32, 0.5);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 10px;
 }
 
-.group-row + .group-row {
-  margin-top: 12px;
-}
-
-.group-selected {
-  border-color: #60a5fa;
-  box-shadow: 0 0 0 3px rgba(96,165,250,0.25);
-}
-
-.group-row-header {
+.pop-group-row-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
   margin-bottom: 8px;
+  gap: 8px;
 }
 
-.chip {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background: #e0f2fe;
-  color: #0ea5e9;
+.pop-group-name {
+  font-family: var(--wi-font-heading);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--wi-text);
 }
 
-.error-text {
-  color: #dc2626;
+.pop-group-was {
+  font-family: var(--wi-font-body);
+  font-size: 0.75rem;
+  color: var(--wi-text-muted);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.pop-slider-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 10px;
+  align-items: center;
+}
+
+.pop-count-input :deep(input) {
+  text-align: center;
+  font-family: var(--wi-font-body) !important;
+  color: var(--wi-text) !important;
+}
+
+.pop-slider :deep(.v-slider-thumb__label) {
+  background: var(--wi-gold) !important;
+  color: #1a1209 !important;
+  font-family: var(--wi-font-body) !important;
+  font-size: 0.75rem !important;
+}
+
+.pop-group-will-be {
+  font-family: var(--wi-font-body);
+  font-size: 0.78rem;
+  color: var(--wi-text-muted);
+  margin-top: 4px;
+}
+
+.pop-group-will-be strong {
+  color: var(--wi-text);
+}
+
+.pop-dialog-totals {
+  font-family: var(--wi-font-body);
+  font-size: 0.85rem;
+  color: var(--wi-text-muted);
+  margin-top: 12px;
+}
+
+.pop-dialog-totals strong {
+  color: var(--wi-text);
+}
+
+.pop-remaining { margin-left: 6px; }
+.remaining-over { color: var(--wi-danger); }
+
+.pop-dialog-error {
+  display: flex;
+  align-items: center;
+  color: var(--wi-danger);
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+.pop-dialog-actions {
+  padding: 12px 20px !important;
+}
+
+.cancel-btn {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-heading) !important;
+}
+
+.save-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+}
+
+.save-btn :deep(.v-btn__overlay) {
+  opacity: 0 !important;
 }
 </style>

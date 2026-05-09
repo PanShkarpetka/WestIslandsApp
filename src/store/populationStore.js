@@ -83,7 +83,7 @@ export const usePopulationStore = defineStore('population', () => {
     )
 
     const groupIncomePerPerson = (group) => normalizeAmount(
-        group?.incomePerPerson ?? 0
+        group?.incomePerPerson ?? group?.income ?? group?.incomePer ?? 0
     )
 
     // Беремо total з islands; якщо 0 — fallback на суму груп

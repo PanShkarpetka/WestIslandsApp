@@ -1,310 +1,395 @@
 <template>
   <div>
-    <!-- Картка з великою скринею -->
-    <v-card
-        class="treasury-card rounded-2xl overflow-hidden"
-        height="280"
-        :elevation="2"
+    <!-- Chest card -->
+    <div
+      class="chest-card"
+      role="button"
+      tabindex="0"
+      @click="open()"
+      @keydown.enter.prevent="open()"
+      @keydown.space.prevent="open()"
     >
-      <!-- Фон-скриня -->
-      <div
-          class="treasury-bg"
-          role="button"
-          tabindex="0"
-          @click="open()"
-          @keydown.enter.prevent="open()"
-          @keydown.space.prevent="open()"
-      >
-        <div class="treasury-overlay" aria-hidden="true"></div>  <!-- НОВЕ -->
-
-        <v-row class="treasury-balance">
-          {{ formattedBalance }} 🪙
-        </v-row>
-        <div class="treasury-hint">Натисніть, щоб {{ isAdmin ? 'внести або зняти' : 'внести' }}</div>
+      <div class="chest-bg" />
+      <div class="chest-content">
+        <div class="chest-balance wi-number">{{ formattedBalance }}</div>
+        <div class="chest-unit">золотих монет</div>
+        <div class="chest-hint">
+          <v-icon size="16" class="mr-1">mdi-hand-coin</v-icon>
+          {{ isAdmin ? 'Внести або зняти' : 'Внести' }}
+        </div>
       </div>
-    </v-card>
+    </div>
 
-    <!-- Модальне вікно -->
-    <!-- REPLACE your modal with this -->
-    <v-dialog v-model="isOpen" max-width="560">
-      <v-card rounded="xl" elevation="2" class="tax-dialog">
-        <!-- Header у стилі донатів -->
-        <v-sheet color="primary" variant="tonal" class="px-5 py-4 rounded-t-xl d-flex align-center gap-3">
-          <v-avatar color="primary" variant="flat" size="36">
-            <v-icon icon="mdi-sack" />
-          </v-avatar>
-          <div class="text-h6">
-            {{ mode === 'deposit' ? 'Внесок у скарбницю' : 'Зняття зі скарбниці' }}
-          </div>
+    <!-- Dialog -->
+    <v-dialog v-model="isOpen" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="chest-dialog">
+
+        <div class="chest-dialog-header">
+          <v-icon class="mr-2">mdi-treasure-chest</v-icon>
+          <span>{{ mode === 'deposit' ? 'Внесок у скарбницю' : 'Зняття зі скарбниці' }}</span>
           <v-spacer />
-          <v-chip size="small" color="primary" variant="elevated" class="opacity-90">
-            {{ formattedBalance }} 🪙
-          </v-chip>
-        </v-sheet>
+          <span class="chest-dialog-balance">
+            <v-icon size="14" class="mr-1">mdi-gold</v-icon>
+            {{ formattedBalance }} зм
+          </span>
+        </div>
 
-        <v-card-text class="pt-5 pb-1 px-5">
-          <!-- перемикач режиму для адміна -->
-          <div v-if="isAdmin" class="mb-4">
-            <v-btn-toggle
-                v-model="mode"
-                color="primary"
-                rounded="xl"
-                mandatory
-                density="comfortable"
-                class="donate-toggle"
-            >
+        <v-card-text class="chest-dialog-body">
+
+          <!-- Mode toggle (admin only) -->
+          <div v-if="isAdmin" class="mode-toggle-wrap">
+            <v-btn-toggle v-model="mode" mandatory density="comfortable" class="mode-toggle">
               <v-btn value="deposit" prepend-icon="mdi-tray-arrow-down">Внести</v-btn>
               <v-btn value="withdraw" prepend-icon="mdi-tray-arrow-up">Зняти</v-btn>
             </v-btn-toggle>
           </div>
 
-          <!-- Сума -->
+          <!-- Amount -->
           <v-text-field
-              v-model.number="amount"
-              type="number"
-              label="Сума (золото)"
-              variant="outlined"
-              density="comfortable"
-              min="0.01"
-              step="0.01"
-              prefix="🪙"
-              :rules="[v => !!v || 'Вкажіть суму', v => v > 0 || 'Більше нуля']"
-              hide-details="auto"
+            v-model.number="amount"
+            type="number"
+            label="Сума (золото)"
+            variant="outlined"
+            density="comfortable"
+            min="0.01"
+            step="0.01"
+            prepend-inner-icon="mdi-gold"
+            :rules="[v => !!v || 'Вкажіть суму', v => v > 0 || 'Більше нуля']"
+            hide-details="auto"
+            class="mb-3"
           />
 
+          <!-- Quick amounts -->
+          <div class="quick-amounts">
+            <v-chip
+              v-for="n in [5, 10, 25, 50, 100]"
+              :key="n"
+              size="small"
+              class="quick-chip"
+              @click="amount = (Number(amount) || 0) + n"
+            >+{{ n }}</v-chip>
+            <v-chip size="small" variant="text" class="clear-chip" @click="amount = null">
+              Очистити
+            </v-chip>
+          </div>
+
+          <!-- Split with guild -->
           <v-checkbox
-              v-if="mode === 'deposit'"
-              v-model="splitWithAdventurerGuild"
-              label="Половину в гільдію Авантюристів, половину в скарбницю"
-              density="comfortable"
-              hide-details
-              class="mt-2"
+            v-if="mode === 'deposit'"
+            v-model="splitWithAdventurerGuild"
+            label="Половину в гільдію Авантюристів, половину в скарбницю"
+            density="comfortable"
+            hide-details
+            color="primary"
+            class="mb-3"
           />
 
-          <!-- Швидкі суми як у донатах -->
-          <div class="mt-2 mb-4 d-flex flex-wrap gap-2">
-            <v-chip
-                v-for="n in [5,10,25,50,100]"
-                :key="n"
-                :text="`+${n}`"
-                color="primary"
-                variant="tonal"
-                size="small"
-                @click="amount = (Number(amount) || 0) + n"
-            />
-            <v-chip
-                text="Очистити"
-                size="small"
-                variant="text"
-                @click="amount = null"
-            />
-          </div>
-
-          <!-- Коментар -->
+          <!-- Comment -->
           <v-textarea
-              v-model="comment"
-              label="Коментар"
-              variant="outlined"
-              density="comfortable"
-              rows="2"
-              auto-grow
-              maxlength="500"
-              :rules="[v => !!v || 'Вкажіть коментар']"
-              hide-details="auto"
+            v-model="comment"
+            label="Коментар"
+            variant="outlined"
+            density="comfortable"
+            rows="2"
+            auto-grow
+            maxlength="500"
+            prepend-inner-icon="mdi-feather"
+            :rules="[v => !!v || 'Вкажіть коментар']"
+            hide-details="auto"
           />
 
-          <div class="text-caption mt-3 opacity-70">
-            Баланс після операції порахується автоматично. Транзакція з’явиться в списку нижче.
-            <b>{{ isLoggedIn ? '' : 'Для операції необхідна авторизація.'}}</b>
-          </div>
+          <p class="chest-dialog-note">
+            Баланс після операції порахується автоматично. Транзакція з'явиться в списку нижче.
+            <strong v-if="!isLoggedIn"> Для операції необхідна авторизація.</strong>
+          </p>
 
-          <div v-if="error" class="text-error text-body-2 mt-2">{{ error }}</div>
+          <div v-if="error" class="chest-dialog-error">
+            <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>{{ error }}
+          </div>
         </v-card-text>
 
-        <v-card-actions class="px-5 pb-5 pt-2">
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="chest-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="isOpen = false">Скасувати</v-btn>
+          <v-spacer />
           <v-btn
-              :loading="loading"
-              class="primary px-5"
-              variant="flat"
-              size="large"
-              :prepend-icon="mode === 'deposit' ? 'mdi-cash-plus' : 'mdi-cash-minus'"
-              @click="submit"
-              :disabled="!isLoggedIn"
+            :loading="loading"
+            :disabled="!isLoggedIn"
+            class="confirm-btn"
+            size="large"
+            :prepend-icon="mode === 'deposit' ? 'mdi-tray-arrow-down' : 'mdi-tray-arrow-up'"
+            @click="submit"
           >
             Підтвердити
-          </v-btn>
-          <v-btn variant="text" @click="isOpen = false">
-            Скасувати
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { useTreasuryStore } from '@/store/treasuryStore';
-import { useUserStore } from '@/store/userStore';
-import { useGuildStore } from '@/store/guildStore';
-import { formatAmount } from '@/utils/formatters';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useTreasuryStore } from '@/store/treasuryStore'
+import { useUserStore } from '@/store/userStore'
+import { useGuildStore } from '@/store/guildStore'
+import { formatAmount } from '@/utils/formatters'
 
-const treasury = useTreasuryStore();
-const guildStore = useGuildStore();
-const user = useUserStore();
+const treasury = useTreasuryStore()
+const guildStore = useGuildStore()
+const user = useUserStore()
 
-const isOpen = ref(false);
-const mode = ref('deposit');
-const amount = ref(null);
-const comment = ref('');
-const loading = ref(false);
-const error = ref('');
-const splitWithAdventurerGuild = ref(false);
+const isOpen = ref(false)
+const mode = ref('deposit')
+const amount = ref(null)
+const comment = ref('')
+const loading = ref(false)
+const error = ref('')
+const splitWithAdventurerGuild = ref(false)
 
-const isAdmin = computed(() => !!user.isAdmin);
-const isLoggedIn = computed(() => user.nickname !== '');
-const balance = computed(() => treasury.balance);
-const formattedBalance = computed(() => formatAmount(balance.value));
+const isAdmin = computed(() => !!user.isAdmin)
+const isLoggedIn = computed(() => user.nickname !== '')
+const balance = computed(() => treasury.balance)
+const formattedBalance = computed(() => formatAmount(balance.value))
 
 function open() {
-  mode.value = 'deposit';
-  amount.value = null;
-  comment.value = '';
-  error.value = '';
-  splitWithAdventurerGuild.value = false;
-  isOpen.value = true;
+  mode.value = 'deposit'
+  amount.value = null
+  comment.value = ''
+  error.value = ''
+  splitWithAdventurerGuild.value = false
+  isOpen.value = true
 }
 
 async function submit() {
-  error.value = '';
-  if (!amount.value || amount.value <= 0) {
-    error.value = 'Вкажіть коректну суму.';
-    return;
-  }
-  loading.value = true;
+  error.value = ''
+  if (!amount.value || amount.value <= 0) { error.value = 'Вкажіть коректну суму.'; return }
+  loading.value = true
   try {
-    const enteredAmount = Number(amount.value);
-    const payload = {
-      amount: enteredAmount,
-      comment: comment.value,
-      user: { uid: user.uid, nickname: user.nickname || 'Гравець' }
-    };
+    const enteredAmount = Number(amount.value)
+    const payload = { amount: enteredAmount, comment: comment.value, user: { uid: user.uid, nickname: user.nickname || 'Гравець' } }
     if (mode.value === 'withdraw') {
-      await treasury.withdraw(payload);
+      await treasury.withdraw(payload)
     } else if (splitWithAdventurerGuild.value) {
-      const guildPart = Math.round((enteredAmount / 2) * 100) / 100;
-      const treasuryPart = Math.round((enteredAmount - guildPart) * 100) / 100;
-
-      if (treasuryPart > 0) {
-        await treasury.deposit({
-          ...payload,
-          amount: treasuryPart,
-          comment: `${comment.value} (50% до скарбниці)`.trim(),
-        });
-      }
-      if (guildPart > 0) {
-        await guildStore.deposit({
-          guildId: 'AdventureGuild',
-          amount: guildPart,
-          comment: `${comment.value} (50% до ГАК)`.trim(),
-          actor: { nickname: user.nickname || 'Гравець' },
-        });
-      }
+      const guildPart = Math.round((enteredAmount / 2) * 100) / 100
+      const treasuryPart = Math.round((enteredAmount - guildPart) * 100) / 100
+      if (treasuryPart > 0) await treasury.deposit({ ...payload, amount: treasuryPart, comment: `${comment.value} (50% до скарбниці)`.trim() })
+      if (guildPart > 0) await guildStore.deposit({ guildId: 'AdventureGuild', amount: guildPart, comment: `${comment.value} (50% до ГАК)`.trim(), actor: { nickname: user.nickname || 'Гравець' } })
     } else {
-      await treasury.deposit(payload);
+      await treasury.deposit(payload)
     }
-    isOpen.value = false;
+    isOpen.value = false
   } catch (e) {
-    error.value = e?.message || String(e);
+    error.value = e?.message || String(e)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
-onMounted(() => treasury.subscribeBalance());
-onBeforeUnmount(() => treasury.unsubscribeBalance());
+onMounted(() => treasury.subscribeBalance())
+onBeforeUnmount(() => treasury.unsubscribeBalance())
 </script>
 
 <style scoped>
-
-.treasury-card{ position:relative; }
-
-/* Зона з фоном-скринею */
-.treasury-bg{
-  position:relative;
-  width:100%;
-  height:100%;
-  cursor:pointer; outline:0;
-  background-image:url(@/images/island/treasury/chest.png);
-  background-repeat:no-repeat;
-  background-position:right 24px center;
-  background-size: 300px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
+/* ── Chest card ─────────────────────────────────────────────── */
+.chest-card {
+  position: relative;
+  height: 260px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--wi-border);
+  box-shadow: 0 6px 32px rgba(0,0,0,0.6);
+  transition: border-color 0.25s, box-shadow 0.25s;
 }
 
-/* Рівномірний напівпрозорий оверлей поверх скрині (без «плями») */
-.treasury-overlay{
-  position:absolute; inset:0;
-  background: rgba(0,0,0,0.08);              /* базова ледь помітна затемненість */
-  transition: background 180ms ease-in-out, opacity 180ms ease-in-out;
-  pointer-events:none;
-}
-.treasury-bg:hover .treasury-overlay,
-.treasury-bg:focus-visible .treasury-overlay{
-  background: rgba(0,0,0,0.18);              /* сильніше, щоб цифра/підпис читались */
+.chest-card:hover {
+  border-color: var(--wi-gold);
+  box-shadow: 0 6px 32px rgba(0,0,0,0.6), 0 0 24px rgba(200,150,42,0.2);
 }
 
-/* Видимий фокус */
-.treasury-bg:focus-visible{
-  box-shadow:0 0 0 3px rgba(99,102,241,.6) inset;
-  border-radius:16px;
+.chest-bg {
+  position: absolute;
+  inset: 0;
+  background-image: url(@/images/island/treasury/chest.png);
+  background-repeat: no-repeat;
+  background-position: right 24px center;
+  background-size: 280px;
+  background-color: var(--wi-surface);
+  transition: transform 0.3s ease;
 }
 
-/* Велике число по центру */
-.treasury-balance{
-  margin-left: 10px;
-  position:relative;
-  z-index:1;
-  font-weight:800;
-  line-height:1;
-  font-size:clamp(48px, 9vw, 112px);
-  color:#f6d13b;
-  letter-spacing:1px;
-  text-align:center;
-  text-shadow:0 2px 14px rgba(0,0,0,.35);
-  display:flex;
-  align-items:baseline;
-  gap:.25em;
-}
-.treasury-bg:hover .treasury-balance,
-.treasury-bg:focus-visible .treasury-balance{
-  text-shadow:0 3px 18px rgba(0,0,0,.55);
+.chest-card:hover .chest-bg {
+  transform: scale(1.02);
 }
 
-/* Підпис знизу, по центру */
-.treasury-hint{
-  position:absolute;
-  z-index:1;
-  bottom:12px;
-  left:0;
-  right:0;
-  text-align:center;
-  font-size:30px;
-  color:#fff;
-  opacity:.75;
-  text-shadow:0 1px 6px rgba(0,0,0,.6);
-  transition: opacity 180ms ease-in-out;
-}
-.treasury-bg:hover .treasury-hint,
-.treasury-bg:focus-visible .treasury-hint{ opacity:1; }
-
-@media (prefers-reduced-motion: reduce){
-  .treasury-overlay, .treasury-hint, .treasury-balance{ transition:none; }
+.chest-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0 32px;
+  background: linear-gradient(90deg, rgba(26,18,9,0.92) 45%, rgba(26,18,9,0.3) 100%);
 }
 
-.primary{ background:#059669; color:#fff; }
-.primary:hover{ background:#047857; }
+.chest-balance {
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  line-height: 1;
+  color: var(--wi-gold);
+  text-shadow: 0 0 20px rgba(200,150,42,0.5), 0 2px 8px rgba(0,0,0,0.5);
+  letter-spacing: 0.02em;
+}
+
+.chest-unit {
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  font-size: 0.95rem;
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+
+.chest-hint {
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+  font-family: var(--wi-font-heading);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.chest-card:hover .chest-hint {
+  opacity: 1;
+  color: var(--wi-gold);
+}
+
+/* ── Dialog ─────────────────────────────────────────────────── */
+.chest-dialog {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
+}
+
+.chest-dialog-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 1.1rem;
+  color: var(--wi-gold);
+  letter-spacing: 0.06em;
+}
+
+.chest-dialog-balance {
+  font-family: var(--wi-font-number);
+  font-size: 0.9rem;
+  color: var(--wi-gold);
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+}
+
+.chest-dialog-body {
+  padding: 20px !important;
+}
+
+/* Mode toggle */
+.mode-toggle-wrap { margin-bottom: 16px; }
+
+.mode-toggle {
+  border: 1px solid var(--wi-border) !important;
+  border-radius: 6px !important;
+  background: #1a1108 !important;
+}
+
+.mode-toggle :deep(.v-btn) {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.05em !important;
+  background: transparent !important;
+}
+
+.mode-toggle :deep(.v-btn .v-btn__overlay) {
+  background-color: var(--wi-gold) !important;
+  opacity: 0 !important;
+}
+
+.mode-toggle :deep(.v-btn--active) {
+  background: linear-gradient(180deg, #d4a233, #a07020) !important;
+  color: #1a1209 !important;
+}
+
+.mode-toggle :deep(.v-btn--active .v-btn__overlay) {
+  opacity: 0 !important;
+}
+
+.mode-toggle :deep(.v-btn--active .v-btn__content) {
+  color: #1a1209 !important;
+}
+
+/* Quick amounts */
+.quick-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.quick-chip {
+  background: rgba(200,150,42,0.12) !important;
+  border: 1px solid var(--wi-border) !important;
+  color: var(--wi-gold) !important;
+  font-family: var(--wi-font-heading) !important;
+  cursor: pointer;
+}
+
+.quick-chip:hover {
+  background: rgba(200,150,42,0.22) !important;
+}
+
+.clear-chip {
+  color: var(--wi-text-muted) !important;
+}
+
+/* Notes & errors */
+.chest-dialog-note {
+  font-family: var(--wi-font-body);
+  font-size: 0.8rem;
+  color: var(--wi-text-muted);
+  font-style: italic;
+  margin-top: 12px;
+}
+
+.chest-dialog-error {
+  display: flex;
+  align-items: center;
+  color: var(--wi-danger);
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+/* Actions */
+.chest-dialog-actions {
+  padding: 12px 20px !important;
+}
+
+.cancel-btn {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-heading) !important;
+}
+
+.confirm-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+}
 </style>

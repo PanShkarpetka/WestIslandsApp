@@ -1,7 +1,7 @@
 <template>
   <div class="religion-modals">
-    <v-dialog v-model="clergyDialogOpen" max-width="840">
-      <v-card v-if="activeClergy" class="clergy-dialog" rounded="xl">
+    <v-dialog v-model="clergyDialogOpen" max-width="840" :fullscreen="false" scrollable>
+      <v-card v-if="activeClergy" class="clergy-dialog" rounded="lg">
         <v-card-text class="pt-0 hero-clergy-modal">
           <v-alert v-if="actionError" type="error" variant="tonal" class="mb-3">
             {{ actionError }}
@@ -654,8 +654,8 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="followersDialogOpen" max-width="720">
-      <v-card rounded="xl">
+    <v-dialog v-model="followersDialogOpen" max-width="720" :fullscreen="false" scrollable>
+      <v-card class="clergy-dialog" rounded="lg">
         <v-card-title class="d-flex align-center justify-space-between">
           <div>
             <div class="text-subtitle-1 font-semibold">Розподіл послідовників</div>
@@ -829,21 +829,21 @@ const props = defineProps({
 </script>
 
 <style scoped>
-.error {
-  color: #dc2626;
-  font-size: 15px;
-  margin-top: 8px;
+/* ── Clergy dialog card ─────────────────────────────────────── */
+.clergy-dialog {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1a1108 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
 }
 
-.hero-clergy-modal {
-  margin-top: 10px;
-}
+.hero-clergy-modal { margin-top: 10px; }
 
+/* ── Overview strip ─────────────────────────────────────────── */
 .clergy-overview {
+  background: rgba(200,150,42,0.08) !important;
+  border: 1px solid rgba(200,150,42,0.25) !important;
+  border-radius: 6px !important;
   padding: 12px 16px;
   margin-bottom: 16px;
-  border: 1px solid rgba(63, 81, 181, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .clergy-overview__top {
@@ -854,22 +854,27 @@ const props = defineProps({
   flex-wrap: wrap;
 }
 
-.meta-pills {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+.meta-pills { display: flex; gap: 12px; flex-wrap: wrap; }
 
 .meta-pill {
   display: flex;
   gap: 10px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(90,62,32,0.5);
+  border-radius: 6px;
   padding: 8px 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 
+/* Override Vuetify text classes inside the overview */
+.clergy-overview :deep(.text-caption) { font-family: var(--wi-font-body) !important; color: var(--wi-text-muted) !important; font-style: italic; }
+.clergy-overview :deep(.text-subtitle-1),
+.clergy-overview :deep(.text-subtitle-2) { font-family: var(--wi-font-heading) !important; color: var(--wi-gold) !important; letter-spacing: 0.04em; }
+.clergy-overview :deep(.text-h6) { font-family: var(--wi-font-heading) !important; color: var(--wi-gold) !important; }
+.clergy-overview :deep(.text-body-2) { font-family: var(--wi-font-body) !important; color: var(--wi-text-muted) !important; font-style: italic; }
+.clergy-overview :deep(.text-black) { color: var(--wi-text) !important; }
+
+/* ── Action cards grid ──────────────────────────────────────── */
 .clergy-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -878,10 +883,14 @@ const props = defineProps({
 }
 
 .action-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(245, 247, 255, 0.8));
-  border: 1px solid rgba(63, 81, 181, 0.08);
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-border) !important;
+  border-radius: 6px !important;
   padding: 14px;
 }
+
+.action-card :deep(.text-subtitle-2) { font-family: var(--wi-font-heading) !important; color: var(--wi-gold) !important; letter-spacing: 0.04em; font-size: 0.88rem !important; }
+.action-card :deep(.text-body-2) { font-family: var(--wi-font-body) !important; color: var(--wi-text-muted) !important; font-style: italic; font-size: 0.82rem !important; }
 
 .action-card__header {
   display: flex;
@@ -899,46 +908,45 @@ const props = defineProps({
 }
 
 .stacked-card {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
   padding: 12px;
-  border: 1px solid rgba(63, 81, 181, 0.08);
+  border: 1px solid var(--wi-border);
 }
 
-.log-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(244, 246, 255, 0.9));
-}
+/* ── Log card ───────────────────────────────────────────────── */
+.log-card { background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important; }
 
-.log-entry + .log-entry {
-  border-top: 1px dashed rgba(0, 0, 0, 0.05);
-}
+.log-entry + .log-entry { border-top: 1px dashed rgba(90,62,32,0.4); }
 
-.shield-status-chip {
-  align-items: center;
-  flex: none;
-}
+/* ── Shield chip ────────────────────────────────────────────── */
+.shield-status-chip { align-items: center; flex: none; }
 
+/* ── Color bullet ───────────────────────────────────────────── */
 .color-bullet {
-  width: 14px;
-  height: 14px;
+  width: 14px; height: 14px;
   border-radius: 50%;
   display: inline-block;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
 }
 
+/* ── Followers dialog ───────────────────────────────────────── */
 .followers-row {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
+  border: 1px solid var(--wi-border);
+  border-radius: 6px;
   padding: 12px;
   margin-bottom: 12px;
-  background-color: #fff;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: rgba(255,255,255,0.02);
+  transition: border-color 0.2s ease;
 }
 
 .followers-row--selected {
-  border-color: #3f51b5;
-  box-shadow: 0 4px 18px rgba(63, 81, 181, 0.15);
+  border-color: var(--wi-gold);
+  box-shadow: 0 0 10px rgba(200,150,42,0.15);
 }
+
+.followers-row :deep(.text-subtitle-2) { font-family: var(--wi-font-heading) !important; color: var(--wi-text) !important; letter-spacing: 0.04em; }
+.followers-row :deep(.text-caption) { font-family: var(--wi-font-body) !important; color: var(--wi-text-muted) !important; font-style: italic; }
 
 .followers-row__header {
   display: flex;
@@ -955,15 +963,16 @@ const props = defineProps({
   margin-bottom: 6px;
 }
 
-@media (max-width: 960px) {
-  .field-row {
-    grid-template-columns: 1fr;
-  }
+/* Slider thumb label gold override */
+.followers-row__controls :deep(.v-slider-thumb__label) {
+  background: var(--wi-gold) !important;
+  color: #1a1209 !important;
+  font-family: var(--wi-font-body) !important;
+  font-size: 0.75rem !important;
 }
 
-@media (max-width: 600px) {
-  .followers-row__controls {
-    grid-template-columns: 1fr;
-  }
-}
+.error { color: var(--wi-danger); font-family: var(--wi-font-body); font-size: 0.9rem; margin-top: 8px; }
+
+@media (max-width: 960px) { .field-row { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .followers-row__controls { grid-template-columns: 1fr; } }
 </style>

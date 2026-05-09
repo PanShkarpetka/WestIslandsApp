@@ -1,21 +1,30 @@
 <template>
-  <v-container class="py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <div>
-        <h1 class="text-h5 font-semibold">Скарбниця острова</h1>
-        <div class="text-sm text-medium-emphasis">
-          Дохід/Витрати: +{{ formatAmount(totalIncome) }} 🪙 / -{{ formatAmount(totalOutcome) }} 🪙
-        </div>
+  <v-container class="treasury-container py-6">
+
+    <div class="treasury-header">
+      <div class="treasury-header-title">
+        <v-icon class="mr-2" color="primary">mdi-treasure-chest</v-icon>
+        <h1 class="wi-heading">Скарбниця острова</h1>
+      </div>
+      <div class="treasury-totals">
+        <span class="total-item income">
+          <v-icon size="15">mdi-arrow-up-bold</v-icon>
+          +{{ formatAmount(totalIncome) }} зм
+        </span>
+        <span class="total-divider">/</span>
+        <span class="total-item expense">
+          <v-icon size="15">mdi-arrow-down-bold</v-icon>
+          −{{ formatAmount(totalOutcome) }} зм
+        </span>
       </div>
     </div>
 
-    <!-- ВЕЛИКА СКРИНЯ -->
     <TreasuryChestCard />
 
-    <!-- Список транзакцій нижче -->
     <div class="mt-6">
       <TreasuryTransactions />
     </div>
+
   </v-container>
 </template>
 
@@ -23,8 +32,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { collection, documentId, getDocs, query, where } from 'firebase/firestore'
-import TreasuryTransactions from "@/components/TreasuryTransactions.vue";
-import TreasuryChestCard from "@/components/TreasuryChestCard.vue";
+import TreasuryTransactions from "@/components/TreasuryTransactions.vue"
+import TreasuryChestCard from "@/components/TreasuryChestCard.vue"
 import { useIslandStore } from '@/store/islandStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { db } from '@/services/firebase'
@@ -39,13 +48,11 @@ const manufactureOutcome = ref(0)
 const populationIncome = computed(() => populationStore.populationIncomeTotal || 0)
 
 const totalIncome = computed(() => {
-  const popIncome = populationIncome.value
-  const combined = manufactureIncome.value + (popIncome > 0 ? popIncome : 0)
+  const combined = manufactureIncome.value + (populationIncome.value > 0 ? populationIncome.value : 0)
   return roundAmount(combined)
 })
 const totalOutcome = computed(() => {
-  const popIncome = populationIncome.value
-  const combined = manufactureOutcome.value + (popIncome < 0 ? Math.abs(popIncome) : 0)
+  const combined = manufactureOutcome.value + (populationIncome.value < 0 ? Math.abs(populationIncome.value) : 0)
   return roundAmount(combined)
 })
 
@@ -61,31 +68,20 @@ async function loadManufactureTotals(ids) {
     manufactureOutcome.value = 0
     return
   }
-
   const chunks = []
-  for (let i = 0; i < ids.length; i += 10) {
-    chunks.push(ids.slice(i, i + 10))
-  }
+  for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10))
 
-  let incomeSum = 0
-  let outcomeSum = 0
+  let incomeSum = 0, outcomeSum = 0
   for (const chunk of chunks) {
-    const q = query(collection(db, 'manufactures'), where(documentId(), 'in', chunk))
-    const snap = await getDocs(q)
-    snap.docs.forEach((docSnap) => {
-      const data = docSnap.data() || {}
-      const destination = data.incomeDestination || 'treasury'
-      if (destination !== 'treasury') return
-
+    const snap = await getDocs(query(collection(db, 'manufactures'), where(documentId(), 'in', chunk)))
+    snap.docs.forEach(d => {
+      const data = d.data() || {}
+      if ((data.incomeDestination || 'treasury') !== 'treasury') return
       const income = roundAmount(Number(data.income || 0))
-      if (income > 0) {
-        incomeSum += income
-      } else if (income < 0) {
-        outcomeSum += Math.abs(income)
-      }
+      if (income > 0) incomeSum += income
+      else if (income < 0) outcomeSum += Math.abs(income)
     })
   }
-
   manufactureIncome.value = roundAmount(incomeSum)
   manufactureOutcome.value = roundAmount(outcomeSum)
 }
@@ -94,24 +90,45 @@ onMounted(() => {
   loadManufactureTotals(island.value?.manufactures)
   populationStore.startListening(islandStore.currentId)
 })
-
-watch(
-  () => island.value?.manufactures,
-  (ids) => {
-    loadManufactureTotals(ids)
-  },
-  { deep: true },
-)
-
-watch(
-  () => islandStore.currentId,
-  (id) => {
-    populationStore.startListening(id)
-  },
-)
-
+watch(() => island.value?.manufactures, ids => loadManufactureTotals(ids), { deep: true })
+watch(() => islandStore.currentId, id => populationStore.startListening(id))
 onBeforeUnmount(() => populationStore.stopListening())
 </script>
 
 <style scoped>
+.treasury-container { padding-top: 24px; }
+
+.treasury-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--wi-border);
+}
+
+.treasury-header-title {
+  display: flex;
+  align-items: center;
+}
+
+.treasury-totals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--wi-font-body);
+  font-size: 0.9rem;
+}
+
+.total-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.income { color: var(--wi-success); }
+.expense { color: var(--wi-danger); }
+.total-divider { color: var(--wi-border); }
 </style>

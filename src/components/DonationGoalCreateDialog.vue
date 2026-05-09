@@ -5,78 +5,30 @@
       max-width="500"
       :persistent="loading"
   >
-    <v-card>
-      <v-card-title class="text-h6">Новий збір</v-card-title>
-
-      <v-card-text class="flex flex-col gap-4">
-        <v-text-field
-            v-model="form.title"
-            label="Назва"
-            :disabled="loading"
-            required
-            prepend-icon="mdi-format-title"
-        />
-
-        <v-textarea
-            v-model="form.description"
-            label="Опис (опційно)"
-            auto-grow
-            :disabled="loading"
-            prepend-icon="mdi-text"
-        />
-
-        <!-- тип збору -->
-        <v-select
-            v-model="form.type"
-            :items="typeItems"
-            label="Тип збору"
-            :disabled="loading"
-            prepend-icon="mdi-shape"
-        />
-
-        <!-- селект будівлі -->
-        <v-select
-            v-if="form.type === 'building'"
-            v-model="form.targetBuildingKey"
-            :items="buildingStore.buildings"
-            item-title="name"
-            item-value="id"
-            label="Цільова будівля"
-            :loading="buildingStore.loading"
-            :disabled="loading || buildingStore.loading"
-            prepend-icon="mdi-home-city"
-        >
-          <template #item="{ props, item }">
-            <v-list-item
-                v-bind="props"
-                :title="item.raw.name"
-                :subtitle="(item.raw.cost || 0).toLocaleString('uk-UA') + ' ₴'"
-            />
+    <v-card class="create-goal-dialog">
+      <div class="create-goal-header">
+        <v-icon class="mr-2">mdi-hand-coin</v-icon>
+        Новий збір
+      </div>
+      <v-card-text class="create-goal-body">
+        <v-text-field v-model="form.title" label="Назва" :disabled="loading" required variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-format-title" />
+        <v-textarea v-model="form.description" label="Опис (опційно)" auto-grow :disabled="loading" variant="outlined" density="compact" hide-details="auto" rows="2" class="mb-3" prepend-inner-icon="mdi-feather" />
+        <v-select v-model="form.type" :items="typeItems" label="Тип збору" :disabled="loading" variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-shape" />
+        <v-select v-if="form.type === 'building'" v-model="form.targetBuildingKey" :items="buildingStore.buildings" item-title="name" item-value="id" label="Цільова будівля" :loading="buildingStore.loading" :disabled="loading || buildingStore.loading" variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-home-city">
+          <template #item="{ props: p, item }">
+            <v-list-item v-bind="p" :title="item.raw.name" :subtitle="(item.raw.cost || 0).toLocaleString('uk-UA') + ' зм'" />
           </template>
           <template #selection="{ item }">
             <span>{{ item.raw.name }}</span>
           </template>
         </v-select>
-
-        <!-- цільова сума -->
-        <v-text-field
-            v-model.number="form.targetAmount"
-            type="number"
-            min="1"
-            label="Цільова сума, ₴"
-            :disabled="loading || (form.type==='building' && !!form.targetBuildingKey)"
-            :hint="targetHint"
-            persistent-hint
-            prepend-icon="mdi-cash-multiple"
-        />
+        <v-text-field v-model.number="form.targetAmount" type="number" min="1" label="Цільова сума (зм)" :disabled="loading || (form.type==='building' && !!form.targetBuildingKey)" :hint="targetHint" persistent-hint variant="outlined" density="compact" prepend-inner-icon="mdi-gold" />
       </v-card-text>
-
-      <v-card-actions>
+      <v-divider style="border-color: var(--wi-border)" />
+      <v-card-actions class="create-goal-actions">
+        <v-btn variant="text" class="cancel-btn" @click="close" :disabled="loading">Скасувати</v-btn>
         <v-spacer />
-        <v-btn variant="text" @click="close" :disabled="loading">Скасувати</v-btn>
-        <v-btn color="primary" @click="save" :loading="loading" :disabled="!isValid || loading">
-          Зберегти
-        </v-btn>
+        <v-btn class="save-btn" @click="save" :loading="loading" :disabled="!isValid || loading" prepend-icon="mdi-feather">Зберегти</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -179,3 +131,46 @@ async function save () {
   }
 }
 </script>
+
+<style scoped>
+.create-goal-dialog {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
+}
+
+.create-goal-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 1rem;
+  color: var(--wi-gold);
+  letter-spacing: 0.06em;
+}
+
+.create-goal-body {
+  padding: 20px !important;
+}
+
+.create-goal-actions {
+  padding: 12px 20px !important;
+}
+
+.cancel-btn {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-heading) !important;
+}
+
+.save-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+}
+
+.save-btn :deep(.v-btn__overlay) {
+  opacity: 0 !important;
+}
+</style>
