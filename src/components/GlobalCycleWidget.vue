@@ -69,15 +69,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.global-cycle-widget {
-  position: relative;
-}
-
-.global-cycle-widget :deep(.v-card) {
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-}
-
 .global-cycle-widget__skeleton {
-  border-radius: 16px;
+  border-radius: 8px;
 }
 </style>

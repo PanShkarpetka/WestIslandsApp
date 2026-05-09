@@ -1,19 +1,23 @@
 <template>
-  <v-card class="pa-4" variant="tonal">
-    <div class="cycle-summary-header">
-      <v-avatar color="primary" variant="elevated">
-        <v-icon>mdi-timeline-clock</v-icon>
-      </v-avatar>
-      <div class="cycle-summary-text">
-        <div class="text-overline text-medium-emphasis mb-1">{{ title }}</div>
-        <div class="text-subtitle-1 font-semibold">Старт поточного циклу: {{ currentStartDateLabel }}</div>
-        <div class="text-body-2 text-medium-emphasis">Тривалість попереднього циклу: {{ previousDurationLabel }}</div>
-      </div>
-      <div v-if="$slots.chips" class="cycle-summary-chips">
-        <slot name="chips" />
-      </div>
+  <div class="cycle-card">
+    <v-icon class="cycle-card__icon" size="22">mdi-anchor</v-icon>
+
+    <div class="cycle-card__section">
+      <span class="cycle-card__label">{{ title }}</span>
+      <span class="cycle-card__value">{{ currentStartDateLabel }}</span>
     </div>
-  </v-card>
+
+    <div class="cycle-card__sep" />
+
+    <div class="cycle-card__section">
+      <span class="cycle-card__label">Тривалість попереднього циклу</span>
+      <span class="cycle-card__value">{{ previousDurationLabel }}</span>
+    </div>
+
+    <div v-if="$slots.chips" class="cycle-card__chips">
+      <slot name="chips" />
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -30,20 +34,54 @@ const previousDurationLabel = computed(() => props.previousCycleDuration || 'н�
 </script>
 
 <style scoped>
-.cycle-summary-header {
+.cycle-card {
   display: flex;
   align-items: center;
   gap: 16px;
+  padding: 10px 20px;
+  background: var(--wi-surface);
+  border: 1px solid var(--wi-border);
+  border-radius: 8px;
 }
 
-.cycle-summary-text {
-  padding-left: 6px;
+.cycle-card__icon {
+  color: var(--wi-gold);
+  flex-shrink: 0;
 }
 
-.cycle-summary-chips {
+.cycle-card__sep {
+  width: 1px;
+  height: 28px;
+  background: var(--wi-border);
+  flex-shrink: 0;
+}
+
+.cycle-card__section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cycle-card__label {
+  color: var(--wi-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1;
+}
+
+.cycle-card__value {
+  color: var(--wi-text);
+  font-size: 0.9rem;
+  font-family: 'Cinzel', serif;
+  line-height: 1.3;
+}
+
+.cycle-card__chips {
   margin-left: auto;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
 }
 </style>
