@@ -314,7 +314,7 @@ async function saveGroup() {
 /* ── Population cards ───────────────────────────────────────── */
 .pop-card {
   position: relative;
-  height: 300px;
+  height: 500px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--wi-border);
