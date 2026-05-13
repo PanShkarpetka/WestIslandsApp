@@ -132,6 +132,140 @@ test('distributeManufactureIncome does nothing when island doc is missing', asyn
   assert.equal(mock.get('treasury/meta').balance, 100);
 });
 
+// ─── distributeManufactureIncome — bureaucrat effects ────────────────────────
+
+test('distributeManufactureIncome — no bureaucrats: income unchanged (regression)', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [{ id: 'p1', name: 'Merchants', count: 100, incomePerPerson: 5, description: '' }],
+    { ...mock.firebase, db: mock.db, rng: () => 0 },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 500);
+  const txs = Object.values(mock.list('treasury-transactions'));
+  assert.equal(txs.length, 1);
+  assert.ok(!txs[0].comment.includes('бюрократ'), 'comment should not mention bureaucrats');
+});
+
+test('distributeManufactureIncome — full coverage: bonus income applied', async () => {
+  // 1 bureaucrat covers 100 people; rng always 0.10 < 0.20 → every covered person pays bonus
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  // bonus per person = max(5 * 0.20, 0.01) = 1.00; 100 people all trigger → +100
+  // civilian income: 100 * 5 + 100 = 600
+  // bureaucrat cost: 1 * (-1) = -1
+  // net: 599
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [
+      { id: 'b1', name: 'Бюрократи', count: 1, incomePerPerson: -1, faction: 'bureaucrats', description: '' },
+      { id: 'p1', name: 'Merchants', count: 100, incomePerPerson: 5, description: '' },
+    ],
+    { ...mock.firebase, db: mock.db, rng: () => 0.10 },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 599);
+  const txs = Object.values(mock.list('treasury-transactions'));
+  const civilianTx = txs.find((t) => t.comment.includes('Merchants'));
+  assert.ok(civilianTx, 'civilian transaction should exist');
+  assert.ok(civilianTx.comment.includes('бонус бюрократів'), 'comment should mention bureaucrat bonus');
+});
+
+test('distributeManufactureIncome — partial coverage: uncovered persons skip payment', async () => {
+  // 1 bureaucrat (capacity=100), civilians=200 → covered=100, uncovered=100, isFull=false
+  // rng always 0.10 < 0.20 → every uncovered person skips
+  // civilian income: 200 * 3 - 100 * 3 = 300
+  // bureaucrat cost: -1
+  // net: 299
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [
+      { id: 'b1', name: 'Бюрократи', count: 1, incomePerPerson: -1, faction: 'bureaucrats', description: '' },
+      { id: 'p1', name: 'Farmers', count: 200, incomePerPerson: 3, description: '' },
+    ],
+    { ...mock.firebase, db: mock.db, rng: () => 0.10 },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 299);
+  const txs = Object.values(mock.list('treasury-transactions'));
+  const civilianTx = txs.find((t) => t.comment.includes('Farmers'));
+  assert.ok(civilianTx.comment.includes('несплачено (без нагляду)'), 'comment should mention penalty');
+  assert.ok(!civilianTx.comment.includes('бонус бюрократів'), 'no bonus when not full coverage');
+});
+
+test('distributeManufactureIncome — bureaucrat group produces withdraw transaction', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 100 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [{ id: 'b1', name: 'Бюрократи', count: 3, incomePerPerson: -1, faction: 'bureaucrats', description: '' }],
+    { ...mock.firebase, db: mock.db, rng: () => 0 },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 97);
+  const txs = Object.values(mock.list('treasury-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].type, 'withdraw');
+  assert.equal(txs[0].amount, -3);
+});
+
+test('distributeManufactureIncome — zero bureaucrat count: no effect on civilians', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [
+      { id: 'b1', name: 'Бюрократи', count: 0, incomePerPerson: -1, faction: 'bureaucrats', description: '' },
+      { id: 'p1', name: 'Traders', count: 50, incomePerPerson: 4, description: '' },
+    ],
+    { ...mock.firebase, db: mock.db, rng: () => 0.10 },
+  );
+
+  // Bureaucrat group has income 0 so filtered out; only civilian income = 200
+  assert.equal(mock.get('treasury/meta').balance, 200);
+  const txs = Object.values(mock.list('treasury-transactions'));
+  const civilianTx = txs.find((t) => t.comment.includes('Traders'));
+  assert.ok(civilianTx, 'civilian tx exists');
+  assert.ok(!civilianTx.comment.includes('бюрократ'), 'no bureaucrat mention when count=0');
+});
+
+test('distributeManufactureIncome — only bureaucrats, no civilians: single withdraw tx', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 50 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock',
+    [{ id: 'b1', name: 'Бюрократи', count: 10, incomePerPerson: -1, faction: 'bureaucrats', description: '' }],
+    { ...mock.firebase, db: mock.db, rng: () => 0.10 },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 40);
+  const txs = Object.values(mock.list('treasury-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].type, 'withdraw');
+});
+
 // ─── distributeBuildingFaithIncome ───────────────────────────────────────────
 
 test('distributeBuildingFaithIncome distributes faith to eligible clergy', async () => {

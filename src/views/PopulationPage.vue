@@ -24,7 +24,7 @@
           >
             <div
               class="pop-card"
-              :class="{ 'pop-card-admin': isAdmin }"
+              :class="{ 'pop-card-admin': isAdmin, 'pop-card-bureaucrat': g.isBureaucrat }"
               @click="openEditor(g)"
             >
               <!-- Background image -->
@@ -39,7 +39,17 @@
               <div class="pop-card-stats">
                 <div class="pop-stat-percent wi-number">{{ g.percentRounded }}%</div>
                 <div class="pop-stat-count">{{ g.count }} осіб</div>
-                <div class="pop-stat-income">
+                <template v-if="g.isBureaucrat">
+                  <div class="pop-stat-income">
+                    <v-icon size="12" class="mr-1">mdi-badge-account</v-icon>
+                    {{ formatAmount(g.incomePerPerson) }} 🪙 / особа
+                  </div>
+                  <div class="pop-stat-income">
+                    <v-icon size="12" class="mr-1">mdi-shield-check</v-icon>
+                    Нагляд: {{ g.count * 100 }} осіб
+                  </div>
+                </template>
+                <div v-else class="pop-stat-income">
                   <v-icon size="12" class="mr-1">mdi-gold</v-icon>
                   {{ formatAmount(g.incomePerPerson) }} / особа
                 </div>
@@ -71,6 +81,21 @@
             <span class="pop-total-item">
               <v-icon size="13" class="mr-1">mdi-gold</v-icon>
               Дохід: <strong>{{ formatAmount(populationIncomeTotal) }}</strong> зм
+            </span>
+          </div>
+          <div v-if="bureaucratStats.bureaucratCount > 0" class="pop-bureaucrat-stats">
+            <span class="pop-total-item">
+              <v-icon size="13" class="mr-1">mdi-badge-account</v-icon>
+              Бюрократи: <strong>{{ bureaucratStats.bureaucratCount }}</strong> осіб
+            </span>
+            <span class="pop-total-item">
+              <v-icon size="13" class="mr-1">mdi-shield-check</v-icon>
+              Охоплення: <strong>{{ bureaucratStats.coveragePercent }}%</strong>
+              <span v-if="bureaucratStats.isFull" class="pop-bureaucrat-full wi-success-text">&nbsp;✓ повне</span>
+            </span>
+            <span class="pop-total-item">
+              <v-icon size="13" class="mr-1">mdi-gold</v-icon>
+              Утримання: <strong>{{ formatAmount(bureaucratStats.maintenanceCost) }} зм</strong>
             </span>
           </div>
           <div class="pop-chart-canvas">
@@ -184,10 +209,13 @@ const isAdmin = computed(() => userStore?.isAdmin ?? false)
 /* Pirate palette — matches the design system */
 const PALETTE = ['#c8962a', '#7b4f2e', '#3a6080', '#5a8a3c', '#8b6914', '#4a7a6a', '#7a3a3a', '#5a6a3a']
 
+const bureaucratStats = computed(() => store.bureaucratStats)
+
 const viewRows = computed(() => {
   return store.groupsAugmented.map((g, i) => ({
     ...g,
     color: PALETTE[i % PALETTE.length],
+    isBureaucrat: g.faction === 'bureaucrats',
   }))
 })
 
@@ -648,5 +676,30 @@ async function saveGroup() {
 
 .save-btn :deep(.v-btn__overlay) {
   opacity: 0 !important;
+}
+
+/* ── Bureaucrat card ────────────────────────────────────────── */
+.pop-card-bureaucrat {
+  border-color: var(--wi-sea) !important;
+}
+
+.pop-card-bureaucrat:hover {
+  border-color: rgba(58, 96, 128, 0.8) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6) !important;
+}
+
+/* ── Bureaucrat stats panel ─────────────────────────────────── */
+.pop-bureaucrat-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(90, 62, 32, 0.3);
+  border-bottom: 1px solid rgba(90, 62, 32, 0.3);
+}
+
+.pop-bureaucrat-full {
+  color: var(--wi-success);
+  font-size: 0.78rem;
 }
 </style>

@@ -119,6 +119,23 @@ export const usePopulationStore = defineStore('population', () => {
         })
     })
 
+    const bureaucratStats = computed(() => {
+        const bureaucrats = state.items.filter((g) => g.faction === 'bureaucrats')
+        const nonBureaucrats = state.items.filter((g) => g.faction !== 'bureaucrats')
+        const bureaucratCount = bureaucrats.reduce((s, g) => s + (g.count || 0), 0)
+        const totalNonBureaucratPop = nonBureaucrats.reduce((s, g) => s + (g.count || 0), 0)
+        const bureaucratCapacity = bureaucratCount * 100
+        const coveredCount = Math.min(bureaucratCapacity, totalNonBureaucratPop)
+        const isFull = totalNonBureaucratPop > 0 && coveredCount >= totalNonBureaucratPop
+        const coveragePercent = totalNonBureaucratPop > 0
+            ? normalizeAmount((coveredCount / totalNonBureaucratPop) * 100)
+            : 0
+        const maintenanceCost = normalizeAmount(
+            bureaucrats.reduce((s, g) => s + (groupIncomePerPerson(g)) * (g.count || 0), 0)
+        )
+        return { bureaucratCount, totalNonBureaucratPop, bureaucratCapacity, coveredCount, isFull, coveragePercent, maintenanceCost }
+    })
+
     return {
         ...toRefs(state),
         startListening,
@@ -127,6 +144,7 @@ export const usePopulationStore = defineStore('population', () => {
         totalCountFromGroups,
         populationIncomeTotal,
         groupsAugmented,
+        bureaucratStats,
         setGroupCount,
     }
 })
