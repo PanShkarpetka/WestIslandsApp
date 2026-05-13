@@ -90,6 +90,50 @@ export async function loadManufacturesByIds(ids, {
   return results
 }
 
+function applyBureaucratEffects(populationEntries, rng) {
+  const bureaucratGroups = populationEntries.filter((e) => e.faction === 'bureaucrats')
+  const nonBureaucratGroups = populationEntries.filter((e) => e.faction !== 'bureaucrats')
+
+  if (!bureaucratGroups.length) return { entries: populationEntries, bureaucratStats: null }
+
+  const bureaucratCount = bureaucratGroups.reduce((s, g) => s + g.count, 0)
+  const totalNonBureaucratPop = nonBureaucratGroups.reduce((s, g) => s + g.count, 0)
+  const bureaucratCapacity = bureaucratCount * 100
+  const coveredCount = Math.min(bureaucratCapacity, totalNonBureaucratPop)
+  const isFull = totalNonBureaucratPop > 0 && coveredCount >= totalNonBureaucratPop
+  const coveredFraction = totalNonBureaucratPop > 0 ? Math.min(1, bureaucratCapacity / totalNonBureaucratPop) : 0
+
+  const adjustedNonBureaucrats = nonBureaucratGroups.map((group) => {
+    const groupCovered = Math.round(group.count * coveredFraction)
+    const groupUncovered = group.count - groupCovered
+    const bonusPerPerson = Math.max(Math.abs(group.incomePerPerson) * 0.20, 0.01)
+
+    let groupBonus = 0
+    if (isFull) {
+      for (let i = 0; i < groupCovered; i++) {
+        if (rng() < 0.20) groupBonus += bonusPerPerson
+      }
+    }
+
+    let groupPenalty = 0
+    for (let i = 0; i < groupUncovered; i++) {
+      if (rng() < 0.20) groupPenalty += Math.abs(group.incomePerPerson)
+    }
+
+    return {
+      ...group,
+      income: normalizeAmount(group.income + groupBonus - groupPenalty),
+      _bureaucratBonus: normalizeAmount(groupBonus),
+      _bureaucratPenalty: normalizeAmount(groupPenalty),
+    }
+  })
+
+  return {
+    entries: [...bureaucratGroups, ...adjustedNonBureaucrats],
+    bureaucratStats: { bureaucratCount, totalNonBureaucratPop, bureaucratCapacity, coveredCount, isFull },
+  }
+}
+
 export async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islandId, populationItems, {
   collection: collectionFn = collection,
   doc: docFn = doc,
@@ -101,6 +145,7 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   runTransaction: runTransactionFn = runTransaction,
   serverTimestamp: serverTimestampFn = serverTimestamp,
   db: firestoreDb = db,
+  rng = Math.random,
 } = {}) {
   const islandSnap = await getDocFn(docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID))
   if (!islandSnap.exists()) return
@@ -108,7 +153,7 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   const manufactureIds = Array.isArray(islandSnap.data()?.manufactures) ? islandSnap.data().manufactures : []
   const loadDeps = { collection: collectionFn, getDocs: getDocsFn, query: queryFn, where: whereFn, documentId: documentIdFn, db: firestoreDb }
   const entries = (await loadManufacturesByIds(manufactureIds, loadDeps)).filter((item) => item.income !== 0)
-  const populationEntries = (populationItems || [])
+  const rawPopulationEntries = (populationItems || [])
     .map((group) => {
       const count = Number(group.count ?? 0)
       const incomePerPerson = normalizeAmount(group.incomePerPerson ?? group.income ?? group.incomePer ?? 0)
@@ -119,10 +164,13 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
         income: normalizeAmount(incomePerPerson * count),
         incomePerPerson,
         count,
+        faction: group.faction || null,
         type: 'population',
       }
     })
     .filter((item) => item.income !== 0)
+
+  const { entries: populationEntries } = applyBureaucratEffects(rawPopulationEntries, rng)
 
   const combinedEntries = [...entries.map((item) => ({ ...item, type: 'manufacture' })), ...populationEntries]
   if (!combinedEntries.length) return
@@ -174,6 +222,8 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
         ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} 🪙)`]
         : [`${label} мануфактури "${item.name || 'Без назви'}"`]
       if (item.type === 'manufacture' && item.description) commentParts.push(item.description)
+      if (item._bureaucratBonus > 0) commentParts.push(`+${formatAmount(item._bureaucratBonus)} 🪙 бонус бюрократів`)
+      if (item._bureaucratPenalty > 0) commentParts.push(`-${formatAmount(item._bureaucratPenalty)} 🪙 несплачено (без нагляду)`)
       commentParts.push(`за цикл ${cycleLabel}.`)
 
       transaction.set(docFn(txCol), {

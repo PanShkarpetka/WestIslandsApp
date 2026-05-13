@@ -39,6 +39,8 @@
  * @property {number} count
  * @property {number} incomePerPerson
  * @property {string} description
+ * @property {string} [imageUrl] - Optional card background image URL.
+ * @property {string} [faction] - Optional faction identifier ('archmasters', 'bureaucrats', etc.).
  */
 
 // ─── INTEREST GROUPS ─────────────────────────────────────────────────────────
