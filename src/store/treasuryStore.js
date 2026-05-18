@@ -51,6 +51,7 @@ export const useTreasuryStore = defineStore('treasury', () => {
   const tx = ref([])
   const loading = ref(false)
   const error = ref(null)
+  const hasMore = ref(false)
   const _pageSize = 20
   let _lastDoc = null
   let _unsubMeta = null
@@ -91,6 +92,7 @@ export const useTreasuryStore = defineStore('treasury', () => {
       const snap = await getDocs(q)
       tx.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
       _lastDoc = snap.docs[snap.docs.length - 1] || null
+      hasMore.value = snap.docs.length === _pageSize
     } catch (e) {
       error.value = e?.message || String(e)
     } finally {
@@ -113,6 +115,7 @@ export const useTreasuryStore = defineStore('treasury', () => {
       const snap = await getDocs(q)
       tx.value.push(...snap.docs.map((d) => ({ id: d.id, ...d.data() })))
       _lastDoc = snap.docs[snap.docs.length - 1] || null
+      hasMore.value = snap.docs.length === _pageSize
     } catch (e) {
       error.value = e?.message || String(e)
     } finally {
@@ -140,6 +143,7 @@ export const useTreasuryStore = defineStore('treasury', () => {
     tx,
     loading,
     error,
+    hasMore,
     subscribeBalance,
     unsubscribeBalance,
     loadFirstPage,
