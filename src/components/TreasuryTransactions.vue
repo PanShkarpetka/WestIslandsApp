@@ -70,7 +70,7 @@ import { formatAmount } from "@/utils/formatters"
 const treasury = useTreasuryStore()
 const tx = computed(() => treasury.tx)
 const loading = computed(() => treasury.loading)
-const hasMore = computed(() => !!treasury._lastDoc)
+const hasMore = computed(() => treasury.hasMore)
 
 function formatDate(v) {
   if (!v) return "—"
