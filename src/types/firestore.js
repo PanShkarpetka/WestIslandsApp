@@ -27,6 +27,8 @@
  * @property {string} id
  * @property {string} name
  * @property {number} cost
+ * @property {Record<number, number>} [growthPerCycle] - Optional map of level → population growth per cycle (e.g. Park building). Keys are level numbers (1–3).
+ * @property {number} [currentLvl] - Current building level (0 = not built). Used together with growthPerCycle.
  */
 
 // ─── POPULATION ──────────────────────────────────────────────────────────────

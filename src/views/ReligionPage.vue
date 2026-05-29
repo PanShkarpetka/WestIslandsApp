@@ -2042,7 +2042,7 @@ async function applyCelestialTransfer() {
         selectedCelestialBonus: celestialTransferForm.selectedBonus || '',
       })
       transaction.update(devaRef, {
-        devaFaith: Number(d.devaFaith ?? 0) + total,
+        devaFaith: Math.min(100, Number(d.devaFaith ?? 0) + total),
       })
     })
   } catch (e) {

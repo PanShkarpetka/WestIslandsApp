@@ -316,6 +316,46 @@ export async function distributeBuildingFaithIncome(cycleId, {
   }
 }
 
+export async function applyParkBuildingGrowth(islandId, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  getDocs: getDocsFn = getDocs,
+  updateDoc: updateDocFn = updateDoc,
+  db: firestoreDb = db,
+} = {}) {
+  const buildingsSnap = await getDocsFn(collectionFn(firestoreDb, 'buildings'))
+  const parkBuildings = buildingsSnap.docs
+    .map((d) => ({ id: d.id, ref: d.ref, ...d.data() }))
+    .filter((b) => b.growthPerCycle && Number(b.currentLvl) > 0)
+
+  if (!parkBuildings.length) return
+
+  for (const building of parkBuildings) {
+    const lvl = Number(building.currentLvl)
+    const growth = Number(building.growthPerCycle?.[lvl] ?? 0)
+    if (!growth) continue
+
+    const peasantsRef = docFn(firestoreDb, 'population', 'peasants')
+    const peasantsSnap = await getDocFn(peasantsRef)
+    if (peasantsSnap.exists()) {
+      await updateDocFn(peasantsRef, { count: Number(peasantsSnap.data().count ?? 0) + growth })
+    }
+
+    const islandRef = docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID)
+    const islandSnap = await getDocFn(islandRef)
+    if (islandSnap.exists()) {
+      await updateDocFn(islandRef, { population: Number(islandSnap.data().population ?? 0) + growth })
+    }
+
+    const unknownReligionRef = docFn(firestoreDb, 'religions', 'Unknown')
+    const unknownReligionSnap = await getDocFn(unknownReligionRef)
+    if (unknownReligionSnap.exists()) {
+      await updateDocFn(unknownReligionRef, { followers: Number(unknownReligionSnap.data().followers ?? 0) + growth })
+    }
+  }
+}
+
 export async function createNewCycleWithEffects({
   startedDate,
   notes = '',
@@ -374,6 +414,7 @@ export async function createNewCycleWithEffects({
     convertedFollowers: 0,
     result: 0,
   })
+  await applyParkBuildingGrowth(islandId, sharedDeps)
   await distributeBuildingFaithIncome(cycleDoc.id, sharedDeps)
   await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems, sharedDeps)
   await settlePreviousSpellRequestsFn()
