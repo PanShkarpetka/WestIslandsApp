@@ -1,11 +1,23 @@
 <template>
   <div class="manufactures-page">
 
+    <!-- Tabs -->
+    <v-tabs v-model="activeTab" align-tabs="start" class="mfg-tabs mb-4">
+      <v-tab value="manufactures">
+        <v-icon start>mdi-factory</v-icon>
+        Мануфактури
+      </v-tab>
+      <v-tab value="auto">
+        <v-icon start>mdi-autorenew</v-icon>
+        Авто-доходи
+      </v-tab>
+    </v-tabs>
+
     <!-- Header row -->
     <div class="mfg-header">
       <div class="mfg-title">
-        <v-icon class="mr-2" size="20">mdi-factory</v-icon>
-        Мануфактури острова
+        <v-icon class="mr-2" size="20">{{ activeTab === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew' }}</v-icon>
+        {{ activeTab === 'manufactures' ? 'Мануфактури острова' : 'Авто-доходи та витрати' }}
       </div>
       <v-btn v-if="isAdmin" class="add-btn" prepend-icon="mdi-plus" @click="openAddDialog">
         Додати
@@ -21,15 +33,15 @@
       <v-icon class="mr-2" size="16">mdi-skull-crossbones</v-icon>
       {{ error }}
     </div>
-    <div v-else-if="!manufactures.length" class="mfg-state">
+    <div v-else-if="!visibleItems.length" class="mfg-state">
       <v-icon class="mr-2" size="16">mdi-anchor</v-icon>
-      Наразі на острові немає мануфактур.
+      {{ activeTab === 'manufactures' ? 'Наразі на острові немає мануфактур.' : 'Наразі немає авто-доходів чи витрат.' }}
     </div>
 
     <!-- Cards grid -->
     <v-row v-else class="mfg-grid">
       <v-col
-        v-for="(item, index) in manufactures"
+        v-for="(item, index) in visibleItems"
         :key="item.key"
         cols="12"
         md="6"
@@ -77,8 +89,8 @@
     <v-dialog v-model="dialogOpen" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
       <v-card class="mfg-dialog">
         <div class="mfg-dialog-header">
-          <v-icon class="mr-2">mdi-factory</v-icon>
-          {{ dialogMode === 'add' ? 'Нова мануфактура' : 'Редагувати мануфактуру' }}
+          <v-icon class="mr-2">{{ dialogMode === 'add' ? (activeTab === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew') : 'mdi-feather' }}</v-icon>
+          {{ dialogMode === 'add' ? (activeTab === 'manufactures' ? 'Нова мануфактура' : 'Новий авто-дохід') : 'Редагувати запис' }}
         </div>
         <v-card-text class="mfg-dialog-body">
           <v-text-field
@@ -120,6 +132,17 @@
             variant="outlined"
             density="compact"
             hide-details="auto"
+            class="mb-3"
+          />
+          <v-select
+            v-model="form.type"
+            :items="typeOptions"
+            item-title="title"
+            item-value="value"
+            label="Тип запису"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
           />
           <div v-if="formError" class="mfg-dialog-error">
             <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>{{ formError }}
@@ -155,6 +178,7 @@ const userStore = useUserStore()
 const guildStore = useGuildStore()
 const isAdmin = computed(() => !!userStore.isAdmin)
 
+const activeTab = ref('manufactures')
 const manufactures = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -162,7 +186,20 @@ const dialogOpen = ref(false)
 const dialogMode = ref('add')
 const saving = ref(false)
 const formError = ref('')
-const form = ref({ id: null, name: '', description: '', income: 0, incomeDestination: 'treasury' })
+const form = ref({ id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: 'manufacture' })
+
+const visibleItems = computed(() =>
+  manufactures.value.filter(item =>
+    activeTab.value === 'manufactures'
+      ? (item.type === 'manufacture' || !item.type)
+      : item.type === 'auto'
+  )
+)
+
+const typeOptions = [
+  { title: 'Мануфактура', value: 'manufacture' },
+  { title: 'Авто-дохід / витрата', value: 'auto' },
+]
 
 const incomeDestinationOptions = computed(() => ([
   { title: 'Скарбниця острова', value: 'treasury' },
@@ -196,6 +233,7 @@ async function loadManufactures(ids) {
           description: data.description || '',
           income: normalizeAmount(data.income || 0),
           incomeDestination: normalizeIncomeDestination(data.incomeDestination),
+          type: data.type === 'auto' ? 'auto' : 'manufacture',
         })
       })
     }
@@ -213,7 +251,7 @@ async function loadManufactures(ids) {
 
 function openAddDialog() {
   dialogMode.value = 'add'
-  form.value = { id: null, name: '', description: '', income: 0, incomeDestination: 'treasury' }
+  form.value = { id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: activeTab.value === 'auto' ? 'auto' : 'manufacture' }
   formError.value = ''
   dialogOpen.value = true
 }
@@ -226,6 +264,7 @@ function openEditDialog(item) {
     description: item.description || '',
     income: item.income || 0,
     incomeDestination: normalizeIncomeDestination(item.incomeDestination),
+    type: item.type === 'auto' ? 'auto' : 'manufacture',
   }
   formError.value = ''
   dialogOpen.value = true
@@ -238,7 +277,8 @@ async function saveManufacture() {
   saving.value = true
   try {
     const incomeDestination = normalizeIncomeDestination(form.value.incomeDestination)
-    const payload = { name, description: form.value.description?.trim() || '', income: normalizeAmount(form.value.income || 0), incomeDestination }
+    const type = form.value.type === 'auto' ? 'auto' : 'manufacture'
+    const payload = { name, description: form.value.description?.trim() || '', income: normalizeAmount(form.value.income || 0), incomeDestination, type }
     if (dialogMode.value === 'add') {
       if (!island.value?.id) throw new Error('Острів не вибрано.')
       const docRef = await addDoc(collection(db, 'manufactures'), payload)
@@ -291,11 +331,34 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
   padding-bottom: 16px;
 }
 
+.mfg-tabs {
+  border-bottom: 1px solid var(--wi-border);
+  margin-bottom: 0 !important;
+}
+
+.mfg-tabs :deep(.v-tab) {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.06em !important;
+  font-size: 0.82rem !important;
+  color: var(--wi-text-muted) !important;
+  text-transform: uppercase !important;
+  min-width: 120px !important;
+}
+
+.mfg-tabs :deep(.v-tab--selected) {
+  color: var(--wi-gold) !important;
+}
+
+.mfg-tabs :deep(.v-tabs-slider) {
+  background-color: var(--wi-gold) !important;
+}
+
 .mfg-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  margin-top: 16px;
 }
 
 .mfg-title {
