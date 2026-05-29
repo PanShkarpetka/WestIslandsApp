@@ -15,12 +15,21 @@
           placeholder="Оберіть дату початку"
         />
         <v-text-field
+          v-model.number="cycleDaysInput"
+          label="Або вкажіть кількість днів циклу"
+          type="number"
+          min="1"
+          density="comfortable"
+          hide-details="auto"
+          class="my-3"
+        />
+        <v-text-field
           :model-value="cycleDurationLabel"
           label="Тривалість попереднього циклу"
           density="comfortable"
           hide-details="auto"
           readonly
-          class="my-3"
+          class="mb-3"
         />
         <v-textarea
           v-model="cycleForm.notes"
@@ -402,7 +411,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, nextTick } from 'vue';
 import {
   addDoc,
   collection,
@@ -445,6 +454,38 @@ const cycleForm = reactive({
   startedDate: null,
   notes: '',
 });
+const cycleDaysInput = ref(null);
+let _daysUpdatingDate = false;
+let _dateUpdatingDays = false;
+
+watch(cycleDaysInput, (days) => {
+  if (_dateUpdatingDays) return
+  const n = Number(days)
+  if (!n || n < 1) return
+  const previousStart = parseFaerunDate(latestCycle.value?.startedAt)
+  if (!previousStart) return
+  _daysUpdatingDate = true
+  const totalDays = previousStart.month * 30 + (previousStart.day - 1) + (n - 1)
+  cycleForm.startedDate = {
+    day: (totalDays % 30) + 1,
+    month: Math.floor(totalDays / 30) % 12,
+    year: previousStart.year + Math.floor(totalDays / 360),
+  }
+  nextTick(() => { _daysUpdatingDate = false })
+})
+
+watch(() => cycleForm.startedDate, (date) => {
+  if (_daysUpdatingDate) return
+  const start = normalizeFaerunDate(date)
+  const previousStart = parseFaerunDate(latestCycle.value?.startedAt)
+  if (!start || !previousStart) return
+  const diff = diffInDays(previousStart, start)
+  if (diff !== null && diff > 0) {
+    _dateUpdatingDays = true
+    cycleDaysInput.value = diff
+    nextTick(() => { _dateUpdatingDays = false })
+  }
+})
 
 const heroes = ref([]);
 const religions = ref([]);
@@ -706,6 +747,7 @@ async function createCycle() {
     cycleForm.notes = '';
     await loadLatestCycle();
     cycleForm.startedDate = suggestNextCycleDate();
+    cycleDaysInput.value = null;
   } catch (error) {
     console.error('[admin] Failed to create cycle', error);
     cycleError.value = 'Не вдалося створити новий цикл.';
