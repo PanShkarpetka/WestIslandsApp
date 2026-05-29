@@ -252,6 +252,7 @@
  * @property {string} description
  * @property {number} income
  * @property {string} incomeDestination - 'treasury' or 'guild:{guildId}'
+ * @property {'manufacture'|'auto'} [type] - 'manufacture' (default) or 'auto' (auto income/expense)
  */
 
 // ─── HEROES & CRAFTING ───────────────────────────────────────────────────────
