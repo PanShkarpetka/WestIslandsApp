@@ -407,3 +407,84 @@ test('createNewCycleWithEffects writes religionAction doc', async () => {
   assert.equal(actions[0].notes, 'Test cycle');
   assert.equal(actions[0].convertedFollowers, 0);
 });
+
+// ─── distributeManufactureIncome — hero destination ──────────────────────────
+
+test('distributeManufactureIncome credits hero goldBalance from manufacture income', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': { name: 'Tavern', income: 5, incomeDestination: 'hero:hero-1', incomeGoods: {} },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 10, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 15);
+  const txs = Object.values(mock.list('hero-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].goldAmount, 5);
+  assert.equal(txs[0].type, 'income');
+  assert.equal(txs[0].heroId, 'hero-1');
+  assert.equal(mock.get('treasury/meta').balance, 0); // treasury unchanged
+});
+
+test('distributeManufactureIncome credits hero goods from manufacture incomeGoods', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': { name: 'Brewery', income: 0, incomeDestination: 'hero:hero-1', incomeGoods: { 'good-barrel': 2 } },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 0, goods: { 'good-barrel': 3 } },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goods['good-barrel'], 5);
+  const txs = Object.values(mock.list('hero-transactions'));
+  assert.equal(txs[0].goods['good-barrel'], 2);
+});
+
+test('distributeManufactureIncome deducts hero goldBalance for negative income (auto deduction)', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': { name: 'Debt', income: -3, incomeDestination: 'hero:hero-1', incomeGoods: {} },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 10, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 7);
+  const txs = Object.values(mock.list('hero-transactions'));
+  assert.equal(txs[0].goldAmount, -3);
+  assert.equal(txs[0].type, 'deduction');
+});
+
+test('distributeManufactureIncome throws when hero deduction would make balance negative', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': { name: 'Debt', income: -50, incomeDestination: 'hero:hero-1', incomeGoods: {} },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 10, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await assert.rejects(
+    () => distributeManufactureIncome(
+      'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+      { ...mock.firebase, db: mock.db },
+    ),
+    /Недостатньо коштів/,
+  );
+
+  // hero balance must be unchanged after failed transaction
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 10);
+});

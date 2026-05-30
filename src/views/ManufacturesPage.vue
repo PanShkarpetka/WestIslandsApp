@@ -80,6 +80,13 @@
               </span>
               <span class="invoice-destination">{{ getIncomeDestinationLabel(item.incomeDestination) }}</span>
             </div>
+            <div v-if="item.incomeDestination?.startsWith('hero:') && Object.keys(item.incomeGoods || {}).length" class="invoice-row">
+              <span class="invoice-label">
+                <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
+                Товари / цикл
+              </span>
+              <span class="invoice-destination">{{ formatIncomeGoods(item.incomeGoods) }}</span>
+            </div>
           </div>
         </div>
       </v-col>
@@ -143,7 +150,51 @@
             variant="outlined"
             density="compact"
             hide-details="auto"
+            class="mb-3"
           />
+
+          <!-- Goods per cycle (only when destination is a hero) -->
+          <template v-if="isHeroDestination">
+            <div class="goods-section-label mt-2 mb-2">
+              <v-icon size="14" class="mr-1">mdi-package-variant</v-icon>
+              Товари за цикл
+            </div>
+            <div v-for="(row, index) in form.incomeGoods" :key="index" class="goods-row-form mb-2">
+              <v-select
+                v-model="row.goodId"
+                :items="goodsStore.goods"
+                item-title="name"
+                item-value="id"
+                label="Товар"
+                variant="outlined"
+                density="compact"
+                hide-details
+                class="flex-1"
+              />
+              <v-text-field
+                v-model.number="row.qty"
+                label="К-сть"
+                type="number"
+                variant="outlined"
+                density="compact"
+                hide-details
+                style="max-width: 90px"
+              />
+              <v-btn size="small" icon variant="text" color="error" @click="form.incomeGoods.splice(index, 1)">
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </div>
+            <v-btn
+              size="small"
+              variant="outlined"
+              prepend-icon="mdi-plus"
+              class="mb-3"
+              @click="form.incomeGoods.push({ goodId: '', qty: 0 })"
+            >
+              Додати товар
+            </v-btn>
+          </template>
+
           <div v-if="formError" class="mfg-dialog-error">
             <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>{{ formError }}
           </div>
@@ -169,6 +220,8 @@ import { addDoc, arrayUnion, collection, doc, documentId, getDocs, query, update
 import { useIslandStore } from '@/store/islandStore'
 import { useUserStore } from '@/store/userStore'
 import { useGuildStore } from '@/store/guildStore'
+import { useGoodsStore } from '@/store/goodsStore'
+import { useHeroesStore } from '@/store/heroesStore'
 import { db } from '@/services/firebase'
 import { formatAmount } from '@/utils/formatters'
 
@@ -176,6 +229,8 @@ const islandStore = useIslandStore()
 const { data: island } = storeToRefs(islandStore)
 const userStore = useUserStore()
 const guildStore = useGuildStore()
+const goodsStore = useGoodsStore()
+const heroesStore = useHeroesStore()
 const isAdmin = computed(() => !!userStore.isAdmin)
 
 const activeTab = ref('manufactures')
@@ -186,7 +241,7 @@ const dialogOpen = ref(false)
 const dialogMode = ref('add')
 const saving = ref(false)
 const formError = ref('')
-const form = ref({ id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: 'manufacture' })
+const form = ref({ id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: 'manufacture', incomeGoods: [] })
 
 const visibleItems = computed(() =>
   manufactures.value.filter(item =>
@@ -207,10 +262,17 @@ const incomeDestinationOptions = computed(() => ([
     title: `Гільдія: ${guild.name || guild.id}`,
     value: `guild:${guild.id}`,
   })),
+  ...heroesStore.playerHeroes.map((hero) => ({
+    title: `Гравець: ${hero.name}`,
+    value: `hero:${hero.id}`,
+  })),
 ]))
+
+const isHeroDestination = computed(() => form.value.incomeDestination?.startsWith('hero:'))
 
 function destinationIcon(dest) {
   if (!dest || dest === 'treasury') return 'mdi-anchor'
+  if (dest.startsWith('hero:')) return 'mdi-sword'
   return 'mdi-sword-cross'
 }
 
@@ -234,6 +296,7 @@ async function loadManufactures(ids) {
           income: normalizeAmount(data.income || 0),
           incomeDestination: normalizeIncomeDestination(data.incomeDestination),
           type: data.type === 'auto' ? 'auto' : 'manufacture',
+          incomeGoods: data.incomeGoods || {},
         })
       })
     }
@@ -251,13 +314,14 @@ async function loadManufactures(ids) {
 
 function openAddDialog() {
   dialogMode.value = 'add'
-  form.value = { id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: activeTab.value === 'auto' ? 'auto' : 'manufacture' }
+  form.value = { id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: activeTab.value === 'auto' ? 'auto' : 'manufacture', incomeGoods: [] }
   formError.value = ''
   dialogOpen.value = true
 }
 
 function openEditDialog(item) {
   dialogMode.value = 'edit'
+  const savedGoods = item.incomeGoods || {}
   form.value = {
     id: item.key,
     name: item.name || '',
@@ -265,6 +329,7 @@ function openEditDialog(item) {
     income: item.income || 0,
     incomeDestination: normalizeIncomeDestination(item.incomeDestination),
     type: item.type === 'auto' ? 'auto' : 'manufacture',
+    incomeGoods: Object.entries(savedGoods).map(([goodId, qty]) => ({ goodId, qty })),
   }
   formError.value = ''
   dialogOpen.value = true
@@ -278,7 +343,13 @@ async function saveManufacture() {
   try {
     const incomeDestination = normalizeIncomeDestination(form.value.incomeDestination)
     const type = form.value.type === 'auto' ? 'auto' : 'manufacture'
-    const payload = { name, description: form.value.description?.trim() || '', income: normalizeAmount(form.value.income || 0), incomeDestination, type }
+    const incomeGoods = {}
+    if (incomeDestination.startsWith('hero:')) {
+      for (const row of (form.value.incomeGoods || [])) {
+        if (row.goodId && row.qty !== 0) incomeGoods[row.goodId] = Number(row.qty) || 0
+      }
+    }
+    const payload = { name, description: form.value.description?.trim() || '', income: normalizeAmount(form.value.income || 0), incomeDestination, type, incomeGoods }
     if (dialogMode.value === 'add') {
       if (!island.value?.id) throw new Error('Острів не вибрано.')
       const docRef = await addDoc(collection(db, 'manufactures'), payload)
@@ -306,19 +377,39 @@ function normalizeIncomeDestination(value) {
   if (typeof value !== 'string') return 'treasury'
   if (value === 'treasury') return 'treasury'
   if (value.startsWith('guild:') && value.length > 'guild:'.length) return value
+  if (value.startsWith('hero:') && value.length > 'hero:'.length) return value
   return 'treasury'
 }
 
 function getIncomeDestinationLabel(destination) {
   if (!destination || destination === 'treasury') return 'Скарбниця острова'
-  if (!destination.startsWith('guild:')) return 'Скарбниця острова'
-  const guildId = destination.slice('guild:'.length)
-  const guild = guildStore.guilds.find((entry) => entry.id === guildId)
-  return guild?.name ? `Гільдія: ${guild.name}` : `Гільдія: ${guildId}`
+  if (destination.startsWith('guild:')) {
+    const guildId = destination.slice('guild:'.length)
+    const guild = guildStore.guilds.find((entry) => entry.id === guildId)
+    return guild?.name ? `Гільдія: ${guild.name}` : `Гільдія: ${guildId}`
+  }
+  if (destination.startsWith('hero:')) {
+    const heroId = destination.slice('hero:'.length)
+    const hero = heroesStore.playerHeroes.find((h) => h.id === heroId)
+    return hero?.name ? `Гравець: ${hero.name}` : `Гравець: ${heroId}`
+  }
+  return 'Скарбниця острова'
+}
+
+function formatIncomeGoods(incomeGoods) {
+  if (!incomeGoods || !Object.keys(incomeGoods).length) return '—'
+  return Object.entries(incomeGoods)
+    .map(([goodId, qty]) => {
+      const good = goodsStore.goods.find((g) => g.id === goodId)
+      return `${qty} ${good?.name || goodId}`
+    })
+    .join(', ')
 }
 
 onMounted(() => {
   guildStore.subscribeGuilds()
+  goodsStore.subscribeGoods()
+  heroesStore.subscribeHeroes()
   loadManufactures(island.value?.manufactures)
 })
 
@@ -559,5 +650,26 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
 
 .save-btn :deep(.v-btn__overlay) {
   opacity: 0 !important;
+}
+
+/* ── Goods form ─────────────────────────────────────────────── */
+.goods-section-label {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 0.72rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+}
+
+.goods-row-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goods-row-form .flex-1 {
+  flex: 1;
 }
 </style>

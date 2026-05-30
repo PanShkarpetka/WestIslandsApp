@@ -251,8 +251,9 @@
  * @property {string} name
  * @property {string} description
  * @property {number} income
- * @property {string} incomeDestination - 'treasury' or 'guild:{guildId}'
+ * @property {string} incomeDestination - 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
  * @property {'manufacture'|'auto'} [type] - 'manufacture' (default) or 'auto' (auto income/expense)
+ * @property {Record<string, number>} [incomeGoods] - goods distributed per cycle, keyed by goodId
  */
 
 // ─── HEROES & CRAFTING ───────────────────────────────────────────────────────
@@ -266,6 +267,31 @@
  * @property {boolean} passiveOVInactive
  * @property {boolean} downtimeAvailable
  * @property {HeroCraftingData} crafting
+ * @property {string} [password] - when set, enables player login
+ * @property {number} [goldBalance] - personal gold balance, never negative
+ * @property {Record<string, number>} [goods] - personal goods inventory, keyed by goodId
+ */
+
+/**
+ * Collection: `goods/{goodId}`
+ * @typedef {Object} GoodDoc
+ * @property {string} name
+ * @property {string} [unit] - display unit, e.g. "barrel", "unit", "кг"
+ */
+
+/**
+ * Collection: `hero-transactions/{txId}`
+ * @typedef {Object} HeroTransactionDoc
+ * @property {string} heroId
+ * @property {string} heroName - snapshot of hero name at transaction time
+ * @property {number} goldAmount - positive = credit, negative = debit
+ * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
+ * @property {'income'|'withdrawal'|'deduction'} type
+ * @property {string} comment
+ * @property {string} [cycleId]
+ * @property {string} [cycleStartedAt]
+ * @property {string} [cycleFinishedAt]
+ * @property {import('firebase/firestore').Timestamp} createdAt
  */
 
 /**

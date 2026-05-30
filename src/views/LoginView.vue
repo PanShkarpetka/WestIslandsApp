@@ -22,32 +22,32 @@
             v-model="nickname"
             label="Ваш псевдонім"
             variant="underlined"
-            :loading="checkingLeader"
+            :loading="checking"
             color="primary"
             class="login-field"
           />
 
           <v-text-field
-            v-if="nickname === 'admin' || requireLeaderPassword"
+            v-if="requiresPassword"
             v-model="password"
-            :label="nickname === 'admin' ? 'Пароль адміністратора' : 'Пароль лідера гільдії'"
+            :label="passwordLabel"
             type="password"
             variant="underlined"
             color="primary"
             class="login-field"
           />
-
-          <v-alert v-if="error" variant="tonal" color="error" density="compact" class="mt-3 login-alert">
-            <v-icon start>mdi-skull-crossbones</v-icon>
-            {{ error }}
-          </v-alert>
         </div>
+
+        <v-alert v-if="error" variant="tonal" color="error" density="compact" class="mt-3 login-alert">
+          <v-icon start>mdi-skull-crossbones</v-icon>
+          {{ error }}
+        </v-alert>
 
         <div class="login-actions">
           <v-btn
             class="login-btn"
             size="large"
-            :loading="checkingLeader"
+            :loading="checking"
             @click="handleLogin"
           >
             <v-icon start>mdi-sail-boat</v-icon>
@@ -60,68 +60,128 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '../store/userStore';
-import { getLeaderGuildAccess, isLeaderNickname, verifyAdminPassword } from '../services/authService.js';
+import { authenticateHero, getLeaderGuildAccess, isLeaderNickname, isPasswordHeroName, verifyAdminPassword } from '../services/authService.js';
 
 const nickname = ref('');
 const password = ref('');
 const error = ref('');
-const requireLeaderPassword = ref(false);
-const checkingLeader = ref(false);
+const checking = ref(false);
+
+// Detected account type based on the typed nickname
+const accountType = ref('regular'); // 'admin' | 'leader' | 'hero' | 'both' | 'regular'
+
+const requiresPassword = computed(() => accountType.value !== 'regular');
+const passwordLabel = computed(() => {
+  if (accountType.value === 'admin') return 'Пароль адміністратора';
+  if (accountType.value === 'leader') return 'Пароль лідера гільдії';
+  if (accountType.value === 'hero') return 'Пароль героя';
+  if (accountType.value === 'both') return 'Пароль';
+  return 'Пароль';
+});
 
 const router = useRouter();
 const userStore = useUserStore();
 
 let checkToken = 0;
-watch(nickname, async (nextNickname) => {
+watch(nickname, async (next) => {
   error.value = '';
   password.value = '';
 
-  if (!nextNickname || nextNickname === 'admin') {
-    requireLeaderPassword.value = false;
+  const name = (next || '').trim();
+
+  if (!name) {
+    accountType.value = 'regular';
+    return;
+  }
+
+  if (name.toLowerCase() === 'admin') {
+    accountType.value = 'admin';
     return;
   }
 
   const currentToken = ++checkToken;
-  checkingLeader.value = true;
+  checking.value = true;
   try {
-    const isLeader = await isLeaderNickname(nextNickname);
+    const [isLeader, isHero] = await Promise.all([
+      isLeaderNickname(name),
+      isPasswordHeroName(name),
+    ]);
     if (currentToken !== checkToken) return;
-    requireLeaderPassword.value = isLeader;
+    if (isLeader && isHero) accountType.value = 'both';
+    else if (isLeader) accountType.value = 'leader';
+    else if (isHero) accountType.value = 'hero';
+    else accountType.value = 'regular';
   } catch {
     if (currentToken !== checkToken) return;
-    requireLeaderPassword.value = false;
+    accountType.value = 'regular';
   } finally {
-    if (currentToken === checkToken) checkingLeader.value = false;
+    if (currentToken === checkToken) checking.value = false;
   }
 });
 
 async function handleLogin() {
   error.value = '';
 
-  if (!nickname.value) return (error.value = 'Введіть ваш псевдонім');
+  const name = (nickname.value || '').trim();
+  if (!name) return (error.value = 'Введіть ваш псевдонім');
 
-  if (nickname.value === 'admin') {
+  if (accountType.value === 'admin') {
     const isValid = await verifyAdminPassword(password.value);
     if (!isValid) return (error.value = 'Невірний пароль');
-    userStore.login(nickname.value, true);
+    userStore.login(name, true);
     return router.push('/ships');
   }
 
-  const leaderAccess = await getLeaderGuildAccess(nickname.value, password.value);
-  if (leaderAccess.requiresPassword && !password.value) {
-    requireLeaderPassword.value = true;
-    return (error.value = 'Для лідера гільдії потрібно ввести пароль');
+  if (accountType.value === 'leader') {
+    if (!password.value) return (error.value = 'Введіть пароль лідера гільдії');
+    const leaderAccess = await getLeaderGuildAccess(name, password.value);
+    if (!leaderAccess.accessibleGuildIds.length) return (error.value = 'Невірний пароль лідера гільдії');
+    userStore.login(name, false, leaderAccess.accessibleGuildIds);
+    return router.push('/ships');
   }
 
-  if (leaderAccess.requiresPassword && !leaderAccess.accessibleGuildIds.length) {
-    requireLeaderPassword.value = true;
-    return (error.value = 'Невірний пароль лідера гільдії');
+  if (accountType.value === 'hero') {
+    if (!password.value) return (error.value = 'Введіть пароль героя');
+    checking.value = true;
+    try {
+      const { heroId } = await authenticateHero(name, password.value);
+      userStore.loginAsHero(name, heroId);
+      router.push('/account');
+    } catch (e) {
+      error.value = e?.message || 'Невірний пароль';
+    } finally {
+      checking.value = false;
+    }
+    return;
   }
 
-  userStore.login(nickname.value, false, leaderAccess.accessibleGuildIds);
+  if (accountType.value === 'both') {
+    if (!password.value) return (error.value = 'Введіть пароль');
+    checking.value = true;
+    try {
+      // Try leader password first; if it matches, log in with guild access
+      const leaderAccess = await getLeaderGuildAccess(name, password.value);
+      if (leaderAccess.accessibleGuildIds.length) {
+        userStore.login(name, false, leaderAccess.accessibleGuildIds);
+        return router.push('/ships');
+      }
+      // Fall back to hero password
+      const { heroId } = await authenticateHero(name, password.value);
+      userStore.loginAsHero(name, heroId);
+      router.push('/account');
+    } catch (e) {
+      error.value = 'Невірний пароль';
+    } finally {
+      checking.value = false;
+    }
+    return;
+  }
+
+  // Regular user — no password required
+  userStore.login(name);
   router.push('/ships');
 }
 </script>

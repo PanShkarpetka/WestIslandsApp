@@ -347,6 +347,14 @@
             />
             <v-switch v-model="editHeroForm.downtimeAvailable" label="Дія не виконана" inset color="warning" />
             <v-switch v-model="editHeroForm.inactive" label="Неактивний герой" inset color="error" />
+            <v-text-field
+              v-model="editHeroForm.password"
+              label="Пароль гравця (залиште порожнім для відключення входу)"
+              type="password"
+              class="mb-2"
+              hint="Встановіть пароль, щоб герой міг входити як гравець"
+              persistent-hint
+            />
           </v-card-text>
           <v-card-actions>
             <v-spacer />
@@ -357,6 +365,58 @@
       </v-dialog>
 
 
+
+      <v-divider class="my-4" />
+
+      <!-- Trade Goods -->
+      <v-card-title class="text-h6">Торгові товари</v-card-title>
+      <v-alert v-if="goodsError" type="error" variant="tonal" class="mb-4">{{ goodsError }}</v-alert>
+      <v-alert v-if="goodsSuccess" type="success" variant="tonal" class="mb-4">{{ goodsSuccess }}</v-alert>
+
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Додати товар</div>
+        <v-row>
+          <v-col cols="12" md="5">
+            <v-text-field v-model="newGoodForm.name" label="Назва товару" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field v-model="newGoodForm.unit" label="Одиниця виміру (напр. barrel, шт.)" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="3" class="d-flex align-end">
+            <v-btn color="primary" prepend-icon="mdi-package-variant-plus" :loading="goodsSaving" @click="createGood">
+              Додати
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card>
+
+      <v-data-table
+        :headers="goodsHeaders"
+        :items="goodsRows"
+        :items-per-page="20"
+        class="elevation-1 mb-4"
+        density="compact"
+      >
+        <template #item.actions="{ item }">
+          <v-btn size="small" variant="text" color="primary" @click="openGoodsEditor(item)">Редагувати</v-btn>
+          <v-btn size="small" variant="text" color="error" @click="deleteGood(item)">Видалити</v-btn>
+        </template>
+      </v-data-table>
+
+      <v-dialog v-model="goodsEditDialog" max-width="420">
+        <v-card>
+          <v-card-title class="text-h6">Редагування товару</v-card-title>
+          <v-card-text>
+            <v-text-field v-model="editGoodForm.name" label="Назва товару" class="mb-2" />
+            <v-text-field v-model="editGoodForm.unit" label="Одиниця виміру" class="mb-2" />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="goodsEditDialog = false">Скасувати</v-btn>
+            <v-btn color="primary" :loading="goodsSaving" @click="saveGood">Зберегти</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
 
       <v-divider class="my-4" />
 
@@ -415,6 +475,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, nextTick } 
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -423,6 +484,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -504,6 +566,82 @@ const snapshotImportState = reactive({
   applySummary: null,
 });
 
+// ── Trade goods ──────────────────────────────────────────────────────────────
+const goodsList = ref([]);
+const goodsSaving = ref(false);
+const goodsError = ref('');
+const goodsSuccess = ref('');
+const goodsEditDialog = ref(false);
+const selectedGoodId = ref('');
+const newGoodForm = reactive({ name: '', unit: '' });
+const editGoodForm = reactive({ name: '', unit: '' });
+let stopGoods = null;
+
+const goodsHeaders = [
+  { title: 'Назва', key: 'name' },
+  { title: 'Одиниця', key: 'unit' },
+  { title: '', key: 'actions', sortable: false },
+];
+
+const goodsRows = computed(() =>
+  goodsList.value.map((g) => ({ id: g.id, name: g.name, unit: g.unit || '—' }))
+);
+
+function openGoodsEditor(item) {
+  selectedGoodId.value = item.id;
+  editGoodForm.name = item.name;
+  editGoodForm.unit = item.unit === '—' ? '' : item.unit;
+  goodsEditDialog.value = true;
+}
+
+async function createGood() {
+  goodsError.value = '';
+  goodsSuccess.value = '';
+  const name = newGoodForm.name.trim();
+  if (!name) { goodsError.value = 'Вкажіть назву товару.'; return; }
+  goodsSaving.value = true;
+  try {
+    await addDoc(collection(db, 'goods'), { name, unit: newGoodForm.unit.trim() });
+    newGoodForm.name = '';
+    newGoodForm.unit = '';
+    goodsSuccess.value = 'Товар додано.';
+  } catch (e) {
+    console.error('[admin] Failed to create good', e);
+    goodsError.value = 'Не вдалося додати товар.';
+  } finally {
+    goodsSaving.value = false;
+  }
+}
+
+async function saveGood() {
+  goodsError.value = '';
+  const name = editGoodForm.name.trim();
+  if (!selectedGoodId.value || !name) { goodsError.value = 'Вкажіть назву.'; return; }
+  goodsSaving.value = true;
+  try {
+    await setDoc(doc(db, 'goods', selectedGoodId.value), { name, unit: editGoodForm.unit.trim() }, { merge: true });
+    goodsEditDialog.value = false;
+    goodsSuccess.value = 'Товар оновлено.';
+  } catch (e) {
+    console.error('[admin] Failed to save good', e);
+    goodsError.value = 'Не вдалося зберегти товар.';
+  } finally {
+    goodsSaving.value = false;
+  }
+}
+
+async function deleteGood(item) {
+  goodsError.value = '';
+  goodsSuccess.value = '';
+  try {
+    await deleteDoc(doc(db, 'goods', item.id));
+    goodsSuccess.value = `Товар "${item.name}" видалено.`;
+  } catch (e) {
+    console.error('[admin] Failed to delete good', e);
+    goodsError.value = 'Не вдалося видалити товар.';
+  }
+}
+
 const craftItemsForAdmin = ref([]);
 const selectedHeroIdForCrafting = ref('');
 
@@ -519,6 +657,7 @@ const editHeroForm = reactive({
   dndbeyondCharacterId: '',
   downtimeAvailable: true,
   inactive: false,
+  password: '',
 });
 
 let stopHeroes = null;
@@ -808,6 +947,7 @@ function subscribeHeroData() {
         balanceDelta: data.balanceDelta || null,
         downtimeAvailable: data.downtimeAvailable !== false,
         inactive: Boolean(data.inactive),
+        password: data.password || '',
       };
     });
   });
@@ -1112,6 +1252,7 @@ function openHeroEditor(hero) {
   editHeroForm.dndbeyondCharacterId = hero.dndbeyondCharacterId || '';
   editHeroForm.downtimeAvailable = hero.downtimeAvailable;
   editHeroForm.inactive = hero.inactive;
+  editHeroForm.password = hero.password || '';
   heroEditDialog.value = true;
 }
 
@@ -1192,13 +1333,18 @@ async function saveHero() {
     const targetReligionRef = doc(db, 'religions', editHeroForm.religionId);
 
     await runTransaction(db, async (transaction) => {
-      transaction.update(heroRef, {
+      const heroUpdates = {
         name,
         dndbeyondCharacterId,
         downtimeAvailable: editHeroForm.downtimeAvailable,
         inactive: editHeroForm.inactive,
         updatedAt: serverTimestamp(),
-      });
+      };
+      const trimmedPassword = editHeroForm.password.trim();
+      if (trimmedPassword) {
+        heroUpdates.password = trimmedPassword;
+      }
+      transaction.update(heroRef, heroUpdates);
 
       if (currentHero?.clergyId) {
         transaction.update(doc(db, 'clergy', currentHero.clergyId), {
@@ -1244,6 +1390,9 @@ onMounted(async () => {
   await loadLatestCycle();
   cycleForm.startedDate = suggestNextCycleDate();
   subscribeHeroData();
+  stopGoods = onSnapshot(query(collection(db, 'goods'), orderBy('name')), (snap) => {
+    goodsList.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  });
   await refreshCraftingAdminData();
 });
 
@@ -1253,6 +1402,7 @@ onBeforeUnmount(() => {
   stopReligions?.();
   stopClergy?.();
   stopHeroBalanceSyncLogs?.();
+  stopGoods?.();
 });
 
 function formatTimestamp(timestamp) {

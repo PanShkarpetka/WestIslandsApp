@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getLeaderGuildAccess, isLeaderNickname, verifyAdminPassword } from '../../src/services/authService.js';
+import { authenticateHero, getLeaderGuildAccess, isLeaderNickname, isPasswordHeroName, verifyAdminPassword } from '../../src/services/authService.js';
 
 test('verifyAdminPassword returns false when document missing', async () => {
   const result = await verifyAdminPassword('secret', {
@@ -106,4 +106,92 @@ test('getLeaderGuildAccess returns guild ids matching leader password', async ()
   });
 
   assert.deepEqual(result, { requiresPassword: true, accessibleGuildIds: ['guild-a', 'guild-b'] });
+});
+
+// ─── isPasswordHeroName ───────────────────────────────────────────────────────
+
+test('isPasswordHeroName returns false for empty name', async () => {
+  const result = await isPasswordHeroName('', makeHeroDeps([]));
+  assert.equal(result, false);
+});
+
+test('isPasswordHeroName returns false for admin', async () => {
+  const result = await isPasswordHeroName('admin', makeHeroDeps([]));
+  assert.equal(result, false);
+});
+
+test('isPasswordHeroName returns false when hero has no password', async () => {
+  const result = await isPasswordHeroName('Boromir', makeHeroDeps([
+    { id: 'hero-1', data: { name: 'Boromir' } },
+  ]));
+  assert.equal(result, false);
+});
+
+test('isPasswordHeroName returns true when hero has a password set', async () => {
+  const result = await isPasswordHeroName('Boromir', makeHeroDeps([
+    { id: 'hero-1', data: { name: 'Boromir', password: 'secret' } },
+  ]));
+  assert.equal(result, true);
+});
+
+// ─── authenticateHero ─────────────────────────────────────────────────────────
+
+function makeHeroDeps(docs) {
+  return {
+    dbRef: {},
+    collectionFn: () => ({}),
+    queryFn: () => ({}),
+    whereFn: () => ({}),
+    getDocsFn: async () => ({
+      empty: docs.length === 0,
+      docs: docs.map((d) => ({ id: d.id, data: () => d.data })),
+    }),
+  };
+}
+
+test('authenticateHero throws when name is empty', async () => {
+  await assert.rejects(
+    () => authenticateHero('', 'pass', makeHeroDeps([])),
+    { message: "Введіть ім'я та пароль" },
+  );
+});
+
+test('authenticateHero throws when password is empty', async () => {
+  await assert.rejects(
+    () => authenticateHero('Boromir', '', makeHeroDeps([])),
+    { message: "Введіть ім'я та пароль" },
+  );
+});
+
+test('authenticateHero throws when hero not found', async () => {
+  await assert.rejects(
+    () => authenticateHero('Boromir', 'pass', makeHeroDeps([])),
+    { message: 'Героя не знайдено' },
+  );
+});
+
+test('authenticateHero throws when password does not match', async () => {
+  await assert.rejects(
+    () => authenticateHero('Boromir', 'wrong', makeHeroDeps([
+      { id: 'hero-1', data: { name: 'Boromir', password: 'correct' } },
+    ])),
+    { message: 'Невірний пароль' },
+  );
+});
+
+test('authenticateHero throws when hero has no password field', async () => {
+  await assert.rejects(
+    () => authenticateHero('Boromir', 'pass', makeHeroDeps([
+      { id: 'hero-1', data: { name: 'Boromir' } },
+    ])),
+    { message: 'Невірний пароль' },
+  );
+});
+
+test('authenticateHero returns heroId and name on success', async () => {
+  const result = await authenticateHero('Boromir', 'secret', makeHeroDeps([
+    { id: 'hero-1', data: { name: 'Boromir', password: 'secret' } },
+  ]));
+
+  assert.deepEqual(result, { heroId: 'hero-1', name: 'Boromir' });
 });

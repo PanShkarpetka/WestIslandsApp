@@ -1,0 +1,585 @@
+<template>
+  <v-container class="account-page py-6">
+
+    <div class="account-header mb-6">
+      <v-icon class="mr-2" size="26" color="primary">mdi-account</v-icon>
+      <h1 class="wi-heading">{{ userStore.nickname }}</h1>
+      <span class="account-subtitle">Особистий рахунок</span>
+    </div>
+
+    <div v-if="loading" class="account-state">
+      <v-icon class="mr-2">mdi-compass</v-icon>
+      Завантаження…
+    </div>
+
+    <div v-else-if="loadError" class="account-state account-error">
+      <v-icon class="mr-2">mdi-skull-crossbones</v-icon>
+      {{ loadError }}
+    </div>
+
+    <template v-else>
+      <!-- Gold balance -->
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-gold</v-icon>
+          Золотий баланс
+        </div>
+        <v-card-text class="account-card-body">
+          <div class="balance-display">
+            <span class="wi-number balance-amount">{{ formatAmount(hero.goldBalance) }}</span>
+            <span class="balance-unit wi-muted-text">зм</span>
+          </div>
+          <v-btn
+            class="withdraw-btn mt-4"
+            prepend-icon="mdi-bank-minus"
+            :disabled="hero.goldBalance <= 0"
+            @click="openGoldWithdrawDialog"
+          >
+            Зняти золото
+          </v-btn>
+        </v-card-text>
+      </v-card>
+
+      <!-- Goods inventory -->
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-package-variant</v-icon>
+          Товари
+        </div>
+        <v-card-text class="account-card-body">
+          <div v-if="!goodsList.length" class="account-empty-state">
+            <v-icon class="mr-1" size="14">mdi-anchor</v-icon>
+            Товарів немає.
+          </div>
+          <div v-else class="goods-list">
+            <div v-for="item in goodsList" :key="item.id" class="goods-row">
+              <div class="goods-info">
+                <span class="goods-name">{{ item.name }}</span>
+                <span class="goods-qty wi-number">{{ item.qty }}</span>
+                <span class="goods-unit wi-muted-text">{{ item.unit || 'шт.' }}</span>
+              </div>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                class="goods-withdraw-btn"
+                :disabled="item.qty <= 0"
+                @click="openGoodsWithdrawDialog(item)"
+              >
+                Зняти
+              </v-btn>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <!-- Transaction history -->
+      <v-card class="account-card" elevation="0">
+        <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-history</v-icon>
+          Історія операцій
+        </div>
+        <v-card-text class="account-card-body pa-0">
+          <div v-if="!transactions.length" class="account-empty-state pa-4">
+            <v-icon class="mr-1" size="14">mdi-anchor</v-icon>
+            Операцій не було.
+          </div>
+          <v-table v-else density="compact" class="tx-table">
+            <thead>
+              <tr>
+                <th class="tx-th">Тип</th>
+                <th class="tx-th">Золото</th>
+                <th class="tx-th">Товари</th>
+                <th class="tx-th">Коментар</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="tx in transactions" :key="tx.id" class="tx-row">
+                <td class="tx-td">
+                  <span :class="txTypeClass(tx.type)">{{ txTypeLabel(tx.type) }}</span>
+                </td>
+                <td class="tx-td tx-amount" :class="tx.goldAmount >= 0 ? 'wi-success-text' : 'wi-danger-text'">
+                  {{ tx.goldAmount >= 0 ? '+' : '' }}{{ formatAmount(tx.goldAmount) }} зм
+                </td>
+                <td class="tx-td tx-goods">{{ formatTxGoods(tx.goods) }}</td>
+                <td class="tx-td tx-comment wi-muted-text">{{ tx.comment }}</td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card-text>
+      </v-card>
+    </template>
+
+    <!-- Gold withdraw dialog -->
+    <v-dialog v-model="goldDialog" max-width="400">
+      <v-card class="account-dialog">
+        <div class="account-dialog-header">
+          <v-icon class="mr-2">mdi-bank-minus</v-icon>
+          Зняти золото
+        </div>
+        <v-card-text class="pa-5">
+          <p class="wi-muted-text mb-3">Доступно: <strong class="wi-gold-text">{{ formatAmount(hero.goldBalance) }} зм</strong></p>
+          <v-text-field
+            v-model.number="goldWithdrawAmount"
+            label="Сума (зм)"
+            type="number"
+            min="0.01"
+            :max="hero.goldBalance"
+            step="0.01"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+          />
+          <div v-if="withdrawError" class="account-error-msg mt-2">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ withdrawError }}
+          </div>
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="pa-4">
+          <v-btn variant="text" class="cancel-btn" @click="goldDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <v-btn class="save-btn" :loading="withdrawing" prepend-icon="mdi-check" @click="withdrawGold">
+            Підтвердити
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Goods withdraw dialog -->
+    <v-dialog v-model="goodsDialog" max-width="400">
+      <v-card class="account-dialog">
+        <div class="account-dialog-header">
+          <v-icon class="mr-2">mdi-package-variant-minus</v-icon>
+          Зняти товар
+        </div>
+        <v-card-text class="pa-5">
+          <p class="wi-muted-text mb-1">Товар: <strong class="wi-gold-text">{{ selectedGood?.name }}</strong></p>
+          <p class="wi-muted-text mb-3">Доступно: <strong class="wi-gold-text">{{ selectedGood?.qty }} {{ selectedGood?.unit || 'шт.' }}</strong></p>
+          <v-text-field
+            v-model.number="goodsWithdrawAmount"
+            label="Кількість"
+            type="number"
+            min="1"
+            :max="selectedGood?.qty"
+            step="1"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+          />
+          <div v-if="withdrawError" class="account-error-msg mt-2">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ withdrawError }}
+          </div>
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="pa-4">
+          <v-btn variant="text" class="cancel-btn" @click="goodsDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <v-btn class="save-btn" :loading="withdrawing" prepend-icon="mdi-check" @click="withdrawGoods">
+            Підтвердити
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+  </v-container>
+</template>
+
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
+import { db } from '@/services/firebase'
+import { useUserStore } from '@/store/userStore'
+import { useGoodsStore } from '@/store/goodsStore'
+import { formatAmount } from '@/utils/formatters'
+
+const userStore = useUserStore()
+const goodsStore = useGoodsStore()
+
+const hero = ref({ goldBalance: 0, goods: {} })
+const transactions = ref([])
+const loading = ref(true)
+const loadError = ref('')
+const goldDialog = ref(false)
+const goodsDialog = ref(false)
+const goldWithdrawAmount = ref(0)
+const goodsWithdrawAmount = ref(1)
+const selectedGood = ref(null)
+const withdrawError = ref('')
+const withdrawing = ref(false)
+
+let unsubscribeHero = null
+let unsubscribeTx = null
+
+const goodsList = computed(() => {
+  const goods = hero.value.goods || {}
+  return Object.entries(goods)
+    .filter(([, qty]) => qty > 0)
+    .map(([goodId, qty]) => {
+      const goodMeta = goodsStore.goods.find((g) => g.id === goodId)
+      return { id: goodId, qty, name: goodMeta?.name || goodId, unit: goodMeta?.unit || '' }
+    })
+})
+
+function txTypeLabel(type) {
+  if (type === 'income') return 'Дохід'
+  if (type === 'withdrawal') return 'Зняття'
+  return 'Списання'
+}
+
+function txTypeClass(type) {
+  if (type === 'income') return 'wi-success-text'
+  if (type === 'withdrawal') return 'wi-gold-text'
+  return 'wi-danger-text'
+}
+
+function formatTxGoods(goods) {
+  if (!goods || !Object.keys(goods).length) return '—'
+  return Object.entries(goods)
+    .map(([goodId, qty]) => {
+      const meta = goodsStore.goods.find((g) => g.id === goodId)
+      return `${qty > 0 ? '+' : ''}${qty} ${meta?.name || goodId}`
+    })
+    .join(', ')
+}
+
+function openGoldWithdrawDialog() {
+  withdrawError.value = ''
+  goldWithdrawAmount.value = 0
+  goldDialog.value = true
+}
+
+function openGoodsWithdrawDialog(item) {
+  withdrawError.value = ''
+  goodsWithdrawAmount.value = 1
+  selectedGood.value = item
+  goodsDialog.value = true
+}
+
+async function withdrawGold() {
+  withdrawError.value = ''
+  const amount = Number(goldWithdrawAmount.value)
+  if (!amount || amount <= 0) return (withdrawError.value = 'Введіть суму більше 0')
+  if (amount > hero.value.goldBalance) return (withdrawError.value = 'Недостатньо коштів')
+
+  withdrawing.value = true
+  try {
+    const heroRef = doc(db, 'heroes', userStore.heroId)
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(heroRef)
+      if (!snap.exists()) throw new Error('Героя не знайдено')
+      const current = Number(snap.data().goldBalance ?? 0)
+      if (amount > current) throw new Error('Недостатньо коштів')
+      tx.update(heroRef, { goldBalance: current - amount })
+      const txDocRef = doc(collection(db, 'hero-transactions'))
+      tx.set(txDocRef, {
+        heroId: userStore.heroId,
+        heroName: userStore.nickname,
+        goldAmount: -amount,
+        goods: {},
+        type: 'withdrawal',
+        comment: `Гравець зняв ${formatAmount(amount)} зм.`,
+        createdAt: serverTimestamp(),
+      })
+    })
+    goldDialog.value = false
+  } catch (e) {
+    withdrawError.value = e?.message || 'Помилка'
+  } finally {
+    withdrawing.value = false
+  }
+}
+
+async function withdrawGoods() {
+  withdrawError.value = ''
+  const item = selectedGood.value
+  if (!item) return
+  const amount = Math.floor(Number(goodsWithdrawAmount.value))
+  if (!amount || amount <= 0) return (withdrawError.value = 'Введіть кількість більше 0')
+  if (amount > item.qty) return (withdrawError.value = 'Недостатньо товару')
+
+  withdrawing.value = true
+  try {
+    const heroRef = doc(db, 'heroes', userStore.heroId)
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(heroRef)
+      if (!snap.exists()) throw new Error('Героя не знайдено')
+      const currentGoods = snap.data().goods || {}
+      const currentQty = Number(currentGoods[item.id] ?? 0)
+      if (amount > currentQty) throw new Error('Недостатньо товару')
+      const newGoods = { ...currentGoods, [item.id]: currentQty - amount }
+      tx.update(heroRef, { goods: newGoods })
+      const txDocRef = doc(collection(db, 'hero-transactions'))
+      tx.set(txDocRef, {
+        heroId: userStore.heroId,
+        heroName: userStore.nickname,
+        goldAmount: 0,
+        goods: { [item.id]: -amount },
+        type: 'withdrawal',
+        comment: `Гравець зняв ${amount} ${item.unit || 'шт.'} "${item.name}".`,
+        createdAt: serverTimestamp(),
+      })
+    })
+    goodsDialog.value = false
+  } catch (e) {
+    withdrawError.value = e?.message || 'Помилка'
+  } finally {
+    withdrawing.value = false
+  }
+}
+
+onMounted(() => {
+  goodsStore.subscribeGoods()
+
+  if (!userStore.heroId) {
+    loadError.value = 'Ви не авторизовані як гравець.'
+    loading.value = false
+    return
+  }
+
+  const heroRef = doc(db, 'heroes', userStore.heroId)
+  unsubscribeHero = onSnapshot(heroRef, (snap) => {
+    if (!snap.exists()) {
+      loadError.value = 'Героя не знайдено.'
+      loading.value = false
+      return
+    }
+    const data = snap.data() || {}
+    hero.value = { goldBalance: data.goldBalance ?? 0, goods: data.goods || {} }
+    loading.value = false
+  }, () => {
+    loadError.value = 'Не вдалося завантажити дані.'
+    loading.value = false
+  })
+
+  const txQuery = query(
+    collection(db, 'hero-transactions'),
+    where('heroId', '==', userStore.heroId),
+    orderBy('createdAt', 'desc'),
+  )
+  unsubscribeTx = onSnapshot(txQuery, (snap) => {
+    transactions.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  })
+})
+
+onBeforeUnmount(() => {
+  unsubscribeHero?.()
+  unsubscribeTx?.()
+  goodsStore.unsubscribeGoods()
+})
+</script>
+
+<style scoped>
+.account-page {
+  max-width: 720px;
+}
+
+.account-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.account-subtitle {
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  font-size: 0.9rem;
+}
+
+.account-state {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  padding: 24px 0;
+}
+
+.account-error { color: var(--wi-danger); }
+
+.account-card {
+  background: linear-gradient(160deg, #2c1e0f 0%, #241809 100%);
+  border: 1px solid var(--wi-border);
+  border-radius: 6px;
+}
+
+.account-card-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 0.85rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wi-gold);
+}
+
+.account-card-body {
+  padding: 16px !important;
+}
+
+.balance-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.balance-amount {
+  font-size: 2.2rem;
+}
+
+.balance-unit {
+  font-size: 1rem;
+}
+
+.withdraw-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+  font-size: 0.8rem !important;
+}
+
+.withdraw-btn :deep(.v-btn__overlay) {
+  opacity: 0 !important;
+}
+
+.account-empty-state {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-body);
+  font-style: italic;
+  color: var(--wi-text-muted);
+  font-size: 0.88rem;
+}
+
+.goods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.goods-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--wi-border);
+  border-radius: 4px;
+}
+
+.goods-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.goods-name {
+  font-family: var(--wi-font-body);
+  color: var(--wi-text);
+  font-size: 0.9rem;
+}
+
+.goods-qty {
+  font-size: 1.1rem;
+}
+
+.goods-unit {
+  font-size: 0.8rem;
+}
+
+.goods-withdraw-btn {
+  color: var(--wi-gold) !important;
+  border-color: var(--wi-border) !important;
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* Transaction table */
+.tx-table {
+  background: transparent !important;
+}
+
+.tx-th {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  color: var(--wi-text-muted) !important;
+  border-bottom: 1px solid var(--wi-border) !important;
+}
+
+.tx-row:hover {
+  background: rgba(200, 150, 42, 0.04) !important;
+}
+
+.tx-td {
+  font-size: 0.82rem !important;
+  border-bottom: 1px solid rgba(90, 62, 32, 0.3) !important;
+  padding: 8px 12px !important;
+}
+
+.tx-amount {
+  font-family: var(--wi-font-number);
+  white-space: nowrap;
+}
+
+.tx-goods {
+  font-family: var(--wi-font-body);
+  font-size: 0.78rem !important;
+  color: var(--wi-text-muted);
+}
+
+.tx-comment {
+  font-style: italic;
+  font-size: 0.78rem !important;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Dialogs */
+.account-dialog {
+  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
+  border: 1px solid var(--wi-gold) !important;
+}
+
+.account-dialog-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--wi-border);
+  font-family: var(--wi-font-heading);
+  font-size: 0.95rem;
+  color: var(--wi-gold);
+  letter-spacing: 0.06em;
+}
+
+.account-error-msg {
+  display: flex;
+  align-items: center;
+  color: var(--wi-danger);
+  font-size: 0.85rem;
+}
+
+.cancel-btn {
+  color: var(--wi-text-muted) !important;
+  font-family: var(--wi-font-heading) !important;
+}
+
+.save-btn {
+  font-family: var(--wi-font-heading) !important;
+  letter-spacing: 0.07em !important;
+  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
+  color: #1a1209 !important;
+  border: 1px solid var(--wi-gold-light) !important;
+}
+
+.save-btn :deep(.v-btn__overlay) {
+  opacity: 0 !important;
+}
+</style>

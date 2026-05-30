@@ -65,3 +65,42 @@ export async function getLeaderGuildAccess(
         accessibleGuildIds,
     };
 }
+
+export async function isPasswordHeroName(
+    name,
+    { dbRef = db, collectionFn = collection, queryFn = query, whereFn = where, getDocsFn = getDocs } = {},
+) {
+    const heroName = (name || '').trim();
+    if (!heroName || heroName.toLowerCase() === 'admin') return false;
+
+    const snap = await getDocsFn(queryFn(
+        collectionFn(dbRef, 'heroes'),
+        whereFn('name', '==', heroName),
+    ));
+    return snap.docs.some((d) => !!(d.data()?.password || '').trim());
+}
+
+export async function authenticateHero(
+    name,
+    inputPassword,
+    { dbRef = db, collectionFn = collection, queryFn = query, whereFn = where, getDocsFn = getDocs } = {},
+) {
+    const heroName = (name || '').trim();
+    const password = (inputPassword || '').trim();
+    if (!heroName || !password) throw new Error('Введіть ім\'я та пароль');
+
+    const heroesQuery = queryFn(
+        collectionFn(dbRef, 'heroes'),
+        whereFn('name', '==', heroName),
+    );
+    const snap = await getDocsFn(heroesQuery);
+    if (snap.empty) throw new Error('Героя не знайдено');
+
+    const heroDoc = snap.docs.find((d) => {
+        const pw = (d.data()?.password || '').trim();
+        return pw && pw === password;
+    });
+    if (!heroDoc) throw new Error('Невірний пароль');
+
+    return { heroId: heroDoc.id, name: heroDoc.data().name };
+}

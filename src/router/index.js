@@ -15,6 +15,7 @@ import TravelPage from "@/views/TravelView.vue";
 import GuildsPage from '@/views/GuildsPage.vue';
 import MageGuildPage from '@/views/MageGuildPage.vue';
 import CraftingPage from '@/views/CraftingPage.vue';
+import AccountPage from '@/views/AccountPage.vue';
 import { useUserStore } from '@/store/userStore';
 
 const routes = [
@@ -41,6 +42,7 @@ const routes = [
     { path: '/mage-guild', component: MageGuildPage, meta: { requiresAuth: false } },
     { path: '/crafting', component: CraftingPage, meta: { requiresAuth: false } },
     { path: '/admin', component: AdminView, meta: { adminOnly: true } },
+    { path: '/account', component: AccountPage, meta: { requiresAuth: false } },
 ];
 
 const router = createRouter({

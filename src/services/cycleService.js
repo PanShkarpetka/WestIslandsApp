@@ -26,6 +26,7 @@ function normalizeIncomeDestination(value) {
   if (typeof value !== 'string') return 'treasury'
   if (value === 'treasury') return 'treasury'
   if (value.startsWith('guild:') && value.length > 'guild:'.length) return value
+  if (value.startsWith('hero:') && value.length > 'hero:'.length) return value
   return 'treasury'
 }
 
@@ -81,6 +82,7 @@ export async function loadManufacturesByIds(ids, {
         description: (data.description || '').trim(),
         income: normalizeAmount(data.income || 0),
         incomeDestination: normalizeIncomeDestination(data.incomeDestination),
+        incomeGoods: data.incomeGoods && typeof data.incomeGoods === 'object' ? data.incomeGoods : {},
       })
     })
   }
@@ -152,7 +154,9 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
 
   const manufactureIds = Array.isArray(islandSnap.data()?.manufactures) ? islandSnap.data().manufactures : []
   const loadDeps = { collection: collectionFn, getDocs: getDocsFn, query: queryFn, where: whereFn, documentId: documentIdFn, db: firestoreDb }
-  const entries = (await loadManufacturesByIds(manufactureIds, loadDeps)).filter((item) => item.income !== 0)
+  const entries = (await loadManufacturesByIds(manufactureIds, loadDeps)).filter(
+    (item) => item.income !== 0 || (item.incomeDestination?.startsWith('hero:') && Object.keys(item.incomeGoods || {}).length > 0),
+  )
   const rawPopulationEntries = (populationItems || [])
     .map((group) => {
       const count = Number(group.count ?? 0)
@@ -178,9 +182,11 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   const metaRef = docFn(firestoreDb, 'treasury/meta')
   const txCol = collectionFn(firestoreDb, 'treasury-transactions')
   const cycleLabel = formatCycleLabel(startedAt, finishedAt)
-  const treasuryEntries = combinedEntries.filter((item) => item.type !== 'manufacture' || !item.incomeDestination?.startsWith('guild:'))
-  const totalIncome = treasuryEntries.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
-  const totalOutcome = treasuryEntries.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
+  const nonHeroManufactures = combinedEntries.filter(
+    (item) => item.type !== 'manufacture' || (!item.incomeDestination?.startsWith('guild:') && !item.incomeDestination?.startsWith('hero:')),
+  )
+  const totalIncome = nonHeroManufactures.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
+  const totalOutcome = nonHeroManufactures.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
 
   await runTransactionFn(firestoreDb, async (transaction) => {
     const metaSnap = await transaction.get(metaRef)
@@ -194,9 +200,26 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
       guildBalances.set(guildId, Number(guildSnap.exists() ? guildSnap.data()?.treasure || 0 : 0))
     }))
 
+    // Pre-read hero balances for hero-destination manufactures
+    const heroBalances = new Map()
+    const heroGoods = new Map()
+    const heroNames = new Map()
+    const heroIds = [...new Set(combinedEntries.filter((item) => item.type === 'manufacture' && item.incomeDestination?.startsWith('hero:')).map((item) => item.incomeDestination.slice('hero:'.length)).filter(Boolean))]
+
+    await Promise.all(heroIds.map(async (heroId) => {
+      const heroRef = docFn(firestoreDb, 'heroes', heroId)
+      const heroSnap = await transaction.get(heroRef)
+      const data = heroSnap.exists() ? heroSnap.data() || {} : {}
+      heroBalances.set(heroId, Number(data.goldBalance ?? 0))
+      heroGoods.set(heroId, { ...(data.goods || {}) })
+      heroNames.set(heroId, data.name || heroId)
+    }))
+
     for (const item of combinedEntries) {
       const isGuildDestination = item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:')
+      const isHeroDestination = item.type === 'manufacture' && item.incomeDestination?.startsWith('hero:')
       const guildId = isGuildDestination ? item.incomeDestination.slice('guild:'.length) : null
+      const heroId = isHeroDestination ? item.incomeDestination.slice('hero:'.length) : null
 
       if (isGuildDestination && guildId) {
         const guildRef = docFn(firestoreDb, 'guilds', guildId)
@@ -212,6 +235,41 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
           userNickname: 'Система',
           createdAt: serverTimestampFn(),
           treasureAfter: guildNext,
+        })
+        continue
+      }
+
+      if (isHeroDestination && heroId) {
+        const heroRef = docFn(firestoreDb, 'heroes', heroId)
+        const heroCurrent = Number(heroBalances.get(heroId) || 0)
+        const heroNext = normalizeAmount(heroCurrent + item.income)
+        if (heroNext < 0) throw new Error(`Недостатньо коштів на рахунку героя для списання з мануфактури "${item.name}".`)
+        heroBalances.set(heroId, heroNext)
+
+        const currentGoods = heroGoods.get(heroId) || {}
+        const updatedGoods = { ...currentGoods }
+        const goodsDelta = {}
+        for (const [goodId, qty] of Object.entries(item.incomeGoods || {})) {
+          const prev = Number(updatedGoods[goodId] ?? 0)
+          const next = prev + Number(qty)
+          if (next < 0) throw new Error(`Недостатньо товару "${goodId}" на рахунку героя.`)
+          updatedGoods[goodId] = next
+          goodsDelta[goodId] = Number(qty)
+        }
+        heroGoods.set(heroId, updatedGoods)
+
+        transaction.set(heroRef, { goldBalance: heroNext, goods: updatedGoods, updatedAt: serverTimestampFn() }, { merge: true })
+        transaction.set(docFn(collectionFn(firestoreDb, 'hero-transactions')), {
+          heroId,
+          heroName: heroNames.get(heroId) || heroId,
+          goldAmount: item.income,
+          goods: goodsDelta,
+          type: item.income >= 0 ? 'income' : 'deduction',
+          comment: `Автонарахування з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`.slice(0, 500),
+          cycleId,
+          cycleStartedAt: startedAt,
+          cycleFinishedAt: finishedAt || null,
+          createdAt: serverTimestampFn(),
         })
         continue
       }

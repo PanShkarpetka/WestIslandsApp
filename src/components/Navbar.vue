@@ -19,6 +19,10 @@
         <v-icon>{{ item.icon }}</v-icon>
         <v-tooltip activator="parent" location="bottom">{{ item.label }}</v-tooltip>
       </v-btn>
+      <v-btn v-if="userStore.isHeroUser" icon to="/account" variant="text" class="nav-icon-btn" title="Мій рахунок">
+        <v-icon>mdi-account</v-icon>
+        <v-tooltip activator="parent" location="bottom">Мій рахунок</v-tooltip>
+      </v-btn>
       <v-btn v-if="userStore.isAdmin" icon to="/admin" variant="text" class="nav-icon-btn" title="Адмін">
         <v-icon>mdi-shield-account</v-icon>
         <v-tooltip activator="parent" location="bottom">Адмін</v-tooltip>
@@ -66,6 +70,17 @@
           <v-icon>{{ item.icon }}</v-icon>
         </template>
         <v-list-item-title>{{ item.label }}</v-list-item-title>
+      </v-list-item>
+
+      <v-list-item
+        v-if="userStore.isHeroUser"
+        to="/account"
+        @click="drawer = false"
+        rounded="lg"
+        class="drawer-item"
+      >
+        <template #prepend><v-icon>mdi-account</v-icon></template>
+        <v-list-item-title>Мій рахунок</v-list-item-title>
       </v-list-item>
 
       <v-list-item
