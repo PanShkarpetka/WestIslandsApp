@@ -288,11 +288,11 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
       currentBalance += item.income
       const label = item.income >= 0 ? 'Дохід' : 'Витрати'
       const commentParts = item.type === 'population'
-        ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} 🪙)`]
+        ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} сс)`]
         : [`${label} мануфактури "${item.name || 'Без назви'}"`]
       if (item.type === 'manufacture' && item.description) commentParts.push(item.description)
-      if (item._bureaucratBonus > 0) commentParts.push(`+${formatAmount(item._bureaucratBonus)} 🪙 бонус бюрократів`)
-      if (item._bureaucratPenalty > 0) commentParts.push(`-${formatAmount(item._bureaucratPenalty)} 🪙 несплачено (без нагляду)`)
+      if (item._bureaucratBonus > 0) commentParts.push(`+${formatAmount(item._bureaucratBonus)} сс бонус бюрократів`)
+      if (item._bureaucratPenalty > 0) commentParts.push(`-${formatAmount(item._bureaucratPenalty)} сс несплачено (без нагляду)`)
       commentParts.push(`за цикл ${cycleLabel}.`)
 
       transaction.set(docFn(txCol), {

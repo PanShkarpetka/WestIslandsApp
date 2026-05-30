@@ -10,6 +10,7 @@
   --wi-gold:          #c8962a;
   --wi-gold-light:    #e8b84b;
   --wi-copper:        #7b4f2e;
+  --wi-silver:        #a8b8c0;
   --wi-text:          #f0ddb0;
   --wi-text-muted:    #a8896a;
   --wi-border:        #5a3e20;
@@ -321,6 +322,16 @@ h1, h2, h3, h4,
 .wi-sea-text    { color: var(--wi-sea) !important; }
 .wi-danger-text { color: var(--wi-danger) !important; }
 .wi-success-text{ color: var(--wi-success) !important; }
+.wi-silver-text { color: var(--wi-silver) !important; }
+
+/* Silver coin abbreviation — replaces 🪙 for cross-platform consistency */
+.wi-coin {
+  color: var(--wi-silver);
+  font-family: var(--wi-font-heading);
+  font-size: 0.75em;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
 
 /* Keep old custom-v-field-background working under new theme */
 .custom-v-field-background .v-input__control {
