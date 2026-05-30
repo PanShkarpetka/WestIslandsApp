@@ -247,7 +247,26 @@
         </v-card-text>
         <v-divider style="border-color: var(--wi-border)" />
         <v-card-actions class="mfg-dialog-actions">
-          <v-btn variant="text" class="cancel-btn" @click="dialogOpen = false">Скасувати</v-btn>
+          <!-- Delete (edit mode only) -->
+          <template v-if="dialogMode === 'edit'">
+            <v-btn
+              v-if="!confirmDelete"
+              variant="text"
+              class="delete-btn"
+              prepend-icon="mdi-trash-can-outline"
+              @click="confirmDelete = true"
+            >
+              Видалити
+            </v-btn>
+            <template v-else>
+              <span class="delete-confirm-text">Підтвердити?</span>
+              <v-btn variant="text" class="delete-btn" :loading="deleting" @click="deleteManufacture">Так</v-btn>
+              <v-btn variant="text" class="cancel-btn" @click="confirmDelete = false">Ні</v-btn>
+            </template>
+          </template>
+          <template v-else>
+            <v-btn variant="text" class="cancel-btn" @click="dialogOpen = false">Скасувати</v-btn>
+          </template>
           <v-spacer />
           <v-btn class="save-btn" :loading="saving" prepend-icon="mdi-feather" @click="saveManufacture">
             Зберегти
@@ -262,7 +281,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { addDoc, arrayUnion, collection, doc, documentId, getDocs, query, updateDoc, where } from 'firebase/firestore'
+import { addDoc, arrayRemove, arrayUnion, collection, deleteDoc, doc, documentId, getDocs, query, updateDoc, where } from 'firebase/firestore'
 import { useIslandStore } from '@/store/islandStore'
 import { useUserStore } from '@/store/userStore'
 import { useGuildStore } from '@/store/guildStore'
@@ -286,6 +305,8 @@ const error = ref('')
 const dialogOpen = ref(false)
 const dialogMode = ref('add')
 const saving = ref(false)
+const deleting = ref(false)
+const confirmDelete = ref(false)
 const formError = ref('')
 const form = ref({ id: null, name: '', description: '', type: 'manufacture', payouts: [emptyPayout()] })
 
@@ -389,6 +410,7 @@ function openAddDialog() {
     payouts: [emptyPayout()],
   }
   formError.value = ''
+  confirmDelete.value = false
   dialogOpen.value = true
 }
 
@@ -406,7 +428,27 @@ function openEditDialog(item) {
     })),
   }
   formError.value = ''
+  confirmDelete.value = false
   dialogOpen.value = true
+}
+
+async function deleteManufacture() {
+  if (!form.value.id) return
+  deleting.value = true
+  try {
+    await deleteDoc(doc(db, 'manufactures', form.value.id))
+    if (island.value?.id) {
+      await updateDoc(doc(db, 'islands', island.value.id), { manufactures: arrayRemove(form.value.id) })
+    }
+    manufactures.value = manufactures.value.filter((m) => m.key !== form.value.id)
+    dialogOpen.value = false
+  } catch (e) {
+    console.error('[manufactures] Failed to delete', e)
+    formError.value = 'Не вдалося видалити запис.'
+  } finally {
+    deleting.value = false
+    confirmDelete.value = false
+  }
 }
 
 async function saveManufacture() {
@@ -753,6 +795,19 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
 .cancel-btn {
   color: var(--wi-text-muted) !important;
   font-family: var(--wi-font-heading) !important;
+}
+
+.delete-btn {
+  color: var(--wi-danger) !important;
+  font-family: var(--wi-font-heading) !important;
+}
+
+.delete-confirm-text {
+  font-family: var(--wi-font-heading);
+  font-size: 0.78rem;
+  color: var(--wi-danger);
+  letter-spacing: 0.05em;
+  margin-right: 4px;
 }
 
 .save-btn {
