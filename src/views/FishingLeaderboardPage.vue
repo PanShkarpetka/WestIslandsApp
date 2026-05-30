@@ -106,78 +106,6 @@
       </div>
     </div>
 
-    <!-- Fish availability -->
-    <div class="section-title mt-2">
-      <v-icon class="mr-2" size="16">mdi-waves</v-icon>
-      Наявність риби
-    </div>
-    <div class="availability-grid mb-6">
-      <div
-        v-for="fish in fishStore.fishesWithRating"
-        :key="fish.id"
-        class="avail-card"
-      >
-        <div class="avail-name wi-gold-text">{{ fish.fishName }}</div>
-        <div class="avail-bar-wrap">
-          <div
-            class="avail-bar"
-            :style="{ width: (fish.rating * 10) + '%', background: ratingColor(fish.rating) }"
-          />
-        </div>
-        <div class="avail-meta">
-          <span :style="{ color: ratingColor(fish.rating) }" class="avail-rating">{{ fish.rating }}/10</span>
-          <span class="avail-stock wi-muted-text">{{ fish.fishAmountAvailableNow }}/{{ fish.fishAmountDaily }}</span>
-        </div>
-        <!-- Admin controls -->
-        <div v-if="isAdmin" class="avail-controls">
-          <v-btn
-            icon size="x-small" variant="text"
-            :disabled="fish.fishAmountAvailableNow <= 0 || savingFishId === fish.id"
-            @click="adjustAvailability(fish, -1)"
-          >
-            <v-icon size="14">mdi-minus</v-icon>
-          </v-btn>
-          <v-btn
-            icon size="x-small" variant="text"
-            :disabled="savingFishId === fish.id"
-            @click="adjustAvailability(fish, 1)"
-          >
-            <v-icon size="14">mdi-plus</v-icon>
-          </v-btn>
-          <v-btn
-            icon size="x-small" variant="text"
-            :disabled="savingFishId === fish.id"
-            @click="openSetDialog(fish)"
-          >
-            <v-icon size="14">mdi-pencil</v-icon>
-          </v-btn>
-        </div>
-      </div>
-    </div>
-
-    <!-- Admin: set availability dialog -->
-    <v-dialog v-model="setDialog.open" max-width="320">
-      <v-card class="set-avail-dialog">
-        <div class="guild-dialog-header">
-          <v-icon class="mr-2">mdi-fish</v-icon>
-          {{ setDialog.fish?.fishName }}
-        </div>
-        <v-card-text>
-          <v-text-field
-            v-model.number="setDialog.value"
-            type="number" min="0" :label="`Наявність (макс. ${setDialog.fish?.fishAmountDaily})`"
-            variant="outlined" density="compact" hide-details="auto"
-          />
-        </v-card-text>
-        <v-divider />
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="setDialog.open = false">Скасувати</v-btn>
-          <v-btn variant="tonal" :loading="savingFishId === setDialog.fish?.id" @click="confirmSet">Зберегти</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Recent activity feed -->
     <div class="section-title">
       <v-icon class="mr-2" size="16">mdi-clock-outline</v-icon>
@@ -220,52 +148,14 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useFishingLeaderboardStore } from '@/store/fishingLeaderboardStore';
-import { useFishStore } from '@/store/fishStore';
-import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
 import { resolveFishValue } from '@/utils/fishingUtils';
 import { FISHING_EXCLUDED_USERS } from '@/config/constants';
 
 const store = useFishingLeaderboardStore();
-const fishStore = useFishStore();
-const isAdmin = computed(() => useUserStore().isAdmin ?? false);
 
-onMounted(() => { store.subscribe(); fishStore.subscribe(); });
-onBeforeUnmount(() => { store.unsubscribe(); fishStore.unsubscribe(); });
-
-// Fish availability
-const savingFishId = ref(null);
-
-function ratingColor(rating) {
-  if (rating >= 7) return 'var(--wi-success)';
-  if (rating >= 4) return '#c8962a'; // wi-gold
-  return 'var(--wi-danger)';
-}
-
-async function adjustAvailability(fish, delta) {
-  savingFishId.value = fish.id;
-  try {
-    await fishStore.setAvailability(fish.id, fish.fishAmountAvailableNow + delta);
-  } finally {
-    savingFishId.value = null;
-  }
-}
-
-const setDialog = ref({ open: false, fish: null, value: 0 });
-
-function openSetDialog(fish) {
-  setDialog.value = { open: true, fish, value: fish.fishAmountAvailableNow };
-}
-
-async function confirmSet() {
-  savingFishId.value = setDialog.value.fish.id;
-  try {
-    await fishStore.setAvailability(setDialog.value.fish.id, setDialog.value.value);
-    setDialog.value.open = false;
-  } finally {
-    savingFishId.value = null;
-  }
-}
+onMounted(() => store.subscribe());
+onBeforeUnmount(() => store.unsubscribe());
 
 // Time filter
 const timeFilter = ref('all');
@@ -641,77 +531,6 @@ function timeAgo(ts) {
 
 .rare-date {
   font-size: 0.7rem;
-}
-
-/* Fish availability */
-.availability-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.avail-card {
-  background: linear-gradient(160deg, var(--wi-surface) 0%, var(--wi-bg) 100%);
-  border: 1px solid var(--wi-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.avail-name {
-  font-family: var(--wi-font-heading);
-  font-size: 0.78rem;
-  line-height: 1.3;
-  margin-bottom: 8px;
-  min-height: 28px;
-}
-
-.avail-bar-wrap {
-  height: 5px;
-  background: rgba(90, 62, 32, 0.4);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.avail-bar {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.4s ease, background 0.4s ease;
-  min-width: 2px;
-}
-
-.avail-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.75rem;
-}
-
-.avail-rating {
-  font-family: var(--wi-font-heading);
-  font-weight: 600;
-}
-
-.avail-stock {
-  font-size: 0.72rem;
-}
-
-.avail-controls {
-  display: flex;
-  gap: 2px;
-  margin-top: 6px;
-  justify-content: flex-end;
-  border-top: 1px solid rgba(90, 62, 32, 0.3);
-  padding-top: 6px;
-}
-
-.set-avail-dialog .guild-dialog-header {
-  padding: 16px 20px 0;
-  font-family: var(--wi-font-heading);
-  font-size: 1rem;
-  color: var(--wi-gold);
-  display: flex;
-  align-items: center;
 }
 
 .feed-date-nav {

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Rules
+
+**Never run `npm run deploy`, `npm run deploy-stage`, or `firebase deploy` unless the user explicitly asks to deploy or release.** Building (`npm run build`) is fine without permission; deploying to production is not.
+
 ## Commands
 
 ```bash
