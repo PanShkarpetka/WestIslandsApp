@@ -16,6 +16,7 @@ import GuildsPage from '@/views/GuildsPage.vue';
 import MageGuildPage from '@/views/MageGuildPage.vue';
 import CraftingPage from '@/views/CraftingPage.vue';
 import AccountPage from '@/views/AccountPage.vue';
+import FishingLeaderboardPage from '@/views/FishingLeaderboardPage.vue';
 import { useUserStore } from '@/store/userStore';
 
 const routes = [
@@ -43,6 +44,7 @@ const routes = [
     { path: '/crafting', component: CraftingPage, meta: { requiresAuth: false } },
     { path: '/admin', component: AdminView, meta: { adminOnly: true } },
     { path: '/account', component: AccountPage, meta: { requiresAuth: false } },
+    { path: '/fishing', component: FishingLeaderboardPage, meta: { requiresAuth: false } },
 ];
 
 const router = createRouter({

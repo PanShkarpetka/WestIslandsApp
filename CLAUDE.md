@@ -172,6 +172,7 @@ Each page view has a companion `.md` file alongside its `.vue` file in `src/view
 - [GuildsPage.md](src/views/GuildsPage.md) — guild cards, deposit/withdraw, ledger dialog
 - [MageGuildPage.md](src/views/MageGuildPage.md) — spell request cards, fulfillment, history panels
 - [CraftingPage.md](src/views/CraftingPage.md) — mastery tracker, price calculator
+- [FishingLeaderboardPage.md](src/views/FishingLeaderboardPage.md) — fishing bot leaderboard, angler rankings, rare catches, live feed
 - [TravelView.md](src/views/TravelView.md) — v-tabs container
   - [ShipsTab.md](src/views/TravelView/ShipsTab.md)
   - [CouriersTab.md](src/views/TravelView/CouriersTab.md)

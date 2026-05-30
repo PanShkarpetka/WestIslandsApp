@@ -128,6 +128,7 @@ const navItems = [
   { to: '/guilds',                      icon: 'mdi-shield-sword',        label: 'Гільдії' },
   { to: '/mage-guild',                  icon: 'mdi-magic-staff',         label: 'Магічні послуги' },
   { to: '/crafting',                    icon: 'mdi-anvil',               label: 'Крафтинг' },
+  { to: '/fishing',                     icon: 'mdi-fish',                label: 'Рибалка' },
 ];
 
 function logout() {
