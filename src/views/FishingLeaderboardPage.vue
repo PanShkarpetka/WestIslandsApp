@@ -80,7 +80,7 @@
             </td>
             <td class="angler-name">{{ angler.username }}</td>
             <td class="wi-gold-text">{{ angler.catches }}</td>
-            <td>{{ formatAmount(angler.totalSilver) }} 🪙</td>
+            <td>{{ formatAmount(angler.totalSilver) }}</td>
             <td class="wi-muted-text">{{ angler.bestFish || '—' }}</td>
             <td>{{ angler.winRate }}%</td>
             <td class="wi-muted-text">{{ angler.attempts }}</td>
