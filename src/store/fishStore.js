@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia';
-import { getFirestore, collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, doc, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
 import { computed, ref } from 'vue';
 
-/** Availability rating 0–10 based on current stock vs daily max. */
-export function fishAvailabilityRating(fish) {
-  const daily = Number(fish.fishAmountDaily || 0);
-  if (daily === 0) return 0;
-  const now = Math.max(0, Number(fish.fishAmountAvailableNow || 0));
-  return Math.min(10, Math.round((now / daily) * 10));
+/** Overall availability rating 0–10 across all fish combined. */
+export function overallAvailabilityRating(fishes) {
+  const totalDaily = fishes.reduce((s, f) => s + Math.max(0, Number(f.fishAmountDaily || 0)), 0);
+  if (totalDaily === 0) return 0;
+  const totalNow = fishes.reduce((s, f) => s + Math.max(0, Number(f.fishAmountAvailableNow || 0)), 0);
+  return Math.min(10, Math.round((totalNow / totalDaily) * 10));
 }
 
 export const useFishStore = defineStore('fish', () => {
@@ -47,8 +47,17 @@ export const useFishStore = defineStore('fish', () => {
     _unsub = null;
   }
 
-  const fishesWithRating = computed(() =>
-    fishes.value.map((f) => ({ ...f, rating: fishAvailabilityRating(f) })),
+  const fishesWithRating = computed(() => fishes.value);
+
+  /** Single 0–10 rating for all fish combined. */
+  const availabilityRating = computed(() => overallAvailabilityRating(fishes.value));
+
+  const totalAvailableNow = computed(() =>
+    fishes.value.reduce((s, f) => s + Math.max(0, Number(f.fishAmountAvailableNow || 0)), 0),
+  );
+
+  const totalDailyCapacity = computed(() =>
+    fishes.value.reduce((s, f) => s + Math.max(0, Number(f.fishAmountDaily || 0)), 0),
   );
 
   async function setAvailability(fishId, value) {
@@ -57,13 +66,39 @@ export const useFishStore = defineStore('fish', () => {
     await updateDoc(doc(db, 'fishes', fishId), { fishAmountAvailableNow: amount });
   }
 
+  /**
+   * Adjust the overall rating by `delta` points (e.g. +1 or -1).
+   * Each fish receives a proportional share: round(targetRating/10 * fishAmountDaily),
+   * clamped to [0, fishAmountDaily]. All writes are batched atomically.
+   */
+  async function adjustRating(delta) {
+    const current = availabilityRating.value;
+    const target = Math.max(0, Math.min(10, current + delta));
+    if (target === current) return;
+
+    const db = getFirestore();
+    const batch = writeBatch(db);
+
+    for (const fish of fishes.value) {
+      const daily = Math.max(0, Number(fish.fishAmountDaily || 0));
+      const newAmount = Math.min(daily, Math.round((target / 10) * daily));
+      batch.update(doc(db, 'fishes', fish.id), { fishAmountAvailableNow: newAmount });
+    }
+
+    await batch.commit();
+  }
+
   return {
     fishes,
     fishesWithRating,
+    availabilityRating,
+    totalAvailableNow,
+    totalDailyCapacity,
     loading,
     error,
     subscribe,
     unsubscribe,
     setAvailability,
+    adjustRating,
   };
 });

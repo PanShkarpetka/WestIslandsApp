@@ -106,6 +106,83 @@
       </div>
     </div>
 
+    <!-- Fish availability -->
+    <div class="section-title mt-2">
+      <v-icon class="mr-2" size="16">mdi-waves</v-icon>
+      Наявність риби
+      <span v-if="isAdmin" class="avail-admin-hint wi-muted-text ml-auto">
+        <v-icon size="13" class="mr-1">mdi-pencil</v-icon>натисніть на рибу для зміни
+      </span>
+    </div>
+    <div class="avail-overall-card mb-6">
+      <div class="avail-bar-wrap">
+        <div
+          class="avail-bar"
+          :style="{ width: (fishStore.availabilityRating * 10) + '%', background: ratingColor(fishStore.availabilityRating) }"
+        />
+      </div>
+      <div class="avail-overall-bottom">
+        <span class="avail-overall-score" :style="{ color: ratingColor(fishStore.availabilityRating) }">
+          {{ fishStore.availabilityRating }}/10
+        </span>
+        <span class="avail-overall-desc wi-muted-text">{{ ratingLabel(fishStore.availabilityRating) }}</span>
+        <div v-if="isAdmin" class="avail-rating-controls ml-auto">
+          <v-btn
+            icon size="x-small" variant="tonal"
+            :disabled="fishStore.availabilityRating <= 0 || adjustingRating"
+            :loading="adjustingRating && ratingDelta === -1"
+            @click="doAdjustRating(-1)"
+          ><v-icon size="14">mdi-minus</v-icon></v-btn>
+          <v-btn
+            icon size="x-small" variant="tonal"
+            :disabled="fishStore.availabilityRating >= 10 || adjustingRating"
+            :loading="adjustingRating && ratingDelta === 1"
+            @click="doAdjustRating(1)"
+          ><v-icon size="14">mdi-plus</v-icon></v-btn>
+        </div>
+      </div>
+      <!-- Admin: per-fish dots for editing only -->
+      <div v-if="isAdmin" class="avail-fish-row">
+        <div
+          v-for="fish in fishStore.fishes"
+          :key="fish.id"
+          class="avail-fish-dot-wrap avail-fish-clickable"
+          :title="fish.fishName + ': ' + fish.fishAmountAvailableNow + '/' + fish.fishAmountDaily"
+          @click="openSetDialog(fish)"
+        >
+          <div class="avail-fish-dot" :style="{ background: ratingColor(fishRating(fish)) }" />
+          <span class="avail-fish-name wi-muted-text">{{ fish.fishName }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin: set fish availability dialog -->
+    <v-dialog v-model="setDialog.open" max-width="320">
+      <v-card class="set-avail-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-fish</v-icon>
+          {{ setDialog.fish?.fishName }}
+        </div>
+        <v-card-text>
+          <div class="avail-dialog-current wi-muted-text mb-3">
+            Наразі: {{ setDialog.fish?.fishAmountAvailableNow }} / {{ setDialog.fish?.fishAmountDaily }}
+          </div>
+          <v-text-field
+            v-model.number="setDialog.value"
+            type="number" min="0"
+            :label="`Нова кількість (макс. ${setDialog.fish?.fishAmountDaily})`"
+            variant="outlined" density="compact" hide-details="auto"
+          />
+        </v-card-text>
+        <v-divider />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="setDialog.open = false">Скасувати</v-btn>
+          <v-btn variant="tonal" :loading="savingFishId === setDialog.fish?.id" @click="confirmSet">Зберегти</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Recent activity feed -->
     <div class="section-title">
       <v-icon class="mr-2" size="16">mdi-clock-outline</v-icon>
@@ -148,14 +225,70 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useFishingLeaderboardStore } from '@/store/fishingLeaderboardStore';
+import { useFishStore } from '@/store/fishStore';
+import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
 import { resolveFishValue } from '@/utils/fishingUtils';
 import { FISHING_EXCLUDED_USERS } from '@/config/constants';
 
 const store = useFishingLeaderboardStore();
+const fishStore = useFishStore();
+const isAdmin = computed(() => useUserStore().isAdmin ?? false);
 
-onMounted(() => store.subscribe());
-onBeforeUnmount(() => store.unsubscribe());
+onMounted(() => { store.subscribe(); fishStore.subscribe(); });
+onBeforeUnmount(() => { store.unsubscribe(); fishStore.unsubscribe(); });
+
+// Fish availability helpers
+function fishRating(fish) {
+  const daily = Number(fish.fishAmountDaily || 0);
+  if (daily === 0) return 0;
+  return Math.min(10, Math.round((Math.max(0, Number(fish.fishAmountAvailableNow || 0)) / daily) * 10));
+}
+
+function ratingColor(rating) {
+  if (rating >= 7) return 'var(--wi-success)';
+  if (rating >= 4) return 'var(--wi-gold)';
+  return 'var(--wi-danger)';
+}
+
+function ratingLabel(rating) {
+  if (rating >= 8) return 'Риби вдосталь';
+  if (rating >= 5) return 'Помірна наявність';
+  if (rating >= 2) return 'Риби мало';
+  return 'Майже вичерпано';
+}
+
+const savingFishId = ref(null);
+const setDialog = ref({ open: false, fish: null, value: 0 });
+
+// Rating-level adjustment
+const adjustingRating = ref(false);
+const ratingDelta = ref(0);
+
+async function doAdjustRating(delta) {
+  adjustingRating.value = true;
+  ratingDelta.value = delta;
+  try {
+    await fishStore.adjustRating(delta);
+  } finally {
+    adjustingRating.value = false;
+    ratingDelta.value = 0;
+  }
+}
+
+function openSetDialog(fish) {
+  setDialog.value = { open: true, fish, value: fish.fishAmountAvailableNow };
+}
+
+async function confirmSet() {
+  savingFishId.value = setDialog.value.fish.id;
+  try {
+    await fishStore.setAvailability(setDialog.value.fish.id, setDialog.value.value);
+    setDialog.value.open = false;
+  } finally {
+    savingFishId.value = null;
+  }
+}
 
 // Time filter
 const timeFilter = ref('all');
@@ -591,5 +724,117 @@ function timeAgo(ts) {
 .feed-time {
   font-size: 0.74rem;
   white-space: nowrap;
+}
+
+/* Fish availability */
+.avail-admin-hint {
+  font-size: 0.72rem;
+  font-family: var(--wi-font-body, serif);
+  text-transform: none;
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+}
+
+.avail-overall-card {
+  background: linear-gradient(160deg, var(--wi-surface) 0%, var(--wi-bg) 100%);
+  border: 1px solid var(--wi-border);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.avail-overall-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+}
+
+.avail-bar-wrap {
+  height: 8px;
+  background: rgba(90, 62, 32, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.avail-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease, background 0.5s ease;
+  min-width: 3px;
+}
+
+.avail-overall-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.avail-rating-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.avail-overall-score {
+  font-family: var(--wi-font-heading);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.avail-overall-desc {
+  font-size: 0.8rem;
+}
+
+.avail-fish-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  border-top: 1px solid rgba(90, 62, 32, 0.3);
+  padding-top: 12px;
+}
+
+.avail-fish-dot-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.avail-fish-clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background 0.15s;
+}
+
+.avail-fish-clickable:hover {
+  background: rgba(200, 150, 42, 0.08);
+}
+
+.avail-fish-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avail-fish-name {
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.set-avail-dialog .guild-dialog-header {
+  padding: 16px 20px 0;
+  font-family: var(--wi-font-heading);
+  font-size: 1rem;
+  color: var(--wi-gold);
+  display: flex;
+  align-items: center;
+}
+
+.avail-dialog-current {
+  font-size: 0.82rem;
 }
 </style>
