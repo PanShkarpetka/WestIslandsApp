@@ -251,9 +251,18 @@
  * @property {string} name
  * @property {string} description
  * @property {number} income
- * @property {string} incomeDestination - 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
  * @property {'manufacture'|'auto'} [type] - 'manufacture' (default) or 'auto' (auto income/expense)
- * @property {Record<string, number>} [incomeGoods] - goods distributed per cycle, keyed by goodId
+ * @property {PayoutRow[]} [payouts] - per-cycle payouts; if absent falls back to legacy income/incomeDestination fields
+ * @property {string} [incomeDestination] - legacy single destination (kept for backward compat)
+ * @property {number} [income] - legacy single income amount (kept for backward compat)
+ * @property {Record<string, number>} [incomeGoods] - legacy single goods map (kept for backward compat)
+ */
+
+/**
+ * @typedef {Object} PayoutRow
+ * @property {string} destination - 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
+ * @property {number} income - gold amount per cycle (negative = deduction)
+ * @property {Record<string, number>} [incomeGoods] - goods per cycle, keyed by goodId (hero destinations only)
  */
 
 // ─── HEROES & CRAFTING ───────────────────────────────────────────────────────

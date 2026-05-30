@@ -63,29 +63,37 @@
 
           <p class="invoice-desc">{{ item.description || 'Опис відсутній.' }}</p>
 
+          <!-- Payouts list -->
           <div class="invoice-footer">
-            <div class="invoice-row">
-              <span class="invoice-label">
-                <v-icon size="13" class="mr-1">mdi-gold</v-icon>
-                Дохід за цикл
-              </span>
-              <span class="invoice-income" :class="item.income >= 0 ? 'income-positive' : 'income-negative'">
-                {{ item.income >= 0 ? '+' : '' }}{{ formatAmount(item.income) }} зм
-              </span>
-            </div>
-            <div class="invoice-row">
-              <span class="invoice-label">
-                <v-icon size="13" class="mr-1">{{ destinationIcon(item.incomeDestination) }}</v-icon>
-                Надходить до
-              </span>
-              <span class="invoice-destination">{{ getIncomeDestinationLabel(item.incomeDestination) }}</span>
-            </div>
-            <div v-if="item.incomeDestination?.startsWith('hero:') && Object.keys(item.incomeGoods || {}).length" class="invoice-row">
-              <span class="invoice-label">
-                <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
-                Товари / цикл
-              </span>
-              <span class="invoice-destination">{{ formatIncomeGoods(item.incomeGoods) }}</span>
+            <div
+              v-for="(payout, pi) in item.payouts"
+              :key="pi"
+              class="payout-row"
+              :class="{ 'payout-row--border': pi > 0 }"
+            >
+              <div class="invoice-row">
+                <span class="invoice-label">
+                  <v-icon size="13" class="mr-1">mdi-gold</v-icon>
+                  Дохід
+                </span>
+                <span class="invoice-income" :class="payout.income >= 0 ? 'income-positive' : 'income-negative'">
+                  {{ payout.income >= 0 ? '+' : '' }}{{ formatAmount(payout.income) }} зм
+                </span>
+              </div>
+              <div class="invoice-row">
+                <span class="invoice-label">
+                  <v-icon size="13" class="mr-1">{{ destinationIcon(payout.destination) }}</v-icon>
+                  До
+                </span>
+                <span class="invoice-destination">{{ getIncomeDestinationLabel(payout.destination) }}</span>
+              </div>
+              <div v-if="payout.destination?.startsWith('hero:') && Object.keys(payout.incomeGoods || {}).length" class="invoice-row">
+                <span class="invoice-label">
+                  <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
+                  Товари
+                </span>
+                <span class="invoice-destination">{{ formatIncomeGoods(payout.incomeGoods) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -93,7 +101,7 @@
     </v-row>
 
     <!-- Add/Edit dialog -->
-    <v-dialog v-model="dialogOpen" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
+    <v-dialog v-model="dialogOpen" max-width="560" :fullscreen="$vuetify.display.smAndDown" scrollable>
       <v-card class="mfg-dialog">
         <div class="mfg-dialog-header">
           <v-icon class="mr-2">{{ dialogMode === 'add' ? (activeTab === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew') : 'mdi-feather' }}</v-icon>
@@ -119,28 +127,6 @@
             hide-details="auto"
             class="mb-3"
           />
-          <v-text-field
-            v-model.number="form.income"
-            label="Дохід за цикл"
-            type="number"
-            variant="outlined"
-            density="compact"
-            step="0.01"
-            prepend-inner-icon="mdi-gold"
-            hide-details="auto"
-            class="mb-3"
-          />
-          <v-select
-            v-model="form.incomeDestination"
-            :items="incomeDestinationOptions"
-            item-title="title"
-            item-value="value"
-            label="Куди зараховувати дохід"
-            variant="outlined"
-            density="compact"
-            hide-details="auto"
-            class="mb-3"
-          />
           <v-select
             v-model="form.type"
             :items="typeOptions"
@@ -150,50 +136,110 @@
             variant="outlined"
             density="compact"
             hide-details="auto"
-            class="mb-3"
+            class="mb-4"
           />
 
-          <!-- Goods per cycle (only when destination is a hero) -->
-          <template v-if="isHeroDestination">
-            <div class="goods-section-label mt-2 mb-2">
-              <v-icon size="14" class="mr-1">mdi-package-variant</v-icon>
-              Товари за цикл
-            </div>
-            <div v-for="(row, index) in form.incomeGoods" :key="index" class="goods-row-form mb-2">
+          <!-- Payouts -->
+          <div class="payouts-label mb-2">
+            <v-icon size="14" class="mr-1">mdi-cash-multiple</v-icon>
+            Нарахування за цикл
+          </div>
+
+          <div
+            v-for="(payout, pi) in form.payouts"
+            :key="pi"
+            class="payout-form-block mb-3"
+          >
+            <div class="payout-form-row">
               <v-select
-                v-model="row.goodId"
-                :items="goodsStore.goods"
-                item-title="name"
-                item-value="id"
-                label="Товар"
+                v-model="payout.destination"
+                :items="incomeDestinationOptions"
+                item-title="title"
+                item-value="value"
+                label="Отримувач"
                 variant="outlined"
                 density="compact"
                 hide-details
                 class="flex-1"
               />
               <v-text-field
-                v-model.number="row.qty"
-                label="К-сть"
+                v-model.number="payout.income"
+                label="Сума (зм)"
                 type="number"
                 variant="outlined"
                 density="compact"
+                step="0.01"
                 hide-details
-                style="max-width: 90px"
+                style="max-width: 110px"
               />
-              <v-btn size="small" icon variant="text" color="error" @click="form.incomeGoods.splice(index, 1)">
+              <v-btn
+                size="small"
+                icon
+                variant="text"
+                color="error"
+                :disabled="form.payouts.length === 1"
+                @click="form.payouts.splice(pi, 1)"
+              >
                 <v-icon>mdi-close</v-icon>
               </v-btn>
             </div>
-            <v-btn
-              size="small"
-              variant="outlined"
-              prepend-icon="mdi-plus"
-              class="mb-3"
-              @click="form.incomeGoods.push({ goodId: '', qty: 0 })"
-            >
-              Додати товар
-            </v-btn>
-          </template>
+
+            <!-- Goods sub-form for hero destinations -->
+            <template v-if="payout.destination?.startsWith('hero:')">
+              <div class="goods-section-label mt-2 mb-1">
+                <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
+                Товари
+              </div>
+              <div
+                v-for="(row, gi) in payout.incomeGoods"
+                :key="gi"
+                class="goods-row-form mb-1"
+              >
+                <v-select
+                  v-model="row.goodId"
+                  :items="goodsStore.goods"
+                  item-title="name"
+                  item-value="id"
+                  label="Товар"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="flex-1"
+                />
+                <v-text-field
+                  v-model.number="row.qty"
+                  label="К-сть"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  style="max-width: 80px"
+                />
+                <v-btn size="x-small" icon variant="text" color="error" @click="payout.incomeGoods.splice(gi, 1)">
+                  <v-icon>mdi-close</v-icon>
+                </v-btn>
+              </div>
+              <v-btn
+                size="x-small"
+                variant="text"
+                prepend-icon="mdi-plus"
+                class="mt-1 mb-1"
+                @click="payout.incomeGoods.push({ goodId: '', qty: 0 })"
+              >
+                Додати товар
+              </v-btn>
+            </template>
+          </div>
+
+          <v-btn
+            size="small"
+            variant="outlined"
+            prepend-icon="mdi-plus"
+            class="mb-3"
+            @click="addPayout"
+          >
+            Додати отримувача
+          </v-btn>
 
           <div v-if="formError" class="mfg-dialog-error">
             <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>{{ formError }}
@@ -241,7 +287,11 @@ const dialogOpen = ref(false)
 const dialogMode = ref('add')
 const saving = ref(false)
 const formError = ref('')
-const form = ref({ id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: 'manufacture', incomeGoods: [] })
+const form = ref({ id: null, name: '', description: '', type: 'manufacture', payouts: [emptyPayout()] })
+
+function emptyPayout() {
+  return { destination: 'treasury', income: 0, incomeGoods: [] }
+}
 
 const visibleItems = computed(() =>
   manufactures.value.filter(item =>
@@ -268,12 +318,40 @@ const incomeDestinationOptions = computed(() => ([
   })),
 ]))
 
-const isHeroDestination = computed(() => form.value.incomeDestination?.startsWith('hero:'))
+function addPayout() {
+  form.value.payouts.push(emptyPayout())
+}
 
 function destinationIcon(dest) {
   if (!dest || dest === 'treasury') return 'mdi-anchor'
-  if (dest.startsWith('hero:')) return 'mdi-sword'
+  if (dest.startsWith('hero:')) return 'mdi-account'
   return 'mdi-sword-cross'
+}
+
+function loadManufacturesFromSnap(docSnap) {
+  const data = docSnap.data() || {}
+  // Normalise payouts — support both new array and legacy single-field format
+  let payouts
+  if (Array.isArray(data.payouts) && data.payouts.length) {
+    payouts = data.payouts.map((p) => ({
+      destination: normalizeIncomeDestination(p.destination),
+      income: normalizeAmount(p.income || 0),
+      incomeGoods: p.incomeGoods && typeof p.incomeGoods === 'object' ? p.incomeGoods : {},
+    }))
+  } else {
+    payouts = [{
+      destination: normalizeIncomeDestination(data.incomeDestination),
+      income: normalizeAmount(data.income || 0),
+      incomeGoods: data.incomeGoods && typeof data.incomeGoods === 'object' ? data.incomeGoods : {},
+    }]
+  }
+  return {
+    key: docSnap.id,
+    name: data.name || '',
+    description: data.description || '',
+    type: data.type === 'auto' ? 'auto' : 'manufacture',
+    payouts,
+  }
 }
 
 async function loadManufactures(ids) {
@@ -287,18 +365,7 @@ async function loadManufactures(ids) {
     for (const chunk of chunks) {
       const q = query(collection(db, 'manufactures'), where(documentId(), 'in', chunk))
       const snap = await getDocs(q)
-      snap.docs.forEach((docSnap) => {
-        const data = docSnap.data() || {}
-        results.push({
-          key: docSnap.id,
-          name: data.name || '',
-          description: data.description || '',
-          income: normalizeAmount(data.income || 0),
-          incomeDestination: normalizeIncomeDestination(data.incomeDestination),
-          type: data.type === 'auto' ? 'auto' : 'manufacture',
-          incomeGoods: data.incomeGoods || {},
-        })
-      })
+      snap.docs.forEach((docSnap) => results.push(loadManufacturesFromSnap(docSnap)))
     }
     const order = new Map(ids.map((id, index) => [id, index]))
     results.sort((a, b) => (order.get(a.key) ?? 0) - (order.get(b.key) ?? 0))
@@ -314,22 +381,29 @@ async function loadManufactures(ids) {
 
 function openAddDialog() {
   dialogMode.value = 'add'
-  form.value = { id: null, name: '', description: '', income: 0, incomeDestination: 'treasury', type: activeTab.value === 'auto' ? 'auto' : 'manufacture', incomeGoods: [] }
+  form.value = {
+    id: null,
+    name: '',
+    description: '',
+    type: activeTab.value === 'auto' ? 'auto' : 'manufacture',
+    payouts: [emptyPayout()],
+  }
   formError.value = ''
   dialogOpen.value = true
 }
 
 function openEditDialog(item) {
   dialogMode.value = 'edit'
-  const savedGoods = item.incomeGoods || {}
   form.value = {
     id: item.key,
     name: item.name || '',
     description: item.description || '',
-    income: item.income || 0,
-    incomeDestination: normalizeIncomeDestination(item.incomeDestination),
     type: item.type === 'auto' ? 'auto' : 'manufacture',
-    incomeGoods: Object.entries(savedGoods).map(([goodId, qty]) => ({ goodId, qty })),
+    payouts: item.payouts.map((p) => ({
+      destination: p.destination,
+      income: p.income,
+      incomeGoods: Object.entries(p.incomeGoods || {}).map(([goodId, qty]) => ({ goodId, qty })),
+    })),
   }
   formError.value = ''
   dialogOpen.value = true
@@ -339,17 +413,34 @@ async function saveManufacture() {
   formError.value = ''
   const name = form.value.name?.trim()
   if (!name) { formError.value = 'Вкажіть назву мануфактури.'; return }
+  if (!form.value.payouts.length) { formError.value = 'Додайте хоча б одне нарахування.'; return }
+
   saving.value = true
   try {
-    const incomeDestination = normalizeIncomeDestination(form.value.incomeDestination)
     const type = form.value.type === 'auto' ? 'auto' : 'manufacture'
-    const incomeGoods = {}
-    if (incomeDestination.startsWith('hero:')) {
-      for (const row of (form.value.incomeGoods || [])) {
-        if (row.goodId && row.qty !== 0) incomeGoods[row.goodId] = Number(row.qty) || 0
+    const payouts = form.value.payouts.map((p) => {
+      const destination = normalizeIncomeDestination(p.destination)
+      const payout = {
+        destination,
+        income: normalizeAmount(p.income || 0),
       }
+      if (destination.startsWith('hero:')) {
+        const incomeGoods = {}
+        for (const row of (p.incomeGoods || [])) {
+          if (row.goodId && row.qty !== 0) incomeGoods[row.goodId] = Number(row.qty) || 0
+        }
+        payout.incomeGoods = incomeGoods
+      }
+      return payout
+    })
+
+    const payload = {
+      name,
+      description: form.value.description?.trim() || '',
+      type,
+      payouts,
     }
-    const payload = { name, description: form.value.description?.trim() || '', income: normalizeAmount(form.value.income || 0), incomeDestination, type, incomeGoods }
+
     if (dialogMode.value === 'add') {
       if (!island.value?.id) throw new Error('Острів не вибрано.')
       const docRef = await addDoc(collection(db, 'manufactures'), payload)
@@ -357,7 +448,18 @@ async function saveManufacture() {
     } else if (form.value.id) {
       await updateDoc(doc(db, 'manufactures', form.value.id), payload)
       const index = manufactures.value.findIndex((item) => item.key === form.value.id)
-      if (index !== -1) manufactures.value[index] = { ...manufactures.value[index], ...payload }
+      if (index !== -1) {
+        manufactures.value[index] = {
+          ...manufactures.value[index],
+          name: payload.name,
+          description: payload.description,
+          type: payload.type,
+          payouts: payload.payouts.map((p) => ({
+            ...p,
+            incomeGoods: p.incomeGoods || {},
+          })),
+        }
+      }
     }
     dialogOpen.value = false
   } catch (e) {
@@ -558,10 +660,23 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
 
 .invoice-footer {
   border-top: 1px solid rgba(90, 62, 32, 0.4);
-  padding: 10px 14px;
+  padding: 8px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
+}
+
+.payout-row {
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payout-row--border {
+  border-top: 1px dashed rgba(90, 62, 32, 0.5);
+  margin-top: 4px;
+  padding-top: 8px;
 }
 
 .invoice-row {
@@ -652,8 +767,8 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
   opacity: 0 !important;
 }
 
-/* ── Goods form ─────────────────────────────────────────────── */
-.goods-section-label {
+/* ── Payouts form ───────────────────────────────────────────── */
+.payouts-label {
   display: flex;
   align-items: center;
   font-family: var(--wi-font-heading);
@@ -663,10 +778,38 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
   color: var(--wi-text-muted);
 }
 
-.goods-row-form {
+.payout-form-block {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--wi-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.payout-form-row {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.payout-form-row .flex-1 {
+  flex: 1;
+}
+
+/* ── Goods sub-form ─────────────────────────────────────────── */
+.goods-section-label {
+  display: flex;
+  align-items: center;
+  font-family: var(--wi-font-heading);
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+}
+
+.goods-row-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .goods-row-form .flex-1 {

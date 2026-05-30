@@ -42,6 +42,9 @@ test('loadManufacturesByIds returns normalised manufacture entries', async () =>
   assert.equal(result[0].name, 'Mine');
   assert.equal(result[0].income, 100);
   assert.equal(result[1].incomeDestination, 'guild:guild-a');
+  // composite id includes manufacture id
+  assert.ok(result[0].id.startsWith('m1'));
+  assert.equal(result[0].manufactureId, 'm1');
 });
 
 test('loadManufacturesByIds returns empty array for empty ids', async () => {
@@ -58,8 +61,30 @@ test('loadManufacturesByIds preserves requested order', async () => {
 
   const result = await loadManufacturesByIds(['b', 'a'], { ...mock.firebase, db: mock.db });
 
-  assert.equal(result[0].id, 'b');
-  assert.equal(result[1].id, 'a');
+  assert.equal(result[0].manufactureId, 'b');
+  assert.equal(result[1].manufactureId, 'a');
+});
+
+test('loadManufacturesByIds expands multi-payout manufactures into separate entries', async () => {
+  const mock = createMockFirestore({
+    'manufactures/m1': {
+      name: 'Mine',
+      payouts: [
+        { destination: 'treasury', income: 100 },
+        { destination: 'hero:hero-1', income: 5, incomeGoods: { 'barrel': 2 } },
+      ],
+    },
+  });
+
+  const result = await loadManufacturesByIds(['m1'], { ...mock.firebase, db: mock.db });
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].manufactureId, 'm1');
+  assert.equal(result[0].income, 100);
+  assert.equal(result[0].incomeDestination, 'treasury');
+  assert.equal(result[1].income, 5);
+  assert.equal(result[1].incomeDestination, 'hero:hero-1');
+  assert.equal(result[1].incomeGoods['barrel'], 2);
 });
 
 // ─── distributeManufactureIncome ─────────────────────────────────────────────

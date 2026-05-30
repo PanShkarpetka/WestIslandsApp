@@ -76,19 +76,30 @@ export async function loadManufacturesByIds(ids, {
     const snapshot = await getDocsFn(q)
     snapshot.docs.forEach((docSnap) => {
       const data = docSnap.data() || {}
-      results.push({
-        id: docSnap.id,
-        name: (data.name || '').trim(),
-        description: (data.description || '').trim(),
-        income: normalizeAmount(data.income || 0),
-        incomeDestination: normalizeIncomeDestination(data.incomeDestination),
-        incomeGoods: data.incomeGoods && typeof data.incomeGoods === 'object' ? data.incomeGoods : {},
+      const name = (data.name || '').trim()
+      const description = (data.description || '').trim()
+
+      // Expand payouts array, falling back to legacy single-field format
+      const payouts = Array.isArray(data.payouts) && data.payouts.length
+        ? data.payouts
+        : [{ destination: data.incomeDestination, income: data.income, incomeGoods: data.incomeGoods }]
+
+      payouts.forEach((payout, index) => {
+        results.push({
+          id: `${docSnap.id}:${index}`,
+          manufactureId: docSnap.id,
+          name,
+          description,
+          income: normalizeAmount(payout.income || 0),
+          incomeDestination: normalizeIncomeDestination(payout.destination),
+          incomeGoods: payout.incomeGoods && typeof payout.incomeGoods === 'object' ? payout.incomeGoods : {},
+        })
       })
     })
   }
 
   const order = new Map(ids.map((id, index) => [id, index]))
-  results.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+  results.sort((a, b) => (order.get(a.manufactureId) ?? 0) - (order.get(b.manufactureId) ?? 0))
   return results
 }
 
