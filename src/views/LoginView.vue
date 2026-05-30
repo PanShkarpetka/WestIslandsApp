@@ -93,11 +93,15 @@ watch(nickname, async (next) => {
   const name = (next || '').trim();
 
   if (!name) {
+    ++checkToken;
+    checking.value = false;
     accountType.value = 'regular';
     return;
   }
 
   if (name.toLowerCase() === 'admin') {
+    ++checkToken;
+    checking.value = false;
     accountType.value = 'admin';
     return;
   }
