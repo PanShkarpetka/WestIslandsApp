@@ -101,7 +101,7 @@
         <div class="rare-angler wi-muted-text">
           <v-icon size="12" class="mr-1">mdi-hook</v-icon>{{ catch_.username }}
         </div>
-        <div class="rare-value wi-number">{{ formatAmount(catch_.fishValue) }} <span class="wi-coin">сс</span></div>
+        <div class="rare-value wi-number">{{ formatAmount(catch_.fishValue) }} <span class="wi-coin">SP</span></div>
         <div class="rare-date wi-muted-text">{{ formatDate(catch_.timestamp) }}</div>
       </div>
     </div>
@@ -212,7 +212,7 @@
         <span v-if="entry.success && entry.fishName" class="feed-text">
           зловив <strong>{{ entry.fishName }}</strong>
           <span v-if="entry.fishCount > 1"> +{{ entry.fishCount - 1 }} ін.</span>
-          ({{ formatAmount(entry.fishValue) }} <span class="wi-coin">сс</span>)
+          ({{ formatAmount(entry.fishValue) }} <span class="wi-coin">SP</span>)
         </span>
         <span v-else-if="!entry.success" class="feed-text wi-muted-text"> нічого не спіймав</span>
         <span class="feed-time wi-muted-text ml-auto">{{ timeAgo(entry.timestamp) }}</span>
