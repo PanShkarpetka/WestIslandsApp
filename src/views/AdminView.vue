@@ -57,6 +57,48 @@
 
       <v-divider class="my-4" />
 
+      <v-card-title class="text-h6">Виправити дати циклу</v-card-title>
+      <v-alert v-if="editCycleError" type="error" variant="tonal" class="mb-4">{{ editCycleError }}</v-alert>
+      <v-alert v-if="editCycleSuccess" type="success" variant="tonal" class="mb-4">{{ editCycleSuccess }}</v-alert>
+      <v-form class="mb-6">
+        <v-select
+          v-model="editCycleId"
+          :items="allCyclesForSelect"
+          item-title="label"
+          item-value="id"
+          label="Оберіть цикл"
+          density="comfortable"
+          hide-details="auto"
+          class="mb-3"
+          clearable
+          @update:model-value="onEditCycleSelected"
+        />
+        <template v-if="editCycleId">
+          <FaerunDatePicker
+            v-model="editCycleForm.startedAt"
+            label="Початок циклу"
+            placeholder="Дата початку"
+            class="mb-3"
+          />
+          <FaerunDatePicker
+            v-model="editCycleForm.finishedAt"
+            label="Кінець циклу (залиште порожнім якщо цикл ще не завершено)"
+            placeholder="Дата завершення"
+            class="mb-3"
+          />
+          <v-btn
+            color="warning"
+            prepend-icon="mdi-calendar-edit"
+            :loading="editCycleSaving"
+            @click="saveCycleDates"
+          >
+            Зберегти дати
+          </v-btn>
+        </template>
+      </v-form>
+
+      <v-divider class="my-4" />
+
       <v-card-title class="text-h6">Герої</v-card-title>
       <v-alert v-if="heroError" type="error" variant="tonal" class="mb-4">{{ heroError }}</v-alert>
       <v-alert v-if="heroSuccess" type="success" variant="tonal" class="mb-4">{{ heroSuccess }}</v-alert>
@@ -490,6 +532,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { DEFAULT_YEAR, diffInDays, normalizeFaerunDate, parseFaerunDate } from 'faerun-date';
+import { formatFaerunDate } from '@/utils/faerun-date.js';
 import { db } from '../services/firebase';
 import FaerunDatePicker from '@/components/FaerunDatePicker.vue';
 import { useIslandStore } from '@/store/islandStore';
@@ -506,6 +549,12 @@ const cycleError = ref('');
 const cycleSuccess = ref('');
 const latestCycle = ref(null);
 const previousCompletedCycle = ref(null);
+const allCycles = ref([]);
+const editCycleId = ref(null);
+const editCycleForm = reactive({ startedAt: null, finishedAt: null });
+const editCycleSaving = ref(false);
+const editCycleError = ref('');
+const editCycleSuccess = ref('');
 const religionSummaryText = ref('');
 const showReligionSummaryDialog = ref(false);
 const religionSummaryLoading = ref(false);
@@ -841,6 +890,61 @@ async function loadLatestCycle() {
   const snapshot = await getDocs(latestCycleQuery);
   latestCycle.value = snapshot.docs[0] ? { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } : null;
   previousCompletedCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null;
+}
+
+async function loadAllCycles() {
+  const snapshot = await getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc')));
+  allCycles.value = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+const allCyclesForSelect = computed(() =>
+  allCycles.value.map((c) => ({
+    id: c.id,
+    label: c.startedAt && c.finishedAt
+      ? `${c.startedAt} — ${c.finishedAt}`
+      : c.startedAt
+        ? `з ${c.startedAt} (поточний)`
+        : c.id,
+  })),
+);
+
+function onEditCycleSelected(id) {
+  editCycleError.value = '';
+  editCycleSuccess.value = '';
+  if (!id) { editCycleForm.startedAt = null; editCycleForm.finishedAt = null; return; }
+  const cycle = allCycles.value.find((c) => c.id === id);
+  editCycleForm.startedAt = cycle?.startedAt ? parseFaerunDate(cycle.startedAt) : null;
+  editCycleForm.finishedAt = cycle?.finishedAt ? parseFaerunDate(cycle.finishedAt) : null;
+}
+
+async function saveCycleDates() {
+  editCycleError.value = '';
+  editCycleSuccess.value = '';
+  const normalizedStart = normalizeFaerunDate(editCycleForm.startedAt);
+  if (!normalizedStart) { editCycleError.value = 'Вкажіть дату початку циклу.'; return; }
+  const normalizedEnd = editCycleForm.finishedAt ? normalizeFaerunDate(editCycleForm.finishedAt) : null;
+
+  editCycleSaving.value = true;
+  try {
+    const updates = { startedAt: formatFaerunDate(normalizedStart) };
+    if (normalizedEnd) {
+      updates.finishedAt = formatFaerunDate(normalizedEnd);
+      const diff = diffInDays(normalizedStart, normalizedEnd);
+      updates.duration = diff > 0 ? diff : null;
+    } else {
+      updates.finishedAt = null;
+      updates.duration = null;
+    }
+    await updateDoc(doc(db, 'cycles', editCycleId.value), updates);
+    editCycleSuccess.value = 'Дати циклу оновлено.';
+    await loadLatestCycle();
+    await loadAllCycles();
+  } catch (error) {
+    console.error('[admin] Failed to update cycle dates', error);
+    editCycleError.value = 'Не вдалося оновити дати циклу.';
+  } finally {
+    editCycleSaving.value = false;
+  }
 }
 
 function suggestNextCycleDate() {
@@ -1388,6 +1492,7 @@ onMounted(async () => {
   const snapshot = await getDocs(q);
   logEntries.value = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   await loadLatestCycle();
+  await loadAllCycles();
   cycleForm.startedDate = suggestNextCycleDate();
   subscribeHeroData();
   stopGoods = onSnapshot(query(collection(db, 'goods'), orderBy('name')), (snap) => {
