@@ -1,5 +1,5 @@
 import { COMMANDS, SESSION_STEPS } from '../config/constants.js';
-import { resolveFishingAttempt } from '../services/fishingService.js';
+import { resolveFishingAttempt, resolveFishByCode } from '../services/fishingService.js';
 import {
   clearUserSession,
   createFishingLog,
@@ -505,6 +505,57 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
         .sort((a, b) => b[1] - a[1])
         .map(([user, total]) => `• ${htmlEscape(user)}: <b>${total}</b> silver`)
     ].join('\n');
+  }
+
+  if (commandToken === COMMANDS.TEST_CATCH_BY_CODE) {
+    const rest = text.slice(COMMANDS.TEST_CATCH_BY_CODE.length).trim();
+    const code = Number.parseInt(rest, 10);
+    if (!Number.isInteger(code) || !rest) {
+      return 'Usage: /admin_fish_test_catch &lt;code&gt;';
+    }
+
+    const fishes = await getAvailableFishes(db);
+    const { requestedFish, resolvedFish, effectiveRoll, isFallback, isUnavailable } = resolveFishByCode(fishes, code);
+
+    if (!requestedFish && !resolvedFish) {
+      return `No fish found at code ${code} or below.`;
+    }
+
+    const lines = [`🎣 <b>Test catch for code ${code}</b>`];
+
+    if (!requestedFish) {
+      lines.push(`No fish defined at code ${code}.`);
+    } else {
+      const requestedRange = getFishCodeRange(requestedFish);
+      const requestedCodeLabel = requestedRange.min === requestedRange.max
+        ? String(requestedRange.min)
+        : `${requestedRange.min}-${requestedRange.max}`;
+      const requestedAvail = Number(requestedFish.fishAmountAvailableNow || 0);
+      lines.push(`Requested: <b>${htmlEscape(requestedFish.fishName)}</b> (#${requestedCodeLabel}) — available: ${requestedAvail}`);
+    }
+
+    if (isFallback && resolvedFish) {
+      const resolvedRange = getFishCodeRange(resolvedFish);
+      const resolvedCodeLabel = resolvedRange.min === resolvedRange.max
+        ? String(resolvedRange.min)
+        : `${resolvedRange.min}-${resolvedRange.max}`;
+      const resolvedAvail = Number(resolvedFish.fishAmountAvailableNow || 0);
+      const price = getFishPriceByCode(resolvedFish, effectiveRoll);
+      lines.push(`Fallback: <b>${htmlEscape(resolvedFish.fishName)}</b> (#${resolvedCodeLabel}) — available: ${resolvedAvail}, price: ${price} silver`);
+      if (resolvedFish.fishDescription) {
+        lines.push(`<blockquote>${htmlEscape(resolvedFish.fishDescription)}</blockquote>`);
+      }
+    } else if (isUnavailable) {
+      lines.push('Result: no catch — fish unavailable and no lower fish found.');
+    } else if (resolvedFish) {
+      const price = getFishPriceByCode(resolvedFish, effectiveRoll);
+      lines.push(`Result: ✅ would catch this fish. Price: ${price} silver`);
+      if (resolvedFish.fishDescription) {
+        lines.push(`<blockquote>${htmlEscape(resolvedFish.fishDescription)}</blockquote>`);
+      }
+    }
+
+    return lines.join('\n');
   }
 
   if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(commandToken)) {

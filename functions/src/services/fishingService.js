@@ -155,6 +155,20 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
   };
 }
 
+export function resolveFishByCode(fishes, code) {
+  const sortedFishes = [...fishes].sort((a, b) => getFishCodeRange(a).min - getFishCodeRange(b).min);
+  const requestedFish = findFishByRoll(sortedFishes, code);
+  const catchData = findCatchableFish({ fishes: sortedFishes, roll: code });
+
+  return {
+    requestedFish,
+    resolvedFish: catchData.fish,
+    effectiveRoll: catchData.effectiveRoll,
+    isFallback: Boolean(requestedFish && catchData.fish && requestedFish !== catchData.fish),
+    isUnavailable: Boolean(requestedFish && !catchData.fish)
+  };
+}
+
 export const __testables = {
   applyBaitBonus,
   applyGuidance,
