@@ -515,47 +515,81 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
     }
 
     const fishes = await getAvailableFishes(db);
-    const { requestedFish, resolvedFish, effectiveRoll, isFallback, isUnavailable } = resolveFishByCode(fishes, code);
+    const { resolvedFish, effectiveRoll } = resolveFishByCode(fishes, code);
 
-    if (!requestedFish && !resolvedFish) {
-      return `No fish found at code ${code} or below.`;
+    if (!resolvedFish) {
+      return `No catchable fish at code ${code} or below.`;
     }
 
-    const lines = [`🎣 <b>Test catch for code ${code}</b>`];
+    const fakeResult = {
+      normalizedInput: { modifiers: [0, 0, 0], baitType: 'basic', useGuidance: false, useShip: false },
+      rawRolls: [0, 0, 0],
+      modifiedRolls: [0, 0, 0],
+      guidance: { guidanceRolls: [], adjustedRolls: [0, 0, 0], totalGuidanceBonus: 0, appliedTo: null },
+      finalRolls: [0, 0, 0],
+      baitBonusRoll: null,
+      shipBonusRoll: null,
+      computedSum: effectiveRoll,
+      finalSum: effectiveRoll,
+      eachRollDc: 10,
+      passedEachRollDc: true,
+      failedRollIndexes: [],
+      rolledFish: null,
+      effectiveRollUsed: effectiveRoll,
+      selectedFish: resolvedFish,
+      success: true
+    };
 
-    if (!requestedFish) {
-      lines.push(`No fish defined at code ${code}.`);
-    } else {
-      const requestedRange = getFishCodeRange(requestedFish);
-      const requestedCodeLabel = requestedRange.min === requestedRange.max
-        ? String(requestedRange.min)
-        : `${requestedRange.min}-${requestedRange.max}`;
-      const requestedAvail = Number(requestedFish.fishAmountAvailableNow || 0);
-      lines.push(`Requested: <b>${htmlEscape(requestedFish.fishName)}</b> (#${requestedCodeLabel}) — available: ${requestedAvail}`);
+    const baseLog = {
+      telegramUserId,
+      telegramUsername: usernameFromPayload(payload),
+      command: COMMANDS.TEST_CATCH_BY_CODE,
+      rawEnteredParams: text,
+      normalizedParams: fakeResult.normalizedInput,
+      d20RawRolls: fakeResult.rawRolls,
+      modifiers: fakeResult.normalizedInput.modifiers,
+      finalRollValues: fakeResult.finalRolls,
+      guidanceData: fakeResult.guidance,
+      baitUsed: fakeResult.normalizedInput.baitType,
+      usedShip: false,
+      baitBonusRoll: null,
+      shipBonusRoll: null,
+      preCapComputedSum: effectiveRoll,
+      finalComputedSum: effectiveRoll,
+      eachRollDc: 10,
+      passedEachRollDc: true,
+      failedRollIndexes: [],
+      effectiveRollUsed: effectiveRoll,
+      successFailureResult: true
+    };
+
+    const requiredRolls = Array.isArray(resolvedFish.fishAdditionalRollsRequiredForSuccessfulCatch)
+      ? resolvedFish.fishAdditionalRollsRequiredForSuccessfulCatch
+      : [];
+
+    if (requiredRolls.length > 0) {
+      const pendingAdditionalRoll = {
+        fishId: resolvedFish.id,
+        fishName: resolvedFish.fishName,
+        requirements: requiredRolls,
+        baseLog,
+        selectedFish: resolvedFish
+      };
+      await upsertUserSession(db, telegramUserId, {
+        step: SESSION_STEPS.ADDITIONAL_ROLL_CONFIRM,
+        payload: { pendingAdditionalRoll, result: fakeResult }
+      });
+      return formatFishingResult(fakeResult, [], { pendingAdditionalRoll });
     }
 
-    if (isFallback && resolvedFish) {
-      const resolvedRange = getFishCodeRange(resolvedFish);
-      const resolvedCodeLabel = resolvedRange.min === resolvedRange.max
-        ? String(resolvedRange.min)
-        : `${resolvedRange.min}-${resolvedRange.max}`;
-      const resolvedAvail = Number(resolvedFish.fishAmountAvailableNow || 0);
-      const price = getFishPriceByCode(resolvedFish, effectiveRoll);
-      lines.push(`Fallback: <b>${htmlEscape(resolvedFish.fishName)}</b> (#${resolvedCodeLabel}) — available: ${resolvedAvail}, price: ${price} silver`);
-      if (resolvedFish.fishDescription) {
-        lines.push(`<blockquote>${htmlEscape(resolvedFish.fishDescription)}</blockquote>`);
-      }
-    } else if (isUnavailable) {
-      lines.push('Result: no catch — fish unavailable and no lower fish found.');
-    } else if (resolvedFish) {
-      const price = getFishPriceByCode(resolvedFish, effectiveRoll);
-      lines.push(`Result: ✅ would catch this fish. Price: ${price} silver`);
-      if (resolvedFish.fishDescription) {
-        lines.push(`<blockquote>${htmlEscape(resolvedFish.fishDescription)}</blockquote>`);
-      }
-    }
+    const txResult = await updateFishAvailabilityTransaction(db, {
+      catches: [resolvedFish],
+      logData: baseLog
+    });
+    const outcome = await registerFishingOutcome(db, { success: true });
+    onDcChanged?.(buildDcChangedMessage(outcome));
 
-    return lines.join('\n');
+    return formatFishingResult(fakeResult, txResult.finalCatches);
   }
 
   if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(commandToken)) {
