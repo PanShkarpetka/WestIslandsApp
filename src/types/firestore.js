@@ -18,6 +18,34 @@
 /**
  * @typedef {Object} BuildingEntry
  * @property {boolean} built - Whether the building has been constructed
+ * @property {string} [builtAt] - Faerun date string when the building was constructed
+ * @property {string} [yieldBuildingId] - Links to yield-buildings collection if this is a custom yield building
+ * @property {YieldEvent[]} [yields] - Scheduled harvest events for this building
+ */
+
+/**
+ * @typedef {Object} YieldEvent
+ * @property {string} id - Unique identifier for this event
+ * @property {string} destination - Recipient: 'hero:{heroId}' or 'guild:{guildId}'
+ * @property {string} date - Faerun date string when this harvest triggers
+ * @property {Record<string, string|number>} goods - goodId → fixed number or dice notation (e.g. "20d10")
+ * @property {boolean} processed - Whether this event has been executed during a cycle rollover
+ * @property {string} [processedAt] - Faerun date string of the cycle start that processed this event
+ * @property {Record<string, number>} [processedAmounts] - Actual rolled amounts per goodId
+ * @property {boolean} [manuallyFulfilled] - True when admin manually fulfilled the event (not auto-processed)
+ */
+
+// ─── YIELD BUILDINGS ─────────────────────────────────────────────────────────
+
+/**
+ * Collection: `yield-buildings/{id}`
+ * Custom buildings that periodically distribute goods to heroes or guilds.
+ * These are admin-created and separate from the standard buildings in the `buildings` collection.
+ * Island instances are stored under islands/{islandId}.buildings with key `yield_<id>`.
+ * @typedef {Object} YieldBuilding
+ * @property {string} id
+ * @property {string} name
+ * @property {string} [description]
  */
 
 // ─── BUILDINGS ───────────────────────────────────────────────────────────────
@@ -109,6 +137,7 @@
  * @property {string} withdrawPassword
  * @property {string} leaderPassword
  * @property {Record<string, unknown>} assets
+ * @property {Record<string, number>} [goods] - Goods inventory keyed by goodId
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {import('firebase/firestore').Timestamp} updatedAt
  */
@@ -123,6 +152,8 @@
  * @property {string} userNickname
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {number} treasureAfter
+ * @property {Record<string, number>} [goods] - Goods delta (positive = added, negative = removed); set for goods transactions
+ * @property {Record<string, number>} [goodsAfter] - Goods snapshot after the transaction
  */
 
 // ─── RELIGION ────────────────────────────────────────────────────────────────
@@ -295,7 +326,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]

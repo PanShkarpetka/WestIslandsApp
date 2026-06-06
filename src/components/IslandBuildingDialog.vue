@@ -85,6 +85,14 @@
 
         </div>
 
+        <!-- Harvest section (admin only, shown when built) -->
+        <BuildingHarvestSection
+          v-if="isAdmin && built"
+          :building-key="buildingKey"
+          :is-admin="isAdmin"
+          :current-cycle-start-date="currentCycleStartDate"
+        />
+
         <!-- Donation progress -->
         <div v-if="progress" class="building-progress-wrap">
           <div class="building-progress-label">
@@ -150,12 +158,14 @@ import { useBuildingStore } from '@/store/buildingStore'
 import { useIslandStore } from '@/store/islandStore'
 import { useDonationGoalStore } from '@/store/donationGoalStore'
 import { useLogStore } from '@/store/logStore'
+import BuildingHarvestSection from '@/components/BuildingHarvestSection.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   buildingKey: { type: String, required: true },
   isAdmin: { type: Boolean, default: false },
   nickname: { type: String, default: 'Admin' },
+  currentCycleStartDate: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue'])
 

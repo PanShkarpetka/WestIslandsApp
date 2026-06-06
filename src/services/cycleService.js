@@ -15,6 +15,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from '../utils/faerun-date.js'
+import { rollDice } from '../utils/dice.js'
 import { db } from './firebase.js'
 import { formatAmount } from '../utils/formatters.js'
 import { normalizeAmount } from '../utils/numbers.js'
@@ -425,6 +426,215 @@ export async function applyParkBuildingGrowth(islandId, {
   }
 }
 
+/**
+ * Distributes goods for a single yield event to its destination hero.
+ * Returns the rolled amounts, or an empty object for non-hero destinations.
+ * Mutates nothing in Firestore — callers handle persistence.
+ * @returns {{ rolledAmounts: Record<string,number>, heroUpdates: Record<string,number>|null, heroData: object|null, heroId: string|null }}
+ */
+async function _distributeYieldEvent(event, buildingKey, buildingEntry, labelDate, cycleId, {
+  docFn, getDocFn, updateDocFn, addDocFn, collectionFn, serverTimestampFn, firestoreDb, rng, manuallyFulfilled = false,
+}) {
+  const destination = normalizeIncomeDestination(event.destination)
+  const goodsMap = event.goods && typeof event.goods === 'object' ? event.goods : {}
+  const buildingName = buildingEntry.name || buildingKey
+  const suffix = manuallyFulfilled ? ' [вручну]' : ''
+  const eventDateStr = event.date || labelDate
+
+  // ── Hero destination ──────────────────────────────────────
+  if (destination.startsWith('hero:')) {
+    const heroId = destination.slice('hero:'.length)
+    const heroRef = docFn(firestoreDb, 'heroes', heroId)
+    const heroSnap = await getDocFn(heroRef)
+    if (!heroSnap.exists()) {
+      console.warn(`[cycle] Building yield: hero "${heroId}" not found — skipping event ${event.id}`)
+      return { rolledAmounts: {}, skipped: true }
+    }
+
+    const heroData = heroSnap.data() || {}
+    const rolledAmounts = {}
+    const goodsUpdates = {}
+    const currentGoods = heroData.goods || {}
+
+    for (const [goodId, notation] of Object.entries(goodsMap)) {
+      const rolled = rollDice(notation, rng)
+      if (rolled <= 0) continue
+      rolledAmounts[goodId] = rolled
+      goodsUpdates[`goods.${goodId}`] = (Number(currentGoods[goodId] ?? 0)) + rolled
+    }
+
+    if (Object.keys(rolledAmounts).length > 0) {
+      await updateDocFn(heroRef, goodsUpdates)
+      await addDocFn(collectionFn(firestoreDb, 'hero-transactions'), {
+        heroId,
+        heroName: heroData.name || heroId,
+        goldAmount: 0,
+        goods: rolledAmounts,
+        type: 'building-yield',
+        comment: `Врожай: ${buildingName} (${eventDateStr})${suffix}.`.slice(0, 500),
+        cycleId: cycleId || null,
+        cycleStartedAt: labelDate,
+        cycleFinishedAt: null,
+        createdAt: serverTimestampFn(),
+      })
+    }
+
+    return { rolledAmounts, skipped: false }
+  }
+
+  // ── Guild destination ─────────────────────────────────────
+  if (destination.startsWith('guild:')) {
+    const guildId = destination.slice('guild:'.length)
+    const guildRef = docFn(firestoreDb, 'guilds', guildId)
+    const guildSnap = await getDocFn(guildRef)
+    if (!guildSnap.exists()) {
+      console.warn(`[cycle] Building yield: guild "${guildId}" not found — skipping event ${event.id}`)
+      return { rolledAmounts: {}, skipped: true }
+    }
+
+    const guildData = guildSnap.data() || {}
+    const rolledAmounts = {}
+    const goodsUpdates = {}
+    const currentGoods = guildData.goods || {}
+
+    for (const [goodId, notation] of Object.entries(goodsMap)) {
+      const rolled = rollDice(notation, rng)
+      if (rolled <= 0) continue
+      rolledAmounts[goodId] = rolled
+      goodsUpdates[`goods.${goodId}`] = (Number(currentGoods[goodId] ?? 0)) + rolled
+    }
+
+    if (Object.keys(rolledAmounts).length > 0) {
+      const goodsAfter = { ...currentGoods }
+      for (const [goodId, qty] of Object.entries(rolledAmounts)) {
+        goodsAfter[goodId] = (Number(goodsAfter[goodId] ?? 0)) + qty
+      }
+
+      await updateDocFn(guildRef, { ...goodsUpdates, updatedAt: serverTimestampFn() })
+      await addDocFn(collectionFn(firestoreDb, 'guilds', guildId, 'logs'), {
+        amount: 0,
+        type: 'goods-deposit',
+        comment: `Врожай: ${buildingName} (${eventDateStr})${suffix}.`.slice(0, 500),
+        userNickname: 'Система',
+        createdAt: serverTimestampFn(),
+        treasureAfter: Number(guildData.treasure || 0),
+        goods: rolledAmounts,
+        goodsAfter,
+      })
+    }
+
+    return { rolledAmounts, skipped: false }
+  }
+
+  console.warn(`[cycle] Building yield: unrecognised destination "${event.destination}" — skipping event ${event.id}`)
+  return { rolledAmounts: {}, skipped: true }
+}
+
+export async function processBuildingYields(cycleId, newCycleStart, islandId, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  updateDoc: updateDocFn = updateDoc,
+  addDoc: addDocFn = addDoc,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+  rng = Math.random,
+} = {}) {
+  const islandRef = docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID)
+  const islandSnap = await getDocFn(islandRef)
+  if (!islandSnap.exists()) return
+
+  const buildings = islandSnap.data().buildings || {}
+  const newCycleStartAt = formatFaerunDate(newCycleStart)
+  const updatedBuildings = {}
+  let anyProcessed = false
+
+  for (const [buildingKey, buildingEntry] of Object.entries(buildings)) {
+    const yields = Array.isArray(buildingEntry.yields) ? buildingEntry.yields : []
+    const pendingEvents = yields.filter((event) => {
+      if (event.processed) return false
+      const parsedEventDate = parseFaerunDate(event.date)
+      if (!parsedEventDate) return false
+      // diffInDays(A, B) > 1 means B is strictly after A, i.e. eventDate < newCycleStart
+      const diff = diffInDays(parsedEventDate, newCycleStart)
+      return diff !== null && diff > 1
+    })
+
+    if (!pendingEvents.length) continue
+
+    const updatedYields = [...yields]
+    const sharedEventDeps = { docFn, getDocFn, updateDocFn, addDocFn, collectionFn, serverTimestampFn, firestoreDb, rng }
+    for (const event of pendingEvents) {
+      const { rolledAmounts, skipped } = await _distributeYieldEvent(
+        event, buildingKey, buildingEntry, newCycleStartAt, cycleId, sharedEventDeps,
+      )
+      if (skipped && !rolledAmounts) continue
+
+      const idx = updatedYields.findIndex((y) => y.id === event.id)
+      if (idx !== -1) {
+        updatedYields[idx] = { ...updatedYields[idx], processed: true, processedAt: newCycleStartAt, processedAmounts: rolledAmounts }
+      }
+      anyProcessed = true
+    }
+
+    updatedBuildings[buildingKey] = { ...buildingEntry, yields: updatedYields }
+  }
+
+  if (anyProcessed) {
+    const buildingUpdates = {}
+    for (const [key, entry] of Object.entries(updatedBuildings)) {
+      buildingUpdates[`buildings.${key}.yields`] = entry.yields
+    }
+    await updateDocFn(islandRef, buildingUpdates)
+  }
+}
+
+/**
+ * Manually fulfills a single yield event: rolls dice, delivers goods to hero, writes a transaction log,
+ * then marks the event as processed with manuallyFulfilled: true.
+ * Called from the admin UI "Виконати вручну" button.
+ */
+export async function fulfillYieldEventManually(islandId, buildingKey, eventId, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  updateDoc: updateDocFn = updateDoc,
+  addDoc: addDocFn = addDoc,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+  rng = Math.random,
+} = {}) {
+  const islandRef = docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID)
+  const islandSnap = await getDocFn(islandRef)
+  if (!islandSnap.exists()) throw new Error('Island not found.')
+
+  const buildings = islandSnap.data().buildings || {}
+  const buildingEntry = buildings[buildingKey]
+  if (!buildingEntry) throw new Error(`Building "${buildingKey}" not found on island.`)
+
+  const yields = Array.isArray(buildingEntry.yields) ? buildingEntry.yields : []
+  const eventIdx = yields.findIndex((y) => y.id === eventId)
+  if (eventIdx === -1) throw new Error(`Yield event "${eventId}" not found.`)
+
+  const event = yields[eventIdx]
+  if (event.processed) throw new Error('Ця подія вже виконана.')
+
+  const nowLabel = event.date || formatFaerunDate({ day: 1, month: 0, year: 815 })
+  const deps = { docFn, getDocFn, updateDocFn, addDocFn, collectionFn, serverTimestampFn, firestoreDb, rng, manuallyFulfilled: true }
+  const { rolledAmounts } = await _distributeYieldEvent(event, buildingKey, buildingEntry, nowLabel, null, deps)
+
+  const updatedYields = [...yields]
+  updatedYields[eventIdx] = {
+    ...event,
+    processed: true,
+    manuallyFulfilled: true,
+    processedAt: nowLabel,
+    processedAmounts: rolledAmounts,
+  }
+
+  await updateDocFn(islandRef, { [`buildings.${buildingKey}.yields`]: updatedYields })
+}
+
 export async function createNewCycleWithEffects({
   startedDate,
   notes = '',
@@ -486,6 +696,7 @@ export async function createNewCycleWithEffects({
   await applyParkBuildingGrowth(islandId, sharedDeps)
   await distributeBuildingFaithIncome(cycleDoc.id, sharedDeps)
   await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems, sharedDeps)
+  await processBuildingYields(cycleDoc.id, normalizedStart, islandId, sharedDeps)
   await settlePreviousSpellRequestsFn()
   await generateSpellRequestsForCycleFn({
     cycleRef: cycleDoc,

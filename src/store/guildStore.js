@@ -140,8 +140,73 @@ export const useGuildStore = defineStore('guilds', {
     async _applyTransaction({ guildId, amount, comment, actor, type }) {
       await applyGuildTransaction({ guildId, amount, comment, actor, type });
     },
+
+    async depositGoods({ guildId, goods, comment, actor }) {
+      const normalized = {};
+      for (const [k, v] of Object.entries(goods || {})) {
+        const n = Number(v);
+        if (n > 0) normalized[k] = n;
+      }
+      if (!Object.keys(normalized).length) throw new Error('Не вказано жодного товару.');
+      await applyGuildGoodsTransaction({ guildId, goods: normalized, comment, actor, type: 'goods-deposit' });
+    },
+
+    async withdrawGoods({ guildId, goods, comment, actor }) {
+      const normalized = {};
+      for (const [k, v] of Object.entries(goods || {})) {
+        const n = Number(v);
+        if (n > 0) normalized[k] = -n;
+      }
+      if (!Object.keys(normalized).length) throw new Error('Не вказано жодного товару.');
+      await applyGuildGoodsTransaction({ guildId, goods: normalized, comment, actor, type: 'goods-withdraw' });
+    },
   },
 });
+
+// Exported for testing. Applies a goods deposit or withdrawal atomically.
+export async function applyGuildGoodsTransaction(
+  { guildId, goods, comment, actor, type },
+  {
+    runTransactionFn = runTransaction,
+    docFn = doc,
+    collectionFn = collection,
+    serverTimestampFn = serverTimestamp,
+    db: firestoreDb,
+  } = {},
+) {
+  const db = firestoreDb ?? getFirestore();
+  const guildRef = docFn(db, 'guilds', guildId);
+  const logsRef = collectionFn(db, 'guilds', guildId, 'logs');
+
+  await runTransactionFn(db, async (t) => {
+    const guildSnap = await t.get(guildRef);
+    if (!guildSnap.exists()) throw new Error('Guild not found.');
+
+    const currentGoods = { ...(guildSnap.data()?.goods || {}) };
+    const updatedGoods = { ...currentGoods };
+
+    for (const [goodId, delta] of Object.entries(goods || {})) {
+      const current = Number(updatedGoods[goodId] ?? 0);
+      const next = current + Number(delta);
+      if (next < 0) throw new Error(`Недостатньо товару на складі гільдії.`);
+      updatedGoods[goodId] = next;
+    }
+
+    t.set(guildRef, { goods: updatedGoods, updatedAt: serverTimestampFn() }, { merge: true });
+
+    const logRef = docFn(logsRef);
+    t.set(logRef, {
+      amount: 0,
+      type,
+      comment: (comment || '').slice(0, 500),
+      userNickname: (actor?.nickname || 'Unknown').slice(0, 80),
+      createdAt: serverTimestampFn(),
+      treasureAfter: Number(guildSnap.data()?.treasure || 0),
+      goods,
+      goodsAfter: updatedGoods,
+    });
+  });
+}
 
 function sanitizeGuild(payload) {
   return {

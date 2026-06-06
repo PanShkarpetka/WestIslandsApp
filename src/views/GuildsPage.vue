@@ -46,10 +46,19 @@
             <div class="guild-balance-label">золотих монет</div>
           </div>
 
+          <!-- Goods inventory (compact chips) -->
+          <div v-if="guildGoodsList(guild).length" class="guild-goods-row" @click.stop>
+            <v-icon size="12" class="mr-1" color="#c8962a">mdi-package-variant</v-icon>
+            <span v-for="item in guildGoodsList(guild)" :key="item.goodId" class="guild-good-chip">
+              {{ item.name }}: <strong>{{ item.qty }}</strong>
+            </span>
+          </div>
+
           <!-- Footer actions -->
           <div class="guild-actions" @click.stop>
             <v-btn class="guild-deposit-btn" size="small" prepend-icon="mdi-tray-arrow-down" @click="openTransaction(guild, 'deposit')">Внести</v-btn>
             <v-btn v-if="user.isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
+            <v-btn v-if="user.isAdmin" class="guild-goods-btn" size="small" prepend-icon="mdi-package-variant" variant="tonal" @click="openGoodsDialog(guild)">Товари</v-btn>
             <v-spacer />
             <v-btn v-if="user.isAdmin" size="small" variant="text" icon="mdi-feather" class="guild-edit-btn" @click="openEditDialog(guild)" />
           </div>
@@ -189,6 +198,91 @@
       </v-card>
     </v-dialog>
 
+    <!-- Goods dialog (admin only) -->
+    <v-dialog v-model="showGoodsDialog" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-package-variant</v-icon>
+          Товари гільдії · {{ selectedGuild?.name }}
+        </div>
+        <v-card-text class="guild-dialog-body">
+
+          <!-- Current inventory -->
+          <div class="goods-inventory-label">Поточний склад</div>
+          <div v-if="guildGoodsList(selectedGuild).length" class="goods-inventory-list mb-4">
+            <div v-for="item in guildGoodsList(selectedGuild)" :key="item.goodId" class="goods-inventory-row">
+              <span class="goods-inv-name">{{ item.name }}</span>
+              <span class="goods-inv-qty wi-number">{{ item.qty }}</span>
+              <span v-if="item.unit" class="goods-inv-unit">{{ item.unit }}</span>
+            </div>
+          </div>
+          <div v-else class="goods-inventory-empty mb-4">Склад порожній</div>
+
+          <!-- Mode toggle -->
+          <v-btn-toggle v-model="goodsTxMode" mandatory density="compact" class="mb-4 goods-mode-toggle">
+            <v-btn value="deposit" size="small">
+              <v-icon start size="14">mdi-tray-arrow-down</v-icon>Поповнити
+            </v-btn>
+            <v-btn value="withdraw" size="small">
+              <v-icon start size="14">mdi-tray-arrow-up</v-icon>Зняти
+            </v-btn>
+          </v-btn-toggle>
+
+          <!-- Goods rows -->
+          <div v-for="(row, idx) in goodsTxRows" :key="idx" class="good-tx-row mb-2">
+            <v-select
+              v-model="row.goodId"
+              :items="goodsOptions"
+              item-title="label"
+              item-value="id"
+              label="Товар"
+              density="comfortable"
+              hide-details="auto"
+              class="flex-grow-1"
+            />
+            <v-text-field
+              v-model.number="row.qty"
+              type="number"
+              min="0.01"
+              step="1"
+              label="Кількість"
+              density="comfortable"
+              hide-details="auto"
+              class="goods-qty-field"
+            />
+            <v-btn icon size="small" variant="text" color="error" @click="removeGoodsTxRow(idx)">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </div>
+          <v-btn size="small" variant="text" prepend-icon="mdi-plus" class="mb-3" @click="addGoodsTxRow">
+            Додати товар
+          </v-btn>
+
+          <v-textarea
+            v-model="goodsTxComment"
+            label="Коментар"
+            rows="2"
+            auto-grow
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+            class="mb-2"
+          />
+
+          <div v-if="goodsTxError" class="guild-dialog-error mt-2">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ goodsTxError }}
+          </div>
+        </v-card-text>
+
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="showGoodsDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <v-btn class="save-btn" :loading="goodsTxLoading" @click="submitGoodsTransaction">Підтвердити</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
   </v-container>
 </template>
 
@@ -197,10 +291,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Timestamp } from 'firebase/firestore'
 import { useGuildStore } from '@/store/guildStore'
 import { useUserStore } from '@/store/userStore'
+import { useGoodsStore } from '@/store/goodsStore'
 import { formatAmount } from '@/utils/formatters'
 
 const store = useGuildStore()
 const user = useUserStore()
+const goodsStore = useGoodsStore()
 
 const showGuildDialog = ref(false)
 const showTxDialog = ref(false)
@@ -307,6 +403,66 @@ function hasWithdrawAccess(guild, password) {
   return user.nickname === (guild?.withdrawUsername || '') && password === (guild?.withdrawPassword || '')
 }
 
+// ── Goods transactions ────────────────────────────────────────
+const showGoodsDialog = ref(false)
+const goodsTxMode = ref('deposit')
+const goodsTxRows = ref([{ goodId: '', qty: 1 }])
+const goodsTxComment = ref('')
+const goodsTxError = ref('')
+const goodsTxLoading = ref(false)
+
+const goodsOptions = computed(() =>
+  goodsStore.goods.map(g => ({ id: g.id, label: g.name + (g.unit ? ` (${g.unit})` : '') }))
+)
+
+function guildGoodsList(guild) {
+  if (!guild?.goods) return []
+  return Object.entries(guild.goods)
+    .filter(([, qty]) => Number(qty) !== 0)
+    .map(([goodId, qty]) => {
+      const def = goodsStore.goods.find(g => g.id === goodId)
+      return { goodId, name: def?.name || goodId, unit: def?.unit || '', qty: Number(qty) }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'))
+}
+
+function openGoodsDialog(guild) {
+  selectedGuild.value = guild
+  goodsTxMode.value = 'deposit'
+  goodsTxRows.value = [{ goodId: '', qty: 1 }]
+  goodsTxComment.value = ''
+  goodsTxError.value = ''
+  showGoodsDialog.value = true
+}
+
+function addGoodsTxRow() { goodsTxRows.value.push({ goodId: '', qty: 1 }) }
+function removeGoodsTxRow(idx) { goodsTxRows.value.splice(idx, 1) }
+
+async function submitGoodsTransaction() {
+  goodsTxError.value = ''
+  const goods = {}
+  for (const row of goodsTxRows.value) {
+    if (!row.goodId) continue
+    const n = Number(row.qty)
+    if (n > 0) goods[row.goodId] = (goods[row.goodId] || 0) + n
+  }
+  if (!Object.keys(goods).length) { goodsTxError.value = 'Додайте хоча б один товар із кількістю.'; return }
+
+  goodsTxLoading.value = true
+  try {
+    if (goodsTxMode.value === 'deposit') {
+      await store.depositGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
+    } else {
+      await store.withdrawGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
+    }
+    showGoodsDialog.value = false
+  } catch (e) {
+    goodsTxError.value = e?.message || String(e)
+  } finally {
+    goodsTxLoading.value = false
+  }
+}
+
 function defaultGuildForm() {
   return { name: '', shortName: '', leader: '', treasure: 0, visibleToAll: true, withdrawUsername: '', withdrawPassword: '' }
 }
@@ -317,8 +473,8 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
 
-onMounted(() => store.subscribeGuilds())
-onBeforeUnmount(() => store.unsubscribeGuilds())
+onMounted(() => { store.subscribeGuilds(); goodsStore.subscribeGoods() })
+onBeforeUnmount(() => { store.unsubscribeGuilds(); goodsStore.unsubscribeGoods() })
 </script>
 
 <style scoped>
@@ -366,7 +522,7 @@ onBeforeUnmount(() => store.unsubscribeGuilds())
   padding: 16px;
   display: grid;
   grid-template-columns: 52px 1fr auto;
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: auto auto auto auto auto;
   gap: 0 12px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -447,7 +603,7 @@ onBeforeUnmount(() => store.unsubscribeGuilds())
 
 .guild-actions {
   grid-column: 1 / 4;
-  grid-row: 3;
+  grid-row: 4;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -482,7 +638,7 @@ onBeforeUnmount(() => store.unsubscribeGuilds())
 
 .guild-log-hint {
   grid-column: 1 / 4;
-  grid-row: 4;
+  grid-row: 5;
   display: flex;
   align-items: center;
   font-family: var(--wi-font-heading);
@@ -589,6 +745,112 @@ onBeforeUnmount(() => store.unsubscribeGuilds())
 .ledger-comment { max-width: 240px; color: var(--wi-text-muted) !important; font-style: italic; }
 .comment-truncated { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .ledger-balance-after { font-family: var(--wi-font-number); font-size: 0.8rem; color: var(--wi-gold) !important; white-space: nowrap; }
+
+/* ── Guild goods row on card ────────────────────────────────── */
+.guild-goods-row {
+  grid-column: 1 / 4;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--wi-text-muted);
+}
+
+.guild-good-chip {
+  background: rgba(200, 150, 42, 0.08);
+  border: 1px solid rgba(200, 150, 42, 0.2);
+  border-radius: 3px;
+  padding: 1px 6px;
+  color: var(--wi-text);
+  font-size: 0.73rem;
+}
+
+.guild-good-chip strong {
+  color: var(--wi-gold);
+  font-family: var(--wi-font-number);
+}
+
+.guild-goods-btn {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.05em !important;
+  color: var(--wi-sea) !important;
+  border-color: rgba(58, 96, 128, 0.35) !important;
+}
+
+/* ── Goods dialog ───────────────────────────────────────────── */
+.goods-inventory-label {
+  font-family: var(--wi-font-heading);
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--wi-text-muted);
+  margin-bottom: 8px;
+}
+
+.goods-inventory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.goods-inventory-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(90, 62, 32, 0.3);
+  border-radius: 4px;
+}
+
+.goods-inv-name {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--wi-text);
+}
+
+.goods-inv-qty {
+  font-size: 0.9rem;
+  color: var(--wi-gold);
+}
+
+.goods-inv-unit {
+  font-size: 0.75rem;
+  color: var(--wi-text-muted);
+  font-style: italic;
+}
+
+.goods-inventory-empty {
+  font-size: 0.82rem;
+  color: var(--wi-text-muted);
+  font-style: italic;
+}
+
+.goods-mode-toggle {
+  width: 100%;
+}
+
+.goods-mode-toggle :deep(.v-btn) {
+  flex: 1;
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.05em !important;
+}
+
+.good-tx-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.goods-qty-field {
+  max-width: 100px;
+  flex-shrink: 0;
+}
 
 .guild-logs-empty {
   display: flex;

@@ -51,6 +51,42 @@ export const useIslandStore = defineStore('islands', () => {
         })
     }
 
+    async function updateBuildingYields (key, { builtAt, yields } = {}) {
+        if (!data.value?.id) return
+        const updates = {}
+        if (builtAt !== undefined) updates[`buildings.${key}.builtAt`] = builtAt ?? null
+        if (yields !== undefined) updates[`buildings.${key}.yields`] = yields ?? []
+        const cur = { ...(data.value.buildings || {}) }
+        cur[key] = { ...(cur[key] || {}), ...(builtAt !== undefined ? { builtAt } : {}), ...(yields !== undefined ? { yields } : {}) }
+        data.value = { ...data.value, buildings: cur }
+        await updateDoc(doc(db, 'islands', data.value.id), updates)
+    }
+
+    async function addYieldBuilding (yieldBuildingId, yieldBuildingName) {
+        if (!data.value?.id) return
+        const key = `yield_${yieldBuildingId}`
+        const entry = { built: true, yieldBuildingId, name: yieldBuildingName || yieldBuildingId, yields: [] }
+        const cur = { ...(data.value.buildings || {}) }
+        cur[key] = entry
+        data.value = { ...data.value, buildings: cur }
+        await updateDoc(doc(db, 'islands', data.value.id), {
+            [`buildings.${key}`]: entry
+        })
+    }
+
+    async function removeYieldBuilding (yieldBuildingId) {
+        if (!data.value?.id) return
+        const key = `yield_${yieldBuildingId}`
+        const cur = { ...(data.value.buildings || {}) }
+        delete cur[key]
+        data.value = { ...data.value, buildings: cur }
+        // Firestore field deletion requires FieldValue.delete()
+        const { deleteField } = await import('firebase/firestore')
+        await updateDoc(doc(db, 'islands', data.value.id), {
+            [`buildings.${key}`]: deleteField()
+        })
+    }
+
     // 0..1 (підтримує як 15, так і 0.15)
     const buildingDiscount = computed(() => {
         const raw = data.value?.buildingDiscount ?? 0
@@ -61,5 +97,6 @@ export const useIslandStore = defineStore('islands', () => {
     return {
         currentId, data, loading, error,
         subscribe, loadOnce, stop, updateIsland, setBuildingBuilt, buildingDiscount,
+        updateBuildingYields, addYieldBuilding, removeYieldBuilding,
     }
 })

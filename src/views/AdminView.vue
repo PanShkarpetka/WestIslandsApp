@@ -462,6 +462,58 @@
 
       <v-divider class="my-4" />
 
+      <!-- Yield Buildings -->
+      <v-card-title class="text-h6">Будівлі-постачальники</v-card-title>
+      <v-alert v-if="yieldBuildingsError" type="error" variant="tonal" class="mb-4">{{ yieldBuildingsError }}</v-alert>
+      <v-alert v-if="yieldBuildingsSuccess" type="success" variant="tonal" class="mb-4">{{ yieldBuildingsSuccess }}</v-alert>
+
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Додати будівлю-постачальника</div>
+        <v-row>
+          <v-col cols="12" md="5">
+            <v-text-field v-model="newYieldBuildingForm.name" label="Назва будівлі" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="5">
+            <v-text-field v-model="newYieldBuildingForm.description" label="Опис (необов'язково)" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="2" class="d-flex align-end">
+            <v-btn color="primary" prepend-icon="mdi-sprout" :loading="yieldBuildingsSaving" @click="createYieldBuilding">
+              Додати
+            </v-btn>
+          </v-col>
+        </v-row>
+      </v-card>
+
+      <v-data-table
+        :headers="yieldBuildingsHeaders"
+        :items="yieldBuildingRows"
+        :items-per-page="20"
+        class="elevation-1 mb-4"
+        density="compact"
+      >
+        <template #item.actions="{ item }">
+          <v-btn size="small" variant="text" color="primary" @click="openYieldBuildingEditor(item)">Редагувати</v-btn>
+          <v-btn size="small" variant="text" color="error" @click="deleteYieldBuilding(item)">Видалити</v-btn>
+        </template>
+      </v-data-table>
+
+      <v-dialog v-model="yieldBuildingEditDialog" max-width="480">
+        <v-card>
+          <v-card-title class="text-h6">Редагування будівлі-постачальника</v-card-title>
+          <v-card-text>
+            <v-text-field v-model="editYieldBuildingForm.name" label="Назва будівлі" class="mb-2" />
+            <v-text-field v-model="editYieldBuildingForm.description" label="Опис" class="mb-2" />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="yieldBuildingEditDialog = false">Скасувати</v-btn>
+            <v-btn color="primary" :loading="yieldBuildingsSaving" @click="saveYieldBuilding">Зберегти</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-divider class="my-4" />
+
       <v-card-title class="text-h6">Crafting</v-card-title>
       <CraftActionForm
         class="mb-4"
@@ -514,6 +566,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, nextTick } from 'vue';
+import { useYieldBuildingStore } from '@/store/yieldBuildingStore';
 import {
   addDoc,
   collection,
@@ -614,6 +667,81 @@ const snapshotImportState = reactive({
   applying: false,
   applySummary: null,
 });
+
+// ── Yield buildings ──────────────────────────────────────────────────────────
+const yieldBuildingStore = useYieldBuildingStore();
+const yieldBuildingsSaving = ref(false);
+const yieldBuildingsError = ref('');
+const yieldBuildingsSuccess = ref('');
+const yieldBuildingEditDialog = ref(false);
+const selectedYieldBuildingId = ref('');
+const newYieldBuildingForm = reactive({ name: '', description: '' });
+const editYieldBuildingForm = reactive({ name: '', description: '' });
+
+const yieldBuildingsHeaders = [
+  { title: 'Назва', key: 'name' },
+  { title: 'Опис', key: 'description' },
+  { title: '', key: 'actions', sortable: false },
+];
+
+const yieldBuildingRows = computed(() =>
+  yieldBuildingStore.yieldBuildings.map(yb => ({ id: yb.id, name: yb.name, description: yb.description || '—' }))
+);
+
+function openYieldBuildingEditor(item) {
+  selectedYieldBuildingId.value = item.id;
+  editYieldBuildingForm.name = item.name;
+  editYieldBuildingForm.description = item.description === '—' ? '' : item.description;
+  yieldBuildingEditDialog.value = true;
+}
+
+async function createYieldBuilding() {
+  yieldBuildingsError.value = '';
+  yieldBuildingsSuccess.value = '';
+  const name = newYieldBuildingForm.name.trim();
+  if (!name) { yieldBuildingsError.value = 'Вкажіть назву будівлі.'; return; }
+  yieldBuildingsSaving.value = true;
+  try {
+    await yieldBuildingStore.create(name, newYieldBuildingForm.description);
+    newYieldBuildingForm.name = '';
+    newYieldBuildingForm.description = '';
+    yieldBuildingsSuccess.value = 'Будівлю додано.';
+  } catch (e) {
+    console.error('[admin] Failed to create yield building', e);
+    yieldBuildingsError.value = 'Не вдалося додати будівлю.';
+  } finally {
+    yieldBuildingsSaving.value = false;
+  }
+}
+
+async function saveYieldBuilding() {
+  yieldBuildingsError.value = '';
+  const name = editYieldBuildingForm.name.trim();
+  if (!selectedYieldBuildingId.value || !name) { yieldBuildingsError.value = 'Вкажіть назву.'; return; }
+  yieldBuildingsSaving.value = true;
+  try {
+    await yieldBuildingStore.update(selectedYieldBuildingId.value, { name, description: editYieldBuildingForm.description });
+    yieldBuildingEditDialog.value = false;
+    yieldBuildingsSuccess.value = 'Будівлю оновлено.';
+  } catch (e) {
+    console.error('[admin] Failed to save yield building', e);
+    yieldBuildingsError.value = 'Не вдалося зберегти будівлю.';
+  } finally {
+    yieldBuildingsSaving.value = false;
+  }
+}
+
+async function deleteYieldBuilding(item) {
+  yieldBuildingsError.value = '';
+  yieldBuildingsSuccess.value = '';
+  try {
+    await yieldBuildingStore.remove(item.id);
+    yieldBuildingsSuccess.value = `Будівлю "${item.name}" видалено.`;
+  } catch (e) {
+    console.error('[admin] Failed to delete yield building', e);
+    yieldBuildingsError.value = 'Не вдалося видалити будівлю.';
+  }
+}
 
 // ── Trade goods ──────────────────────────────────────────────────────────────
 const goodsList = ref([]);
@@ -1498,6 +1626,7 @@ onMounted(async () => {
   stopGoods = onSnapshot(query(collection(db, 'goods'), orderBy('name')), (snap) => {
     goodsList.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   });
+  yieldBuildingStore.subscribe();
   await refreshCraftingAdminData();
 });
 
@@ -1508,6 +1637,7 @@ onBeforeUnmount(() => {
   stopClergy?.();
   stopHeroBalanceSyncLogs?.();
   stopGoods?.();
+  yieldBuildingStore.stop();
 });
 
 function formatTimestamp(timestamp) {
