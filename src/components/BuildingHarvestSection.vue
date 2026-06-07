@@ -16,6 +16,11 @@
       />
     </div>
 
+    <!-- Error from manual fulfillment (shown outside collapsed panels) -->
+    <v-alert v-if="fulfillError" type="error" density="compact" variant="tonal" class="mb-2" closable @click:close="fulfillError = ''">
+      {{ fulfillError }}
+    </v-alert>
+
     <!-- Yield events list -->
     <div v-if="sortedYields.length" class="yield-events-list">
       <div
@@ -429,10 +434,12 @@ async function removeEvent(eventId) {
 }
 
 const fulfillManuallyLoading = ref(null) // holds the eventId being processed
+const fulfillError = ref('')
 
 async function fulfillManually(eventId) {
   if (fulfillManuallyLoading.value) return
   fulfillManuallyLoading.value = eventId
+  fulfillError.value = ''
   try {
     const islandId = islandStore.data?.id
     if (!islandId) throw new Error('Island not loaded.')
@@ -440,9 +447,7 @@ async function fulfillManually(eventId) {
     // islandStore is reactive via onSnapshot — no manual update needed
   } catch (e) {
     console.error('[harvest] Manual fulfill failed', e)
-    // surface error briefly
-    addEventError.value = e?.message || 'Помилка виконання.'
-    setTimeout(() => { addEventError.value = '' }, 4000)
+    fulfillError.value = e?.message || 'Помилка виконання події врожаю.'
   } finally {
     fulfillManuallyLoading.value = null
   }

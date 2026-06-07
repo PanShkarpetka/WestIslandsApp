@@ -453,18 +453,17 @@ async function _distributeYieldEvent(event, buildingKey, buildingEntry, labelDat
 
     const heroData = heroSnap.data() || {}
     const rolledAmounts = {}
-    const goodsUpdates = {}
-    const currentGoods = heroData.goods || {}
+    const newHeroGoods = { ...(heroData.goods || {}) }
 
     for (const [goodId, notation] of Object.entries(goodsMap)) {
       const rolled = rollDice(notation, rng)
       if (rolled <= 0) continue
       rolledAmounts[goodId] = rolled
-      goodsUpdates[`goods.${goodId}`] = (Number(currentGoods[goodId] ?? 0)) + rolled
+      newHeroGoods[goodId] = (Number(newHeroGoods[goodId] ?? 0)) + rolled
     }
 
     if (Object.keys(rolledAmounts).length > 0) {
-      await updateDocFn(heroRef, goodsUpdates)
+      await updateDocFn(heroRef, { goods: newHeroGoods })
       await addDocFn(collectionFn(firestoreDb, 'hero-transactions'), {
         heroId,
         heroName: heroData.name || heroId,
@@ -494,23 +493,17 @@ async function _distributeYieldEvent(event, buildingKey, buildingEntry, labelDat
 
     const guildData = guildSnap.data() || {}
     const rolledAmounts = {}
-    const goodsUpdates = {}
-    const currentGoods = guildData.goods || {}
+    const newGuildGoods = { ...(guildData.goods || {}) }
 
     for (const [goodId, notation] of Object.entries(goodsMap)) {
       const rolled = rollDice(notation, rng)
       if (rolled <= 0) continue
       rolledAmounts[goodId] = rolled
-      goodsUpdates[`goods.${goodId}`] = (Number(currentGoods[goodId] ?? 0)) + rolled
+      newGuildGoods[goodId] = (Number(newGuildGoods[goodId] ?? 0)) + rolled
     }
 
     if (Object.keys(rolledAmounts).length > 0) {
-      const goodsAfter = { ...currentGoods }
-      for (const [goodId, qty] of Object.entries(rolledAmounts)) {
-        goodsAfter[goodId] = (Number(goodsAfter[goodId] ?? 0)) + qty
-      }
-
-      await updateDocFn(guildRef, { ...goodsUpdates, updatedAt: serverTimestampFn() })
+      await updateDocFn(guildRef, { goods: newGuildGoods, updatedAt: serverTimestampFn() })
       await addDocFn(collectionFn(firestoreDb, 'guilds', guildId, 'logs'), {
         amount: 0,
         type: 'goods-deposit',
@@ -519,7 +512,7 @@ async function _distributeYieldEvent(event, buildingKey, buildingEntry, labelDat
         createdAt: serverTimestampFn(),
         treasureAfter: Number(guildData.treasure || 0),
         goods: rolledAmounts,
-        goodsAfter,
+        goodsAfter: newGuildGoods,
       })
     }
 
