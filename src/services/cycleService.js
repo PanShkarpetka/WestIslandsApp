@@ -437,7 +437,6 @@ async function _distributeYieldEvent(event, buildingKey, buildingEntry, labelDat
 }) {
   const destination = normalizeIncomeDestination(event.destination)
   const goodsMap = event.goods && typeof event.goods === 'object' ? event.goods : {}
-  console.log('[yield:dist] destination =', destination, '| goodsMap =', JSON.stringify(goodsMap))
   const buildingName = buildingEntry.name || buildingKey
   const suffix = manuallyFulfilled ? ' [вручну]' : ''
   const eventDateStr = event.date || labelDate
@@ -613,13 +612,9 @@ export async function fulfillYieldEventManually(islandId, buildingKey, eventId, 
   const event = yields[eventIdx]
   if (event.processed) throw new Error('Ця подія вже виконана.')
 
-  console.log('[yield:manual] event =', JSON.stringify(event))
-  console.log('[yield:manual] buildingKey =', buildingKey, '| buildingEntry.name =', buildingEntry.name)
-
   const nowLabel = event.date || formatFaerunDate({ day: 1, month: 0, year: 815 })
   const deps = { docFn, getDocFn, updateDocFn, addDocFn, collectionFn, serverTimestampFn, firestoreDb, rng, manuallyFulfilled: true }
-  const { rolledAmounts, skipped } = await _distributeYieldEvent(event, buildingKey, buildingEntry, nowLabel, null, deps)
-  console.log('[yield:manual] rolledAmounts =', JSON.stringify(rolledAmounts), '| skipped =', skipped)
+  const { rolledAmounts } = await _distributeYieldEvent(event, buildingKey, buildingEntry, nowLabel, null, deps)
 
   const updatedYields = [...yields]
   updatedYields[eventIdx] = {
