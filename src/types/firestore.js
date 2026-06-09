@@ -147,7 +147,7 @@
  * @typedef {Object} GuildLogDoc
  * @property {string} id
  * @property {number} amount
- * @property {'deposit'|'withdraw'} type
+ * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'} type
  * @property {string} comment
  * @property {string} userNickname
  * @property {import('firebase/firestore').Timestamp} createdAt

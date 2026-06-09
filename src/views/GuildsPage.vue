@@ -58,7 +58,7 @@
           <div class="guild-actions" @click.stop>
             <v-btn class="guild-deposit-btn" size="small" prepend-icon="mdi-tray-arrow-down" @click="openTransaction(guild, 'deposit')">Внести</v-btn>
             <v-btn v-if="user.isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
-            <v-btn v-if="user.isAdmin" class="guild-goods-btn" size="small" prepend-icon="mdi-package-variant" variant="tonal" @click="openGoodsDialog(guild)">Товари</v-btn>
+            <v-btn v-if="canManageGuildGoods(guild)" class="guild-goods-btn" size="small" prepend-icon="mdi-package-variant" variant="tonal" @click="openGoodsDialog(guild)">Товари</v-btn>
             <v-spacer />
             <v-btn v-if="user.isAdmin" size="small" variant="text" icon="mdi-feather" class="guild-edit-btn" @click="openEditDialog(guild)" />
           </div>
@@ -162,13 +162,16 @@
                   <td class="ledger-date">{{ formatDate(log.createdAt) }}</td>
                   <td class="ledger-who">{{ log.userNickname || 'Невідомий' }}</td>
                   <td>
-                    <span class="tx-type" :class="log.type === 'deposit' ? 'tx-deposit' : 'tx-withdraw'">
-                      <v-icon size="12" class="mr-1">{{ log.type === 'deposit' ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold' }}</v-icon>
-                      {{ log.type === 'deposit' ? 'Внесок' : 'Зняття' }}
+                    <span class="tx-type" :class="logOperationClass(log)">
+                      <v-icon size="12" class="mr-1">{{ logOperationIcon(log) }}</v-icon>
+                      {{ logOperationLabel(log) }}
                     </span>
                   </td>
                   <td class="text-right">
-                    <span :class="log.amount >= 0 ? 'amount-positive' : 'amount-negative'">
+                    <span v-if="isGoodsLog(log)" :class="goodsLogDeltaClass(log)">
+                      {{ formatLogGoods(log.goods) }}
+                    </span>
+                    <span v-else :class="log.amount >= 0 ? 'amount-positive' : 'amount-negative'">
                       {{ log.amount >= 0 ? '+' : '' }}{{ formatAmount(log.amount || 0) }}
                     </span>
                   </td>
@@ -180,7 +183,9 @@
                       {{ log.comment || '—' }}
                     </v-tooltip>
                   </td>
-                  <td class="text-right ledger-balance-after">{{ formatAmount(log.treasureAfter || 0) }}</td>
+                  <td class="text-right ledger-balance-after">
+                    {{ isGoodsLog(log) ? formatLogGoods(log.goodsAfter, { includeSign: false }) : formatAmount(log.treasureAfter || 0) }}
+                  </td>
                 </tr>
               </tbody>
             </v-table>
@@ -227,6 +232,17 @@
               <v-icon start size="14">mdi-tray-arrow-up</v-icon>Зняти
             </v-btn>
           </v-btn-toggle>
+
+          <v-text-field
+            v-if="goodsTxMode === 'withdraw' && !user.isAdmin"
+            v-model="goodsTxPassword"
+            label="Пароль гільдії"
+            type="password"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+            class="mb-3"
+          />
 
           <!-- Goods rows -->
           <div v-for="(row, idx) in goodsTxRows" :key="idx" class="good-tx-row mb-2">
@@ -333,6 +349,12 @@ function canViewGuildLogs(guild) {
   return user.canAccessGuild(guild.id)
 }
 
+function canManageGuildGoods(guild) {
+  if (!guild) return false
+  if (user.isAdmin) return true
+  return user.canAccessGuild(guild.id)
+}
+
 function isNegativeGuild(guild) { return Number(guild?.treasure || 0) < 0 }
 
 async function openGuildLogs(guild) {
@@ -408,6 +430,7 @@ const showGoodsDialog = ref(false)
 const goodsTxMode = ref('deposit')
 const goodsTxRows = ref([{ goodId: '', qty: 1 }])
 const goodsTxComment = ref('')
+const goodsTxPassword = ref('')
 const goodsTxError = ref('')
 const goodsTxLoading = ref(false)
 
@@ -431,6 +454,7 @@ function openGoodsDialog(guild) {
   goodsTxMode.value = 'deposit'
   goodsTxRows.value = [{ goodId: '', qty: 1 }]
   goodsTxComment.value = ''
+  goodsTxPassword.value = ''
   goodsTxError.value = ''
   showGoodsDialog.value = true
 }
@@ -447,6 +471,7 @@ async function submitGoodsTransaction() {
     if (n > 0) goods[row.goodId] = (goods[row.goodId] || 0) + n
   }
   if (!Object.keys(goods).length) { goodsTxError.value = 'Додайте хоча б один товар із кількістю.'; return }
+  if (goodsTxMode.value === 'withdraw' && !hasWithdrawAccess(selectedGuild.value, goodsTxPassword.value)) { goodsTxError.value = `Хибне ім'я або пароль.`; return }
 
   goodsTxLoading.value = true
   try {
@@ -461,6 +486,45 @@ async function submitGoodsTransaction() {
   } finally {
     goodsTxLoading.value = false
   }
+}
+
+function isGoodsLog(log) {
+  return log?.type === 'goods-deposit' || log?.type === 'goods-withdraw'
+}
+
+function logOperationClass(log) {
+  if (log?.type === 'deposit' || log?.type === 'goods-deposit') return 'tx-deposit'
+  return 'tx-withdraw'
+}
+
+function logOperationIcon(log) {
+  if (log?.type === 'goods-deposit') return 'mdi-package-down'
+  if (log?.type === 'goods-withdraw') return 'mdi-package-up'
+  return log?.type === 'deposit' ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold'
+}
+
+function logOperationLabel(log) {
+  if (log?.type === 'goods-deposit') return 'Товари +'
+  if (log?.type === 'goods-withdraw') return 'Товари -'
+  return log?.type === 'deposit' ? 'Внесок' : 'Зняття'
+}
+
+function goodsLogDeltaClass(log) {
+  return log?.type === 'goods-deposit' ? 'amount-positive' : 'amount-negative'
+}
+
+function formatLogGoods(goods, { includeSign = true } = {}) {
+  const entries = Object.entries(goods || {}).filter(([, qty]) => Number(qty) !== 0)
+  if (!entries.length) return '—'
+  return entries
+    .map(([goodId, qty]) => {
+      const n = Number(qty)
+      const def = goodsStore.goods.find(g => g.id === goodId)
+      const sign = includeSign && n > 0 ? '+' : ''
+      const unit = def?.unit ? ` ${def.unit}` : ''
+      return `${def?.name || goodId}: ${sign}${n}${unit}`
+    })
+    .join(', ')
 }
 
 function defaultGuildForm() {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyGuildTransaction } from '../../src/store/guildStore.js';
+import { applyGuildGoodsTransaction, applyGuildTransaction } from '../../src/store/guildStore.js';
 import { createMockFirestore } from '../helpers/mockFirestore.js';
 
 function makeDeps(seed = {}) {
@@ -106,4 +106,39 @@ test('multiple transactions accumulate correctly', async () => {
 
   assert.equal(mock.get('guilds/guild-f').treasure, 120);
   assert.equal(Object.keys(mock.list('guilds/guild-f/logs')).length, 2);
+});
+
+test('goods deposit updates guild goods and writes goods log entry', async () => {
+  const { mock, deps } = makeDeps({ 'guilds/guild-g': { treasure: 100, goods: { timber: 2 } } });
+
+  await applyGuildGoodsTransaction(
+    { guildId: 'guild-g', goods: { timber: 3, iron: 1 }, comment: 'Harvest', actor: { nickname: 'Quartermaster' }, type: 'goods-deposit' },
+    deps,
+  );
+
+  assert.deepEqual(mock.get('guilds/guild-g').goods, { timber: 5, iron: 1 });
+
+  const logs = Object.values(mock.list('guilds/guild-g/logs'));
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].amount, 0);
+  assert.equal(logs[0].type, 'goods-deposit');
+  assert.deepEqual(logs[0].goods, { timber: 3, iron: 1 });
+  assert.deepEqual(logs[0].goodsAfter, { timber: 5, iron: 1 });
+  assert.equal(logs[0].treasureAfter, 100);
+  assert.equal(logs[0].userNickname, 'Quartermaster');
+});
+
+test('goods withdrawal refuses to make guild goods negative', async () => {
+  const { mock, deps } = makeDeps({ 'guilds/guild-h': { treasure: 0, goods: { timber: 2 } } });
+
+  await assert.rejects(
+    () => applyGuildGoodsTransaction(
+      { guildId: 'guild-h', goods: { timber: -3 }, comment: '', actor: null, type: 'goods-withdraw' },
+      deps,
+    ),
+    /товару|goods/i,
+  );
+
+  assert.deepEqual(mock.get('guilds/guild-h').goods, { timber: 2 });
+  assert.equal(Object.keys(mock.list('guilds/guild-h/logs')).length, 0);
 });
