@@ -112,6 +112,15 @@ function getFishPriceByCode(fish, code) {
   return Number.isFinite(low) ? low : high;
 }
 
+function silverToGold(value) {
+  const silver = Number(value ?? 0);
+  return Number.isFinite(silver) ? silver / 10 : 0;
+}
+
+function formatGoldFromSilver(value) {
+  return silverToGold(value).toFixed(2);
+}
+
 function parseFishCodesInput(text, command) {
   const rest = text.slice(command.length).trim();
   if (!rest) {
@@ -197,12 +206,12 @@ function buildFishPriceReport(fishes, codes) {
       continue;
     }
 
-    const price = Number(getFishPriceByCode(fish, code) || 0);
-    total += price;
-    lines.push(`• #${code}: <b>${htmlEscape(fish.fishName)}</b> — ${price} silver`);
+    const priceSilver = Number(getFishPriceByCode(fish, code) || 0);
+    total += priceSilver;
+    lines.push(`• #${code}: <b>${htmlEscape(fish.fishName)}</b> — ${formatGoldFromSilver(priceSilver)} gold`);
   }
 
-  lines.push(`Σ Total: <b>${total}</b> silver`);
+  lines.push(`Σ Total: <b>${formatGoldFromSilver(total)}</b> gold`);
   return lines.join('\n');
 }
 
@@ -221,7 +230,7 @@ function extractSuccessfulCatchRows(logs) {
         user,
         fishName: fish.fishName,
         resultCode,
-        price: Number(getFishPriceByCode(fish, resultCode) || 0)
+        priceSilver: Number(getFishPriceByCode(fish, resultCode) || 0)
       });
     });
   });
@@ -470,7 +479,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
 
     return [
       '📘 <b>Successful catches today</b>',
-      ...catches.map((row) => `• ${htmlEscape(row.user)}: ${htmlEscape(row.fishName)}, code ${row.resultCode}, price ${row.price} silver`)
+      ...catches.map((row) => `• ${htmlEscape(row.user)}: ${htmlEscape(row.fishName)}, code ${row.resultCode}, price ${formatGoldFromSilver(row.priceSilver)} gold`)
     ].join('\n');
   }
 
@@ -483,7 +492,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
 
     return [
       '📙 <b>Successful catches yesterday</b>',
-      ...catches.map((row) => `• ${htmlEscape(row.user)}: ${htmlEscape(row.fishName)}, code ${row.resultCode}, price ${row.price} silver`)
+      ...catches.map((row) => `• ${htmlEscape(row.user)}: ${htmlEscape(row.fishName)}, code ${row.resultCode}, price ${formatGoldFromSilver(row.priceSilver)} gold`)
     ].join('\n');
   }
 
@@ -495,7 +504,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
     }
 
     const byUser = catches.reduce((acc, row) => {
-      acc.set(row.user, (acc.get(row.user) || 0) + row.price);
+      acc.set(row.user, (acc.get(row.user) || 0) + row.priceSilver);
       return acc;
     }, new Map());
 
@@ -503,7 +512,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
       '🧾 <b>Catch value totals by user (all time)</b>',
       ...[...byUser.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([user, total]) => `• ${htmlEscape(user)}: <b>${total}</b> silver`)
+        .map(([user, total]) => `• ${htmlEscape(user)}: <b>${formatGoldFromSilver(total)}</b> gold`)
     ].join('\n');
   }
 

@@ -1,6 +1,6 @@
 # LoginView
 
-Route: `/` — public, no auth guard.
+Route: `/login` — public, no auth guard.
 
 ## Purpose
 Entry point for the app. Authenticates the user and stores identity in `userStore`. After login, redirects to `/ships`.

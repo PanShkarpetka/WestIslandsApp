@@ -39,16 +39,16 @@ export const useIslandStore = defineStore('islands', () => {
         await updateDoc(doc(db, 'islands', data.value.id), partial)
     }
 
-    async function setBuildingBuilt (key, built) {
+    async function setBuildingBuilt (key, built, { cycleId = null } = {}) {
         if (!data.value?.id) return
         // оптимістично оновлюємо локально (щоб піни змінилися відразу)
         const cur = { ...(data.value.buildings || {}) }
-        cur[key] = { ...(cur[key] || {}), built: !!built }
+        cur[key] = { ...(cur[key] || {}), built: !!built, ...(built && cycleId ? { builtCycleId: cycleId } : {}) }
         data.value = { ...data.value, buildings: cur }
 
-        await updateDoc(doc(db, 'islands', data.value.id), {
-            [`buildings.${key}.built`]: !!built
-        })
+        const updates = { [`buildings.${key}.built`]: !!built }
+        if (built && cycleId) updates[`buildings.${key}.builtCycleId`] = cycleId
+        await updateDoc(doc(db, 'islands', data.value.id), updates)
     }
 
     async function updateBuildingYields (key, { builtAt, yields } = {}) {
@@ -62,10 +62,10 @@ export const useIslandStore = defineStore('islands', () => {
         await updateDoc(doc(db, 'islands', data.value.id), updates)
     }
 
-    async function addYieldBuilding (yieldBuildingId, yieldBuildingName) {
+    async function addYieldBuilding (yieldBuildingId, yieldBuildingName, { cycleId = null } = {}) {
         if (!data.value?.id) return
         const key = `yield_${yieldBuildingId}`
-        const entry = { built: true, yieldBuildingId, name: yieldBuildingName || yieldBuildingId, yields: [] }
+        const entry = { built: true, yieldBuildingId, name: yieldBuildingName || yieldBuildingId, yields: [], ...(cycleId ? { builtCycleId: cycleId } : {}) }
         const cur = { ...(data.value.buildings || {}) }
         cur[key] = entry
         data.value = { ...data.value, buildings: cur }

@@ -42,7 +42,7 @@
                 <template v-if="g.isBureaucrat">
                   <div class="pop-stat-income">
                     <v-icon size="12" class="mr-1">mdi-badge-account</v-icon>
-                    {{ formatAmount(g.incomePerPerson) }} <span class="wi-coin">SP</span> / особа
+                    {{ formatAmount(g.incomePerPerson) }} <span class="wi-coin">зм</span> / особа
                   </div>
                   <div class="pop-stat-income">
                     <v-icon size="12" class="mr-1">mdi-shield-check</v-icon>

@@ -36,7 +36,7 @@ export const useFishingLeaderboardStore = defineStore('fishingLeaderboard', () =
     _unsub = null;
   }
 
-  /** Top 8 best catches — one per angler, sorted by resolved silver value. */
+  /** Top 8 best catches — one per angler, sorted by resolved fish value. */
   const rareCatches = computed(() => {
     const bestPerUser = new Map();
 

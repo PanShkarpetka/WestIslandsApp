@@ -272,10 +272,34 @@ export async function markUpdateProcessed(db, updateId, payload = {}) {
   }
 }
 
+async function resolveActiveCycleMeta(db) {
+  try {
+    const snapshot = await db.collection('cycles')
+      .orderBy('createdAt', 'desc')
+      .limit(5)
+      .get();
+
+    const activeCycle = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+      .find((cycle) => cycle.startedAt && !cycle.finishedAt);
+
+    if (!activeCycle) return {};
+
+    return {
+      cycleId: activeCycle.id,
+      cycleStartedAt: activeCycle.startedAt || ''
+    };
+  } catch (_error) {
+    return {};
+  }
+}
+
 export async function createFishingLog(db, logData) {
   const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
+  const cycleMeta = await resolveActiveCycleMeta(db);
   await logRef.set({
     ...logData,
+    ...cycleMeta,
     timestamp: new Date().toISOString()
   });
 
@@ -283,6 +307,7 @@ export async function createFishingLog(db, logData) {
 }
 
 export async function updateFishAvailabilityTransaction(db, { catches, logData }) {
+  const cycleMeta = await resolveActiveCycleMeta(db);
   return db.runTransaction(async (transaction) => {
     const fishDeltas = new Map();
     catches.forEach((fish) => {
@@ -324,6 +349,7 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData }
     const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
     transaction.set(logRef, {
       ...logData,
+      ...cycleMeta,
       fishSelected: finalCatches,
       fishQuantityCaught: finalCatches.length,
       fishAvailabilityChanges: availabilityChanges,

@@ -1,11 +1,19 @@
 # HomeView
 
-Route: none (not currently registered in router).
+Route: `/`
 
-## Status
-Stub — contains only `<div>Home Page</div>`. Not linked from the navbar or any route. Reserved for a future landing/dashboard page.
+## Purpose
+Campaign dashboard and app homepage. Shows the current active cycle for context and summarizes the most recently finished cycle.
 
-## If expanding this page
-- Add a route entry in `router/index.js`
-- Follow the pirate design system (see CLAUDE.md for design tokens)
-- Add a companion section to the Navbar if it should be globally accessible
+## Data
+- `dashboardService.fetchDashboardData()` loads dashboard aggregates.
+- Damaged ships come from `ships` where `hp < hpMax`.
+- Last-cycle highlights are keyed to the newest finished `cycles/{cycleId}`.
+- Population deltas come from `cycle-summaries/{cycleId}`.
+- Buildings added come from `islands/{islandId}.buildings.*.builtCycleId`.
+- Crafting highlights use `heroes/*/crafting-logs` with `cycleId`.
+
+## Behavior
+- Public page following the app's existing open-page behavior.
+- Missing historical data renders empty states instead of blocking the page.
+- Login is available at `/login`.

@@ -5,6 +5,7 @@ import PopulationPage from '@/views/PopulationPage.vue'
 import TreasuryPage from '@/views/TreasuryPage.vue'
 import BuildingsPage from '@/views/BuildingsPage.vue'
 import ManufacturesPage from '@/views/ManufacturesPage.vue'
+import HomeView from '@/views/HomeView.vue';
 import LoginView from '@/views/LoginView.vue';
 import AdminView from '@/views/AdminView.vue';
 import ShipsView from '@/views/ShipsView.vue';
@@ -20,7 +21,8 @@ import FishingLeaderboardPage from '@/views/FishingLeaderboardPage.vue';
 import { useUserStore } from '@/store/userStore';
 
 const routes = [
-    { path: '/', component: LoginView },
+    { path: '/', component: HomeView, meta: { requiresAuth: false } },
+    { path: '/login', component: LoginView, meta: { requiresAuth: false } },
     {
         path: '/islands/:islandId',
         name: 'islands',

@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { BOT_CONFIG_DOC, COLLECTIONS } from '../src/config/constants.js';
 import {
   applyAvailabilityGuard,
+  createFishingLog,
   registerFishingOutcome,
-  resetFishingDailyStateIfNeeded
+  resetFishingDailyStateIfNeeded,
+  updateFishAvailabilityTransaction
 } from '../src/services/firestoreService.js';
 
 function createMockDb(seed = {}) {
   const collections = new Map();
+  let autoId = 0;
 
   for (const [collectionName, docs] of Object.entries(seed)) {
     collections.set(collectionName, new Map(Object.entries(docs)));
@@ -23,51 +26,79 @@ function createMockDb(seed = {}) {
   }
 
   return {
+    _collections: collections,
     collection(name) {
       const docs = getCollection(name);
+      function makeDocRef(id = `auto_${++autoId}`) {
+        return {
+          id,
+          async get() {
+            if (!docs.has(id)) {
+              return { exists: false };
+            }
+
+            return {
+              exists: true,
+              data: () => docs.get(id)
+            };
+          },
+          async set(nextValue, options = {}) {
+            if (options.merge && docs.has(id)) {
+              docs.set(id, { ...docs.get(id), ...nextValue });
+              return;
+            }
+
+            docs.set(id, nextValue);
+          }
+        };
+      }
+
+      function makeQuery(currentDocs) {
+        return {
+          orderBy() {
+            return makeQuery(currentDocs);
+          },
+          limit(count) {
+            return makeQuery(currentDocs.slice(0, count));
+          },
+          async get() {
+            return {
+              size: currentDocs.length,
+              docs: currentDocs.map(([id, value]) => ({
+                id,
+                data: () => value,
+                ref: makeDocRef(id)
+              }))
+            };
+          }
+        };
+      }
+
       return {
         async get() {
-          return {
-            size: docs.size,
-            docs: [...docs.entries()].map(([id, value]) => ({
-              id,
-              data: () => value,
-              ref: {
-                set: async (nextValue, options = {}) => {
-                  if (options.merge && docs.has(id)) {
-                    docs.set(id, { ...docs.get(id), ...nextValue });
-                    return;
-                  }
-
-                  docs.set(id, nextValue);
-                }
-              }
-            }))
-          };
+          return makeQuery([...docs.entries()]).get();
+        },
+        orderBy(field, direction = 'asc') {
+          const sorted = [...docs.entries()].sort(([, a], [, b]) => {
+            const av = a?.[field] ?? 0;
+            const bv = b?.[field] ?? 0;
+            if (av === bv) return 0;
+            return direction === 'desc' ? (av > bv ? -1 : 1) : (av > bv ? 1 : -1);
+          });
+          return makeQuery(sorted);
         },
         doc(id) {
-          return {
-            async get() {
-              if (!docs.has(id)) {
-                return { exists: false };
-              }
-
-              return {
-                exists: true,
-                data: () => docs.get(id)
-              };
-            },
-            async set(nextValue, options = {}) {
-              if (options.merge && docs.has(id)) {
-                docs.set(id, { ...docs.get(id), ...nextValue });
-                return;
-              }
-
-              docs.set(id, nextValue);
-            }
-          };
+          return makeDocRef(id);
         }
       };
+    },
+    async runTransaction(callback) {
+      const transaction = {
+        get: (ref) => ref.get(),
+        set: (ref, data, options) => ref.set(data, options),
+        update: (ref, data) => ref.set(data, { merge: true })
+      };
+      return callback(transaction);
     }
   };
 }
@@ -200,4 +231,39 @@ test('force option performs reset even when current noon-key was already reset',
   assert.equal(config.data().dc.eachRollDc, 10);
   assert.equal(config.data().fishingState.caughtCounter, 0);
   assert.equal(config.data().fishingState.notCaughtCounter, 0);
+});
+
+test('createFishingLog tags logs with active campaign cycle', async () => {
+  const db = createMockDb({
+    cycles: {
+      old: { startedAt: '1 Hammer', finishedAt: '10 Hammer', createdAt: 1 },
+      active: { startedAt: '11 Hammer', finishedAt: '', createdAt: 2 }
+    }
+  });
+
+  const logId = await createFishingLog(db, { telegramUserId: 42 });
+  const log = await db.collection(COLLECTIONS.FISHING_LOGS).doc(logId).get();
+
+  assert.equal(log.data().cycleId, 'active');
+  assert.equal(log.data().cycleStartedAt, '11 Hammer');
+});
+
+test('updateFishAvailabilityTransaction tags successful logs with active campaign cycle', async () => {
+  const db = createMockDb({
+    cycles: {
+      active: { startedAt: '11 Hammer', createdAt: 2 }
+    },
+    [COLLECTIONS.FISHES]: {
+      cod: { fishName: 'Cod', fishAmountAvailableNow: 2 }
+    }
+  });
+
+  await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 42 }
+  });
+
+  const logs = await db.collection(COLLECTIONS.FISHING_LOGS).get();
+  assert.equal(logs.docs[0].data().cycleId, 'active');
+  assert.equal(logs.docs[0].data().cycleStartedAt, '11 Hammer');
 });

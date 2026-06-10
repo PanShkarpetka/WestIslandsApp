@@ -19,6 +19,7 @@
  * @typedef {Object} BuildingEntry
  * @property {boolean} built - Whether the building has been constructed
  * @property {string} [builtAt] - Faerun date string when the building was constructed
+ * @property {string} [builtCycleId] - Cycle ID when the building was constructed
  * @property {string} [yieldBuildingId] - Links to yield-buildings collection if this is a custom yield building
  * @property {YieldEvent[]} [yields] - Scheduled harvest events for this building
  */
@@ -93,6 +94,20 @@
  * @property {string} speedUnit
  * @property {number} capacity
  * @property {boolean} visible
+ * @property {number} [hp] - Current hull hit points
+ * @property {number} [hpMax] - Maximum hull hit points
+ * @property {number} [ac]
+ * @property {number} [damageThreshold]
+ * @property {number} [hullDiceUsed]
+ * @property {number} [crewCurrent]
+ * @property {number} [passengerCurrent]
+ * @property {number} [tonnageCurrent]
+ * @property {number} [weaponSlotsUsed]
+ * @property {unknown[]} [weaponSlots]
+ * @property {Record<string, number>} [ammunition]
+ * @property {string} [size]
+ * @property {string} [description]
+ * @property {string} [image]
  */
 
 // ─── TREASURY ─────────────────────────────────────────────────────────────────
@@ -270,7 +285,24 @@
  * @property {string} id
  * @property {string} startedAt - Faerun date string
  * @property {string|null} finishedAt - Faerun date string, null if cycle is open
+ * @property {number} [populationAtStart]
  * @property {import('firebase/firestore').Timestamp} createdAt
+ */
+
+/**
+ * Collection: `cycle-summaries/{cycleId}`
+ * @typedef {Object} CycleSummaryDoc
+ * @property {string} cycleId
+ * @property {string} cycleStartedAt
+ * @property {string} cycleFinishedAt
+ * @property {number|null} populationBefore
+ * @property {number|null} populationAfter
+ * @property {number|null} populationDelta
+ * @property {{ fishName: string, fishValue: number, username: string, timestamp: import('firebase/firestore').Timestamp|string|null }|null} [bestFish]
+ * @property {{ heroId: string, heroName: string, totalValue: number, totalItems: number, actions: number }|null} [bestCrafter]
+ * @property {import('firebase/firestore').Timestamp} [migratedAt]
+ * @property {string} [migrationSource]
+ * @property {import('firebase/firestore').Timestamp} updatedAt
  */
 
 // ─── MANUFACTURES ────────────────────────────────────────────────────────────
@@ -361,6 +393,8 @@
  * Subcollection: `heroes/{heroId}/crafting-logs/{logId}`
  * @typedef {Object} CraftingLogDoc
  * @property {string} id
+ * @property {string} heroId
+ * @property {string} heroName
  * @property {string} itemSlug
  * @property {string} itemName
  * @property {number} amountCrafted
@@ -377,6 +411,14 @@
  * @property {boolean} specializationCappedReached
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {string} createdBy
+ * @property {string|null} cycleId
+ * @property {string} cycleStartedAt
+ */
+
+/**
+ * Collection: `cycle-crafting-logs/{heroId_logId}`
+ * Dashboard-friendly mirror of hero crafting logs, keyed by cycle without requiring a collection-group index.
+ * @typedef {CraftingLogDoc & { sourcePath: string, cycleFinishedAt?: string }} CycleCraftingLogDoc
  */
 
 /**
@@ -549,6 +591,7 @@
  * @property {Array<{ fishId: string, before: number, requested: number, awarded: number, after: number }>} fishAvailabilityChanges
  * @property {unknown[]} extraCheckResults
  * @property {import('firebase/firestore').Timestamp|string} timestamp
+ * @property {string} [cycleId]
  */
 
 /**

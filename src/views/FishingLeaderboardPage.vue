@@ -80,7 +80,7 @@
             </td>
             <td class="angler-name">{{ angler.username }}</td>
             <td class="wi-gold-text">{{ angler.catches }}</td>
-            <td>{{ formatAmount(angler.totalSilver) }}</td>
+            <td>{{ formatGoldFromSilver(angler.totalSilver) }}</td>
             <td class="wi-muted-text">{{ angler.bestFish || '—' }}</td>
             <td>{{ angler.winRate }}%</td>
             <td class="wi-muted-text">{{ angler.attempts }}</td>
@@ -101,7 +101,7 @@
         <div class="rare-angler wi-muted-text">
           <v-icon size="12" class="mr-1">mdi-hook</v-icon>{{ catch_.username }}
         </div>
-        <div class="rare-value wi-number">{{ formatAmount(catch_.fishValue) }} <span class="wi-coin">SP</span></div>
+        <div class="rare-value wi-number">{{ formatGoldFromSilver(catch_.fishValue) }} <span class="wi-coin">зм</span></div>
         <div class="rare-date wi-muted-text">{{ formatDate(catch_.timestamp) }}</div>
       </div>
     </div>
@@ -212,7 +212,7 @@
         <span v-if="entry.success && entry.fishName" class="feed-text">
           зловив <strong>{{ entry.fishName }}</strong>
           <span v-if="entry.fishCount > 1"> +{{ entry.fishCount - 1 }} ін.</span>
-          ({{ formatAmount(entry.fishValue) }} <span class="wi-coin">SP</span>)
+          ({{ formatGoldFromSilver(entry.fishValue) }} <span class="wi-coin">зм</span>)
         </span>
         <span v-else-if="!entry.success" class="feed-text wi-muted-text"> нічого не спіймав</span>
         <span class="feed-time wi-muted-text ml-auto">{{ timeAgo(entry.timestamp) }}</span>
@@ -228,7 +228,7 @@ import { useFishingLeaderboardStore } from '@/store/fishingLeaderboardStore';
 import { useFishStore } from '@/store/fishStore';
 import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
-import { resolveFishValue } from '@/utils/fishingUtils';
+import { resolveFishValue, silverToGold } from '@/utils/fishingUtils';
 import { FISHING_EXCLUDED_USERS } from '@/config/constants';
 
 const store = useFishingLeaderboardStore();
@@ -375,7 +375,7 @@ const sortDesc = ref(true);
 const columns = [
   { key: 'username', label: 'Рибалка' },
   { key: 'catches', label: 'Улови' },
-  { key: 'totalSilver', label: 'Срібло' },
+  { key: 'totalSilver', label: 'Золото' },
   { key: 'bestFish', label: 'Найкращий улов' },
   { key: 'winRate', label: 'Успіх %' },
   { key: 'attempts', label: 'Спроби' },
@@ -470,6 +470,10 @@ function formatDate(ts) {
   if (!ts) return '?';
   const d = new Date(ts);
   return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function formatGoldFromSilver(value) {
+  return formatAmount(silverToGold(value));
 }
 
 function timeAgo(ts) {

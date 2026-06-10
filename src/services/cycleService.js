@@ -10,6 +10,7 @@ import {
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -289,11 +290,11 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
       currentBalance += item.income
       const label = item.income >= 0 ? 'Дохід' : 'Витрати'
       const commentParts = item.type === 'population'
-        ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} SP)`]
+        ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} зм)`]
         : [`${label} мануфактури "${item.name || 'Без назви'}"`]
       if (item.type === 'manufacture' && item.description) commentParts.push(item.description)
-      if (item._bureaucratBonus > 0) commentParts.push(`+${formatAmount(item._bureaucratBonus)} SP бонус бюрократів`)
-      if (item._bureaucratPenalty > 0) commentParts.push(`-${formatAmount(item._bureaucratPenalty)} SP несплачено (без нагляду)`)
+      if (item._bureaucratBonus > 0) commentParts.push(`+${formatAmount(item._bureaucratBonus)} зм бонус бюрократів`)
+      if (item._bureaucratPenalty > 0) commentParts.push(`-${formatAmount(item._bureaucratPenalty)} зм несплачено (без нагляду)`)
       commentParts.push(`за цикл ${cycleLabel}.`)
 
       transaction.set(docFn(txCol), {
@@ -641,6 +642,7 @@ export async function createNewCycleWithEffects({
   getDocs: getDocsFn = getDocs,
   addDoc: addDocFn = addDoc,
   updateDoc: updateDocFn = updateDoc,
+  setDoc: setDocFn = setDoc,
   query: queryFn = query,
   where: whereFn = where,
   orderBy: orderByFn = orderBy,
@@ -661,7 +663,8 @@ export async function createNewCycleWithEffects({
   const lastCycleSnapshot = await getDocsFn(queryFn(cyclesRef, orderByFn('createdAt', 'desc'), limitFn(1)))
   const lastCycleDoc = lastCycleSnapshot.docs[0]
   const startedAt = formatFaerunDate(normalizedStart)
-  const cycleDoc = await addDocFn(cyclesRef, { startedAt, createdAt: serverTimestampFn() })
+  const populationAtStart = Number(population ?? 0)
+  const cycleDoc = await addDocFn(cyclesRef, { startedAt, populationAtStart, createdAt: serverTimestampFn() })
 
   if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
     const previousCycle = lastCycleDoc.data()
@@ -675,6 +678,19 @@ export async function createNewCycleWithEffects({
     const previousUpdate = { finishedAt: formatFaerunDate(previousFinishedDate) }
     if (previousDuration && previousDuration > 0) previousUpdate.duration = previousDuration
     await updateDocFn(lastCycleDoc.ref, previousUpdate)
+
+    const populationBefore = Number(previousCycle.populationAtStart)
+    const hasPopulationBefore = Number.isFinite(populationBefore)
+    const hasPopulationAfter = Number.isFinite(populationAtStart)
+    await setDocFn(docFn(firestoreDb, 'cycle-summaries', lastCycleDoc.id), {
+      cycleId: lastCycleDoc.id,
+      cycleStartedAt: previousCycle.startedAt || '',
+      cycleFinishedAt: previousUpdate.finishedAt,
+      populationBefore: hasPopulationBefore ? populationBefore : null,
+      populationAfter: hasPopulationAfter ? populationAtStart : null,
+      populationDelta: hasPopulationBefore && hasPopulationAfter ? populationAtStart - populationBefore : null,
+      updatedAt: serverTimestampFn(),
+    }, { merge: true })
   }
 
   await resetReligionsSvTemp(sharedDeps)

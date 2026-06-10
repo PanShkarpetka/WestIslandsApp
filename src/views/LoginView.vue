@@ -136,7 +136,7 @@ async function handleLogin() {
     const isValid = await verifyAdminPassword(password.value);
     if (!isValid) return (error.value = 'Невірний пароль');
     userStore.login(name, true);
-    return router.push('/ships');
+    return router.push('/');
   }
 
   if (accountType.value === 'leader') {
@@ -144,7 +144,7 @@ async function handleLogin() {
     const leaderAccess = await getLeaderGuildAccess(name, password.value);
     if (!leaderAccess.accessibleGuildIds.length) return (error.value = 'Невірний пароль лідера гільдії');
     userStore.login(name, false, leaderAccess.accessibleGuildIds);
-    return router.push('/ships');
+    return router.push('/');
   }
 
   if (accountType.value === 'hero') {
@@ -153,7 +153,7 @@ async function handleLogin() {
     try {
       const { heroId } = await authenticateHero(name, password.value);
       userStore.loginAsHero(name, heroId);
-      router.push('/account');
+      router.push('/');
     } catch (e) {
       error.value = e?.message || 'Невірний пароль';
     } finally {
@@ -170,12 +170,12 @@ async function handleLogin() {
       const leaderAccess = await getLeaderGuildAccess(name, password.value);
       if (leaderAccess.accessibleGuildIds.length) {
         userStore.login(name, false, leaderAccess.accessibleGuildIds);
-        return router.push('/ships');
+        return router.push('/');
       }
       // Fall back to hero password
       const { heroId } = await authenticateHero(name, password.value);
       userStore.loginAsHero(name, heroId);
-      router.push('/account');
+      router.push('/');
     } catch (e) {
       error.value = 'Невірний пароль';
     } finally {
@@ -186,7 +186,7 @@ async function handleLogin() {
 
   // Regular user — no password required
   userStore.login(name);
-  router.push('/ships');
+  router.push('/');
 }
 </script>
 

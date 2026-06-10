@@ -74,6 +74,7 @@
     :building-key="activeKey"
     :nickname="auth.nickname"
     :is-admin="isAdmin"
+    :current-cycle-id="currentCycleId"
     :current-cycle-start-date="currentCycleStartDate"
   />
 
@@ -163,6 +164,7 @@ const { data: island } = storeToRefs(islandStore)
 const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 const currentCycleStartDate = ref(null)
+const currentCycleId = ref(null)
 
 onMounted(async () => {
   islandStore.subscribe()
@@ -177,6 +179,7 @@ onMounted(async () => {
     const snap = await getDocs(q)
     if (!snap.empty) {
       const data = snap.docs[0].data()
+      if (data.startedAt && !data.finishedAt) currentCycleId.value = snap.docs[0].id
       if (data.startedAt) currentCycleStartDate.value = parseFaerunDate(data.startedAt)
     }
   } catch (e) {
@@ -245,7 +248,7 @@ async function addYieldBuildingToIsland() {
   addingYield.value = true
   try {
     const yb = yieldBuildingStore.byId.get(selectedYieldBuildingId.value)
-    await islandStore.addYieldBuilding(selectedYieldBuildingId.value, yb?.name || selectedYieldBuildingId.value)
+    await islandStore.addYieldBuilding(selectedYieldBuildingId.value, yb?.name || selectedYieldBuildingId.value, { cycleId: currentCycleId.value })
     selectedYieldBuildingId.value = null
     showAddYieldDialog.value = false
   } catch (e) {

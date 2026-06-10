@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveFishValue } from '../../src/utils/fishingUtils.js';
+import { resolveFishValue, silverToGold } from '../../src/utils/fishingUtils.js';
 
 // Helpers
 const fish = (code, value) => ({ fishCodeNumber: code, fishValueSilver: value });
@@ -54,4 +54,10 @@ test('resolveFishValue returns high for single-code fish (min === max)', () => {
 test('resolveFishValue handles equal low and high gracefully', () => {
   const f = fish({ min: 10, max: 20 }, { low: 150, high: 150 });
   assert.equal(resolveFishValue(f, 15), 150);
+});
+
+test('silverToGold converts fish silver prices to campaign gold', () => {
+  assert.equal(silverToGold(10), 1);
+  assert.equal(silverToGold(7), 0.7);
+  assert.equal(silverToGold(null), 0);
 });

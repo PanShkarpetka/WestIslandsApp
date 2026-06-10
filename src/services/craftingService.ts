@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDocs,
+  limit,
   orderBy,
   query,
   runTransaction,
@@ -76,17 +77,48 @@ export function getEmptyCraftingState() {
   };
 }
 
-export async function registerCraftAction({ heroId, itemSlug, amountCrafted, craftItems, createdBy = null }: any, {
+async function resolveCraftCycle({ cycleId, cycleStartedAt }: any, {
+  collection: collectionFn = collection,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  orderBy: orderByFn = orderBy,
+  limit: limitFn = limit,
+  db: firestoreDb = db,
+}: any = {}) {
+  if (cycleId) return { cycleId, cycleStartedAt: cycleStartedAt || '' };
+
+  try {
+    const snap = await getDocsFn(queryFn(collectionFn(firestoreDb, 'cycles'), orderByFn('createdAt', 'desc'), limitFn(5)));
+    const active = snap.docs
+      .map((docSnap: any) => ({ id: docSnap.id, ...(docSnap.data() || {}) }))
+      .find((cycle: any) => cycle.startedAt && !cycle.finishedAt);
+    return active ? { cycleId: active.id, cycleStartedAt: active.startedAt || '' } : { cycleId: null, cycleStartedAt: '' };
+  } catch (_error) {
+    return { cycleId: null, cycleStartedAt: '' };
+  }
+}
+
+export async function registerCraftAction({ heroId, itemSlug, amountCrafted, craftItems, createdBy = null, cycleId = null, cycleStartedAt = '' }: any, {
   doc: docFn = doc,
   collection: collectionFn = collection,
   getDocs: getDocsFn = getDocs,
   query: queryFn = query,
+  orderBy: orderByFn = orderBy,
+  limit: limitFn = limit,
   runTransaction: runTransactionFn = runTransaction,
   serverTimestamp: serverTimestampFn = serverTimestamp,
   db: firestoreDb = db,
 }: any = {}) {
   const heroRef = docFn(firestoreDb, 'heroes', heroId);
   const logsRef = collectionFn(firestoreDb, 'heroes', heroId, 'crafting-logs');
+  const cycleInfo = await resolveCraftCycle({ cycleId, cycleStartedAt }, {
+    collection: collectionFn,
+    getDocs: getDocsFn,
+    query: queryFn,
+    orderBy: orderByFn,
+    limit: limitFn,
+    db: firestoreDb,
+  });
 
   const allItems = (craftItems?.length
     ? craftItems
@@ -102,6 +134,7 @@ export async function registerCraftAction({ heroId, itemSlug, amountCrafted, cra
     if (!item) throw new Error('Craft item not found');
 
     const heroData = heroDoc.data() || {};
+    const heroName = heroData.name || heroData.heroName || heroData.nickname || heroId;
     const currentCrafting = recalculateHeroCrafting(heroData.crafting || getEmptyCraftingState(), allItems);
 
     const existingProgress = currentCrafting.itemProgress[item.slug] || createDefaultItemProgress(item);
@@ -139,10 +172,13 @@ export async function registerCraftAction({ heroId, itemSlug, amountCrafted, cra
     });
 
     const logRef = docFn(logsRef);
+    const cycleLogRef = docFn(firestoreDb, 'cycle-crafting-logs', `${heroId}_${logRef.id}`);
     const totalComponentPriceAtTime = Number(item.componentPrice || 0) * Number(amountCrafted || 0);
 
-    transaction.set(logRef, {
+    const logData = {
       id: logRef.id,
+      heroId,
+      heroName,
       itemSlug: item.slug,
       itemName: item.name,
       amountCrafted: Number(amountCrafted || 0),
@@ -159,7 +195,17 @@ export async function registerCraftAction({ heroId, itemSlug, amountCrafted, cra
       specializationCappedReached: progressUpdate.specializationCappedReached,
       createdAt: serverTimestampFn(),
       createdBy,
-    });
+      cycleId: cycleInfo.cycleId,
+      cycleStartedAt: cycleInfo.cycleStartedAt,
+    };
+
+    transaction.set(logRef, logData);
+    if (cycleInfo.cycleId) {
+      transaction.set(cycleLogRef, {
+        ...logData,
+        sourcePath: logRef.__path || logRef.path || `heroes/${heroId}/crafting-logs/${logRef.id}`,
+      });
+    }
 
     return {
       heroId,

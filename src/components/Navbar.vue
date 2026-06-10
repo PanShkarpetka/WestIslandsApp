@@ -6,7 +6,7 @@
     </v-btn>
 
     <!-- Title -->
-    <v-toolbar-title class="navbar-title">
+    <v-toolbar-title class="navbar-title" @click="goDashboard">
       <v-icon class="mr-1" size="22">mdi-anchor</v-icon>
       West Islands
     </v-toolbar-title>
@@ -50,7 +50,7 @@
 
   <!-- Mobile drawer -->
   <v-navigation-drawer v-model="drawer" temporary location="left" width="260">
-    <div class="drawer-header">
+    <div class="drawer-header" @click="goDashboard">
       <v-icon size="28" class="mr-2">mdi-anchor</v-icon>
       <span class="drawer-title">West Islands</span>
     </div>
@@ -131,15 +131,20 @@ const navItems = [
   { to: '/fishing',                     icon: 'mdi-fish',                label: 'Рибалка' },
 ];
 
+function goDashboard() {
+  drawer.value = false;
+  router.push('/');
+}
+
 function logout() {
   drawer.value = false;
   userStore.logout();
-  router.push('/');
+  router.push('/login');
 }
 
 function login() {
   drawer.value = false;
-  router.push('/');
+  router.push('/login');
 }
 
 const isMobile = computed(() => window.innerWidth < 600);
@@ -162,6 +167,8 @@ const isMobile = computed(() => window.innerWidth < 600);
   text-shadow: 0 0 14px rgba(200, 150, 42, 0.45);
   display: flex;
   align-items: center;
+  cursor: pointer;
+  user-select: none;
 }
 
 .nav-icon-btn {
@@ -207,6 +214,8 @@ const isMobile = computed(() => window.innerWidth < 600);
   color: var(--wi-gold);
   font-family: var(--wi-font-heading);
   text-shadow: 0 0 10px rgba(200, 150, 42, 0.4);
+  cursor: pointer;
+  user-select: none;
 }
 
 .drawer-title {

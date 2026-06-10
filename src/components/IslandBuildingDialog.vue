@@ -165,6 +165,7 @@ const props = defineProps({
   buildingKey: { type: String, required: true },
   isAdmin: { type: Boolean, default: false },
   nickname: { type: String, default: 'Admin' },
+  currentCycleId: { type: String, default: null },
   currentCycleStartDate: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue'])
@@ -221,7 +222,7 @@ async function build() {
   if (loading.value) return
   loading.value = true
   try {
-    await islandStore.setBuildingBuilt(props.buildingKey, true)
+    await islandStore.setBuildingBuilt(props.buildingKey, true, { cycleId: props.currentCycleId })
     await logStore.addLog({
       action: `Admin built ${meta.value?.name || props.buildingKey}`,
       user: props.nickname || 'system',

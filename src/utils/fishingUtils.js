@@ -9,6 +9,13 @@
  * @param {number|null} effectiveRollUsed - the effectiveRollUsed field from the parent log
  * @returns {number}
  */
+export const SILVER_PER_GOLD = 10;
+
+export function silverToGold(value) {
+  const silver = Number(value ?? 0);
+  return Number.isFinite(silver) ? silver / SILVER_PER_GOLD : 0;
+}
+
 export function resolveFishValue(fish, effectiveRollUsed) {
   const val = fish.fishValueSilver;
 

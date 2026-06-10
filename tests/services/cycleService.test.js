@@ -369,13 +369,13 @@ test('createNewCycleWithEffects creates cycle doc with startedAt', async () => {
 
 test('createNewCycleWithEffects closes open previous cycle', async () => {
   const mock = createMockFirestore({
-    'cycles/prev': { startedAt: '1 Uktar 1489', createdAt: 'old' },
+    'cycles/prev': { startedAt: '1 Uktar 1489', populationAtStart: 90, createdAt: 'old' },
     'islands/island_rock': { manufactures: [] },
     'treasury/meta': { balance: 0 },
   });
 
   await createNewCycleWithEffects(
-    { startedDate: '1 Hammer 1490', islandId: 'island_rock' },
+    { startedDate: '1 Hammer 1490', islandId: 'island_rock', population: 120 },
     {
       ...mock.firebase,
       db: mock.db,
@@ -395,6 +395,10 @@ test('createNewCycleWithEffects closes open previous cycle', async () => {
   );
 
   assert.ok(mock.get('cycles/prev').finishedAt, 'previous cycle should be closed');
+  const summary = mock.get('cycle-summaries/prev');
+  assert.equal(summary.populationBefore, 90);
+  assert.equal(summary.populationAfter, 120);
+  assert.equal(summary.populationDelta, 30);
 });
 
 test('createNewCycleWithEffects throws on invalid date', async () => {

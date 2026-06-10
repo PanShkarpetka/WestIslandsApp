@@ -41,6 +41,8 @@ function makeDeps(seed = {}) {
       collection: mock.firebase.collection,
       getDocs: mock.firebase.getDocs,
       query: mock.firebase.query,
+      orderBy: mock.firebase.orderBy,
+      limit: mock.firebase.limit,
       runTransaction: mock.firebase.runTransaction,
       serverTimestamp: mock.firebase.serverTimestamp,
     },
@@ -73,6 +75,30 @@ test('registerCraftAction updates hero crafting progress and writes a log entry'
   assert.equal(logs[0].componentPriceAtTime, 15);
   assert.equal(logs[0].totalComponentPriceAtTime, 45);
   assert.equal(logs[0].createdBy, 'player1');
+});
+
+test('registerCraftAction links log to current active cycle', async () => {
+  const { mock, deps } = makeDeps({
+    'cycles/finished': { startedAt: '1 Hammer 1490', finishedAt: '10 Hammer 1490', createdAt: 1 },
+    'cycles/current': { startedAt: '11 Hammer 1490', createdAt: 2 },
+    'heroes/hero1': { name: 'Gandalf', crafting: null },
+  });
+
+  await registerCraftAction(
+    { heroId: 'hero1', itemSlug: 'longsword', amountCrafted: 1, craftItems: [SWORD_ITEM] },
+    deps,
+  );
+
+  const logs = Object.values(mock.list('heroes/hero1/crafting-logs'));
+  assert.equal(logs[0].cycleId, 'current');
+  assert.equal(logs[0].cycleStartedAt, '11 Hammer 1490');
+  assert.equal(logs[0].heroId, 'hero1');
+  assert.equal(logs[0].heroName, 'Gandalf');
+
+  const cycleLogs = Object.values(mock.list('cycle-crafting-logs'));
+  assert.equal(cycleLogs.length, 1);
+  assert.equal(cycleLogs[0].cycleId, 'current');
+  assert.equal(cycleLogs[0].sourcePath.includes('heroes/hero1/crafting-logs'), true);
 });
 
 test('registerCraftAction accumulates progress across multiple craft actions', async () => {
