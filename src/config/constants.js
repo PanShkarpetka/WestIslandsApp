@@ -4,5 +4,5 @@ export const PSEUDO_RELIGION_ID = 'psevdo'
 
 export const DEFAULT_HERO_PASSWORD = 'password'
 
-/** Telegram usernames excluded from the fishing leaderboard (admins / testers). */
-export const FISHING_EXCLUDED_USERS = new Set(['ElifasTeQ', 'PanShkarpetka'])
+/** Telegram usernames or user IDs excluded from the fishing leaderboard (admins / testers). */
+export const FISHING_EXCLUDED_USERS = new Set(['ElifasTeQ', 'PanShkarpetka', '345178217'])
