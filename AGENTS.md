@@ -166,6 +166,7 @@ Each page view has a companion `.md` file alongside its `.vue` file in `src/view
 ### Standalone pages
 - [HomeView.md](src/views/HomeView.md) — campaign dashboard homepage, current/last cycle highlights
 - [LoginView.md](src/views/LoginView.md) — auth flows, pirate-themed entry
+- [AccountPage.md](src/views/AccountPage.md) — hero account balance, goods, caught fish, transaction history
 - [ShipsView.md](src/views/ShipsView.md) — fleet management, ship cards
 - [DonationGoalsPage.md](src/views/DonationGoalsPage.md) — fundraising goals, donor dialog
 - [ReligionPage.md](src/views/ReligionPage.md) — 4-mode view toggle

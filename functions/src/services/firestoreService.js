@@ -22,6 +22,63 @@ export function applyAvailabilityGuard(before, requested) {
   return { awarded, after };
 }
 
+function getFishCodeRange(fish) {
+  const code = fish?.fishCodeNumber;
+  if (typeof code === 'number') {
+    return { min: Number(code), max: Number(code) };
+  }
+
+  return {
+    min: Number(code?.min ?? Number.NaN),
+    max: Number(code?.max ?? Number.NaN)
+  };
+}
+
+function resolveFishValueSilver(fish, effectiveRollUsed) {
+  const value = fish?.fishValueSilver;
+  if (typeof value === 'number') return Number(value) || 0;
+  if (!value || typeof value !== 'object') return 0;
+
+  const low = Number(value.low ?? 0);
+  const high = Number(value.high ?? 0);
+  const range = getFishCodeRange(fish);
+  const roll = Number(effectiveRollUsed);
+
+  if (Number.isFinite(roll) && Number.isFinite(range.min) && Number.isFinite(range.max)) {
+    if (range.max > range.min) {
+      const t = Math.max(0, Math.min(1, (roll - range.min) / (range.max - range.min)));
+      return low + t * (high - low);
+    }
+    return high;
+  }
+
+  return (low + high) / 2;
+}
+
+function normalizeTelegramUsername(value) {
+  return String(value || '').trim().replace(/^@+/, '').toLowerCase();
+}
+
+function matchesTelegramIdentity(heroTelegramId, { telegramUserId, telegramUsername }) {
+  const link = String(heroTelegramId || '').trim();
+  if (!link) return false;
+
+  if (/^\d+$/.test(link)) {
+    return link === String(telegramUserId || '').trim();
+  }
+
+  return normalizeTelegramUsername(link) === normalizeTelegramUsername(telegramUsername);
+}
+
+async function findHeroByTelegramIdentity(db, { telegramUserId, telegramUsername } = {}) {
+  if (telegramUserId == null && !telegramUsername) return null;
+
+  const heroesRef = db.collection(COLLECTIONS.HEROES);
+  const snap = await heroesRef.get();
+  const doc = snap.docs.find((item) => matchesTelegramIdentity(item.data()?.telegramId, { telegramUserId, telegramUsername }));
+  return doc ? { id: doc.id, ...doc.data() } : null;
+}
+
 export async function getBotConfig(db) {
   const docRef = db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC);
   const snapshot = await docRef.get();
@@ -297,9 +354,15 @@ async function resolveActiveCycleMeta(db) {
 export async function createFishingLog(db, logData) {
   const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
   const cycleMeta = await resolveActiveCycleMeta(db);
+  const linkedHero = await findHeroByTelegramIdentity(db, {
+    telegramUserId: logData?.telegramUserId,
+    telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname
+  });
   await logRef.set({
     ...logData,
     ...cycleMeta,
+    heroId: linkedHero?.id || null,
+    heroName: linkedHero?.name || null,
     timestamp: new Date().toISOString()
   });
 
@@ -308,6 +371,10 @@ export async function createFishingLog(db, logData) {
 
 export async function updateFishAvailabilityTransaction(db, { catches, logData }) {
   const cycleMeta = await resolveActiveCycleMeta(db);
+  const linkedHero = await findHeroByTelegramIdentity(db, {
+    telegramUserId: logData?.telegramUserId,
+    telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname
+  });
   return db.runTransaction(async (transaction) => {
     const fishDeltas = new Map();
     catches.forEach((fish) => {
@@ -350,10 +417,36 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData }
     transaction.set(logRef, {
       ...logData,
       ...cycleMeta,
+      heroId: linkedHero?.id || null,
+      heroName: linkedHero?.name || null,
       fishSelected: finalCatches,
       fishQuantityCaught: finalCatches.length,
       fishAvailabilityChanges: availabilityChanges,
       timestamp: new Date().toISOString()
+    });
+
+    finalCatches.forEach((fish) => {
+      const valueSilver = resolveFishValueSilver(fish, logData?.effectiveRollUsed);
+      transaction.set(db.collection(COLLECTIONS.CAUGHT_FISH).doc(), {
+        fishId: fish.id,
+        fishName: fish.fishName,
+        fishDescription: fish.fishDescription,
+        fishCodeNumber: fish.fishCodeNumber,
+        fishValueSilver: fish.fishValueSilver,
+        effectiveRollUsed: logData?.effectiveRollUsed ?? null,
+        valueSilver,
+        valueGold: valueSilver / 10,
+        telegramUserId: logData?.telegramUserId == null ? null : String(logData.telegramUserId),
+        telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname || '',
+        telegramUsernameKey: normalizeTelegramUsername(logData?.telegramUsername || logData?.telegramUserNickname),
+        heroId: linkedHero?.id || null,
+        heroName: linkedHero?.name || null,
+        sourceFishingLogId: logRef.id,
+        cycleId: cycleMeta.cycleId || null,
+        status: 'available',
+        createdAt: new Date().toISOString(),
+        disposedAt: null
+      });
     });
 
     return { finalCatches, availabilityChanges, logId: logRef.id };

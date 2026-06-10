@@ -1,6 +1,5 @@
 <template>
   <v-container class="account-page py-6">
-
     <div class="account-header mb-6">
       <v-icon class="mr-2" size="26" color="primary">mdi-account</v-icon>
       <h1 class="wi-heading">{{ userStore.nickname }}</h1>
@@ -9,7 +8,7 @@
 
     <div v-if="loading" class="account-state">
       <v-icon class="mr-2">mdi-compass</v-icon>
-      Завантаження…
+      Завантаження...
     </div>
 
     <div v-else-if="loadError" class="account-state account-error">
@@ -18,7 +17,6 @@
     </div>
 
     <template v-else>
-      <!-- Gold balance -->
       <v-card class="account-card mb-4" elevation="0">
         <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-gold</v-icon>
@@ -40,7 +38,6 @@
         </v-card-text>
       </v-card>
 
-      <!-- Goods inventory -->
       <v-card class="account-card mb-4" elevation="0">
         <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-package-variant</v-icon>
@@ -72,7 +69,77 @@
         </v-card-text>
       </v-card>
 
-      <!-- Transaction history -->
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-fish</v-icon>
+          Піймана риба
+        </div>
+        <v-card-text class="account-card-body">
+          <div v-if="fishAccountState.error" class="account-error-msg">
+            <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+            {{ fishAccountState.error }}
+          </div>
+          <div v-else-if="fishLoading" class="account-empty-state">
+            <v-icon class="mr-1" size="14">mdi-compass</v-icon>
+            Завантаження улову...
+          </div>
+          <div v-else-if="fishError" class="account-error-msg">
+            <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>
+            {{ fishError }}
+          </div>
+          <div v-else-if="!caughtFish.length" class="account-empty-state">
+            <v-icon class="mr-1" size="14">mdi-fish-off</v-icon>
+            Пійманої риби немає.
+          </div>
+          <template v-else>
+            <div class="fish-list">
+              <label v-for="fish in caughtFish" :key="fish.id" class="fish-row">
+                <v-checkbox-btn
+                  v-model="selectedFishIds"
+                  :value="fish.id"
+                  color="primary"
+                  class="fish-checkbox"
+                />
+                <div class="fish-info">
+                  <span class="fish-name">{{ fish.fishName }}</span>
+                </div>
+                <span class="wi-number fish-price">{{ formatAmount(fish.valueGold) }} зм</span>
+              </label>
+            </div>
+
+            <div class="fish-summary mt-4">
+              <span>Обрано: {{ selectedFish.length }}</span>
+              <span>Сума: {{ formatAmount(fishSaleTotals.gross) }} зм</span>
+              <span>Податок: {{ formatAmount(fishSaleTotals.tax) }} зм</span>
+              <strong>До зарахування: {{ formatAmount(fishSaleTotals.net) }} зм</strong>
+            </div>
+            <div v-if="fishActionError" class="account-error-msg mt-2">
+              <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ fishActionError }}
+            </div>
+            <div class="fish-actions mt-4">
+              <v-btn
+                variant="outlined"
+                prepend-icon="mdi-waves"
+                :disabled="!selectedFishIds.length || Boolean(fishActionLoading)"
+                :loading="fishActionLoading === 'release'"
+                @click="releaseSelectedFish"
+              >
+                Відпустити
+              </v-btn>
+              <v-btn
+                class="save-btn"
+                prepend-icon="mdi-cash-plus"
+                :disabled="!selectedFishIds.length || Boolean(fishActionLoading)"
+                :loading="fishActionLoading === 'sell'"
+                @click="sellSelectedFish"
+              >
+                Продати
+              </v-btn>
+            </div>
+          </template>
+        </v-card-text>
+      </v-card>
+
       <v-card class="account-card" elevation="0">
         <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-history</v-icon>
@@ -81,7 +148,7 @@
         <v-card-text class="account-card-body pa-0">
           <div v-if="!transactions.length" class="account-empty-state pa-4">
             <v-icon class="mr-1" size="14">mdi-anchor</v-icon>
-            Операцій не було.
+            {{ transactionsError || 'Операцій не було.' }}
           </div>
           <v-table v-else density="compact" class="tx-table">
             <thead>
@@ -109,7 +176,6 @@
       </v-card>
     </template>
 
-    <!-- Gold withdraw dialog -->
     <v-dialog v-model="goldDialog" max-width="400">
       <v-card class="account-dialog">
         <div class="account-dialog-header">
@@ -144,7 +210,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Goods withdraw dialog -->
     <v-dialog v-model="goodsDialog" max-width="400">
       <v-card class="account-dialog">
         <div class="account-dialog-header">
@@ -179,23 +244,39 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-
   </v-container>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { useUserStore } from '@/store/userStore'
 import { useGoodsStore } from '@/store/goodsStore'
 import { formatAmount } from '@/utils/formatters'
+import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
+import {
+  calculateFishSaleTotals,
+  getCaughtFishLookup,
+  getCaughtFishAccountState,
+  isCaughtFishOwnedByHero,
+  releaseCaughtFish,
+  sellCaughtFish,
+} from '@/services/caughtFishService.js'
 
 const userStore = useUserStore()
 const goodsStore = useGoodsStore()
 
-const hero = ref({ goldBalance: 0, goods: {} })
+const hero = ref({ id: '', name: '', goldBalance: 0, goods: {}, telegramId: '' })
 const transactions = ref([])
+const transactionsError = ref('')
+const caughtFish = ref([])
+const selectedFishIds = ref([])
+const fishLoading = ref(false)
+const fishError = ref('')
+const fishActionError = ref('')
+const fishActionLoading = ref('')
+const fishSaleTaxRate = ref(0.1)
 const loading = ref(true)
 const loadError = ref('')
 const goldDialog = ref(false)
@@ -208,6 +289,16 @@ const withdrawing = ref(false)
 
 let unsubscribeHero = null
 let unsubscribeTx = null
+let unsubscribeFish = null
+let unsubscribeIsland = null
+
+const fishAccountState = computed(() => getCaughtFishAccountState(hero.value))
+
+const selectedFish = computed(() =>
+  caughtFish.value.filter((fish) => selectedFishIds.value.includes(fish.id))
+)
+
+const fishSaleTotals = computed(() => calculateFishSaleTotals(selectedFish.value, fishSaleTaxRate.value))
 
 const goodsList = computed(() => {
   const goods = hero.value.goods || {}
@@ -222,23 +313,36 @@ const goodsList = computed(() => {
 function txTypeLabel(type) {
   if (type === 'income') return 'Дохід'
   if (type === 'withdrawal') return 'Зняття'
+  if (type === 'fish-sale') return 'Продаж риби'
+  if (type === 'fish-release') return 'Відпускання риби'
+  if (type === 'admin-balance-adjustment') return 'Корекція балансу'
   return 'Списання'
 }
 
 function txTypeClass(type) {
-  if (type === 'income') return 'wi-success-text'
+  if (type === 'income' || type === 'fish-sale') return 'wi-success-text'
   if (type === 'withdrawal') return 'wi-gold-text'
+  if (type === 'fish-release') return 'wi-sea-text'
   return 'wi-danger-text'
 }
 
 function formatTxGoods(goods) {
-  if (!goods || !Object.keys(goods).length) return '—'
+  if (!goods || !Object.keys(goods).length) return '-'
   return Object.entries(goods)
     .map(([goodId, qty]) => {
       const meta = goodsStore.goods.find((g) => g.id === goodId)
       return `${qty > 0 ? '+' : ''}${qty} ${meta?.name || goodId}`
     })
     .join(', ')
+}
+
+function toMillis(value) {
+  if (!value) return 0
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.toDate === 'function') return value.toDate().getTime()
+  if (typeof value === 'number') return value
+  const parsed = new Date(value).getTime()
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 function openGoldWithdrawDialog() {
@@ -252,6 +356,82 @@ function openGoodsWithdrawDialog(item) {
   goodsWithdrawAmount.value = 1
   selectedGood.value = item
   goodsDialog.value = true
+}
+
+function subscribeCaughtFish() {
+  unsubscribeFish?.()
+  unsubscribeFish = null
+  caughtFish.value = []
+  selectedFishIds.value = []
+  fishError.value = ''
+
+  if (!fishAccountState.value.canLoadFish) {
+    fishLoading.value = false
+    return
+  }
+
+  fishLoading.value = true
+  const lookup = getCaughtFishLookup(fishAccountState.value.telegramId)
+  if (!lookup) {
+    fishLoading.value = false
+    return
+  }
+
+  const fishQuery = query(
+    collection(db, 'caught-fish'),
+    where(lookup.field, '==', lookup.value),
+  )
+
+  unsubscribeFish = onSnapshot(fishQuery, (snap) => {
+    caughtFish.value = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((fish) => fish.status === 'available')
+      .filter((fish) => isCaughtFishOwnedByHero(fish, { heroId: userStore.heroId, telegramId: fishAccountState.value.telegramId }))
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    selectedFishIds.value = selectedFishIds.value.filter((id) => caughtFish.value.some((fish) => fish.id === id))
+    fishLoading.value = false
+  }, (err) => {
+    fishError.value = err?.message || 'Не вдалося завантажити пійману рибу.'
+    fishLoading.value = false
+  })
+}
+
+async function sellSelectedFish() {
+  fishActionError.value = ''
+  fishActionLoading.value = 'sell'
+  try {
+    await sellCaughtFish({
+      heroId: userStore.heroId,
+      heroName: hero.value.name || userStore.nickname,
+      telegramId: hero.value.telegramId,
+      caughtFishIds: selectedFishIds.value,
+      actorName: userStore.nickname,
+    })
+    selectedFishIds.value = []
+  } catch (e) {
+    fishActionError.value = e?.message || 'Не вдалося продати рибу.'
+  } finally {
+    fishActionLoading.value = ''
+  }
+}
+
+async function releaseSelectedFish() {
+  fishActionError.value = ''
+  fishActionLoading.value = 'release'
+  try {
+    await releaseCaughtFish({
+      heroId: userStore.heroId,
+      heroName: hero.value.name || userStore.nickname,
+      telegramId: hero.value.telegramId,
+      caughtFishIds: selectedFishIds.value,
+      actorName: userStore.nickname,
+    })
+    selectedFishIds.value = []
+  } catch (e) {
+    fishActionError.value = e?.message || 'Не вдалося відпустити рибу.'
+  } finally {
+    fishActionLoading.value = ''
+  }
 }
 
 async function withdrawGold() {
@@ -343,7 +523,13 @@ onMounted(() => {
       return
     }
     const data = snap.data() || {}
-    hero.value = { goldBalance: data.goldBalance ?? 0, goods: data.goods || {} }
+    hero.value = {
+      id: snap.id,
+      name: data.name || userStore.nickname,
+      goldBalance: data.goldBalance ?? 0,
+      goods: data.goods || {},
+      telegramId: String(data.telegramId || '').trim(),
+    }
     loading.value = false
   }, () => {
     loadError.value = 'Не вдалося завантажити дані.'
@@ -353,16 +539,30 @@ onMounted(() => {
   const txQuery = query(
     collection(db, 'hero-transactions'),
     where('heroId', '==', userStore.heroId),
-    orderBy('createdAt', 'desc'),
   )
   unsubscribeTx = onSnapshot(txQuery, (snap) => {
-    transactions.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    transactionsError.value = ''
+    transactions.value = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+  }, (err) => {
+    transactionsError.value = err?.message || 'Не вдалося завантажити історію операцій.'
   })
+
+  unsubscribeIsland = onSnapshot(doc(db, 'islands', DEFAULT_ISLAND_ID), (snap) => {
+    fishSaleTaxRate.value = Number(snap.data()?.fishSaleTaxRate ?? 0.1) || 0.1
+  })
+})
+
+watch(() => hero.value.telegramId, () => {
+  subscribeCaughtFish()
 })
 
 onBeforeUnmount(() => {
   unsubscribeHero?.()
   unsubscribeTx?.()
+  unsubscribeFish?.()
+  unsubscribeIsland?.()
   goodsStore.unsubscribeGoods()
 })
 </script>
@@ -432,16 +632,21 @@ onBeforeUnmount(() => {
   font-size: 1rem;
 }
 
-.withdraw-btn {
+.withdraw-btn,
+.save-btn {
   font-family: var(--wi-font-heading) !important;
   letter-spacing: 0.07em !important;
   background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
   color: #1a1209 !important;
   border: 1px solid var(--wi-gold-light) !important;
+}
+
+.withdraw-btn {
   font-size: 0.8rem !important;
 }
 
-.withdraw-btn :deep(.v-btn__overlay) {
+.withdraw-btn :deep(.v-btn__overlay),
+.save-btn :deep(.v-btn__overlay) {
   opacity: 0 !important;
 }
 
@@ -454,40 +659,99 @@ onBeforeUnmount(() => {
   font-size: 0.88rem;
 }
 
-.goods-list {
+.goods-list,
+.fish-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.goods-row {
+.goods-row,
+.fish-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 10px;
   padding: 8px 10px;
   background: rgba(0,0,0,0.2);
   border: 1px solid var(--wi-border);
   border-radius: 4px;
 }
 
-.goods-info {
+.fish-row {
+  cursor: pointer;
+}
+
+.fish-checkbox {
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+}
+
+.fish-checkbox :deep(.v-selection-control) {
+  flex: 0 0 32px;
+  min-width: 32px;
+}
+
+.fish-checkbox :deep(.v-selection-control__wrapper) {
+  margin-inline-start: 0;
+  margin-inline-end: 0;
+}
+
+.goods-info,
+.fish-info {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
+  flex: 1;
 }
 
-.goods-name {
+.fish-info {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.goods-name,
+.fish-name {
   font-family: var(--wi-font-body);
   color: var(--wi-text);
   font-size: 0.9rem;
+}
+
+.fish-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .goods-qty {
   font-size: 1.1rem;
 }
 
-.goods-unit {
+.goods-unit,
+.fish-meta {
   font-size: 0.8rem;
+}
+
+.fish-price {
+  font-size: 0.95rem;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.fish-summary {
+  display: grid;
+  gap: 6px;
+  color: var(--wi-text);
+  font-size: 0.85rem;
+}
+
+.fish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .goods-withdraw-btn {
@@ -498,7 +762,6 @@ onBeforeUnmount(() => {
   letter-spacing: 0.06em !important;
 }
 
-/* Transaction table */
 .tx-table {
   background: transparent !important;
 }
@@ -542,7 +805,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* Dialogs */
 .account-dialog {
   background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
   border: 1px solid var(--wi-gold) !important;
@@ -569,17 +831,5 @@ onBeforeUnmount(() => {
 .cancel-btn {
   color: var(--wi-text-muted) !important;
   font-family: var(--wi-font-heading) !important;
-}
-
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
-
-.save-btn :deep(.v-btn__overlay) {
-  opacity: 0 !important;
 }
 </style>

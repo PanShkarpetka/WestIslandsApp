@@ -6,9 +6,58 @@ import { FISHING_EXCLUDED_USERS } from '@/config/constants';
 
 export const useFishingLeaderboardStore = defineStore('fishingLeaderboard', () => {
   const logs = ref([]);
+  const heroes = ref([]);
   const loading = ref(false);
   const error = ref(null);
   let _unsub = null;
+  let _heroesUnsub = null;
+
+  function normalizeTelegramUsername(value) {
+    return String(value || '').trim().replace(/^@+/, '').toLowerCase();
+  }
+
+  function isNumericTelegramIdentity(value) {
+    return /^\d+$/.test(String(value || '').trim());
+  }
+
+  function logTelegramUsername(log) {
+    return log.telegramUsername || log.telegramUserNickname || '';
+  }
+
+  function logTelegramFallback(log) {
+    return logTelegramUsername(log) || String(log.telegramUserId || 'unknown');
+  }
+
+  function isExcludedLog(log) {
+    return FISHING_EXCLUDED_USERS.has(logTelegramFallback(log));
+  }
+
+  function findHeroForLog(log) {
+    if (log.heroId || log.heroName) {
+      return { id: log.heroId || '', name: log.heroName || log.heroId || '' };
+    }
+
+    const userId = String(log.telegramUserId || '').trim();
+    const username = normalizeTelegramUsername(logTelegramUsername(log));
+    return heroes.value.find((hero) => {
+      const link = String(hero.telegramId || '').trim();
+      if (!link) return false;
+      if (isNumericTelegramIdentity(link)) return link === userId;
+      return normalizeTelegramUsername(link) === username;
+    }) || null;
+  }
+
+  function getLogDisplayName(log) {
+    const hero = findHeroForLog(log);
+    return hero?.name || logTelegramFallback(log);
+  }
+
+  function getLogParticipantKey(log) {
+    const hero = findHeroForLog(log);
+    if (hero?.id) return `hero:${hero.id}`;
+    if (hero?.name) return `hero-name:${hero.name}`;
+    return `telegram:${logTelegramFallback(log)}`;
+  }
 
   function subscribe() {
     if (_unsub) return;
@@ -29,11 +78,23 @@ export const useFishingLeaderboardStore = defineStore('fishingLeaderboard', () =
         loading.value = false;
       },
     );
+
+    _heroesUnsub = onSnapshot(
+      collection(db, 'heroes'),
+      (snap) => {
+        heroes.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      },
+      () => {
+        heroes.value = [];
+      },
+    );
   }
 
   function unsubscribe() {
     _unsub?.();
+    _heroesUnsub?.();
     _unsub = null;
+    _heroesUnsub = null;
   }
 
   /** Top 8 best catches — one per angler, sorted by resolved fish value. */
@@ -43,17 +104,18 @@ export const useFishingLeaderboardStore = defineStore('fishingLeaderboard', () =
     for (const log of logs.value) {
       const isSuccess = log.successFailureResult === 'success' || log.successFailureResult === true;
       if (!isSuccess) continue;
-      const username = log.telegramUsername || String(log.telegramUserId || 'unknown');
-      if (FISHING_EXCLUDED_USERS.has(username)) continue;
+      if (isExcludedLog(log)) continue;
+      const participantKey = getLogParticipantKey(log);
+      const participantName = getLogDisplayName(log);
 
       for (const f of (Array.isArray(log.fishSelected) ? log.fishSelected : [])) {
         const val = resolveFishValue(f, log.effectiveRollUsed);
-        const existing = bestPerUser.get(username);
+        const existing = bestPerUser.get(participantKey);
         if (!existing || val > existing.fishValue) {
-          bestPerUser.set(username, {
+          bestPerUser.set(participantKey, {
             fishName: f.fishName || '?',
             fishValue: val,
-            username,
+            username: participantName,
             timestamp: log.timestamp,
           });
         }
@@ -69,14 +131,13 @@ export const useFishingLeaderboardStore = defineStore('fishingLeaderboard', () =
   const recentFeed = computed(() => {
     return logs.value
       .filter((log) => {
-        const username = log.telegramUsername || String(log.telegramUserId || 'unknown');
-        return !FISHING_EXCLUDED_USERS.has(username);
+        return !isExcludedLog(log);
       })
       .slice(0, 20)
       .map((log) => {
         const isSuccess = log.successFailureResult === 'success' || log.successFailureResult === true;
         const fish = Array.isArray(log.fishSelected) ? log.fishSelected : [];
-        const username = log.telegramUsername || String(log.telegramUserId || 'unknown');
+        const username = getLogDisplayName(log);
         const topFish = fish[0] || null;
         return {
           id: log.id,
@@ -92,11 +153,15 @@ export const useFishingLeaderboardStore = defineStore('fishingLeaderboard', () =
 
   return {
     logs,
+    heroes,
     loading,
     error,
     subscribe,
     unsubscribe,
     rareCatches,
     recentFeed,
+    getLogDisplayName,
+    getLogParticipantKey,
+    isExcludedLog,
   };
 });

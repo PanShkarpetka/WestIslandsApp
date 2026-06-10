@@ -238,6 +238,9 @@ test('createFishingLog tags logs with active campaign cycle', async () => {
     cycles: {
       old: { startedAt: '1 Hammer', finishedAt: '10 Hammer', createdAt: 1 },
       active: { startedAt: '11 Hammer', finishedAt: '', createdAt: 2 }
+    },
+    [COLLECTIONS.HEROES]: {
+      h1: { name: 'Aela', telegramId: '42' }
     }
   });
 
@@ -246,6 +249,8 @@ test('createFishingLog tags logs with active campaign cycle', async () => {
 
   assert.equal(log.data().cycleId, 'active');
   assert.equal(log.data().cycleStartedAt, '11 Hammer');
+  assert.equal(log.data().heroId, 'h1');
+  assert.equal(log.data().heroName, 'Aela');
 });
 
 test('updateFishAvailabilityTransaction tags successful logs with active campaign cycle', async () => {
@@ -266,4 +271,93 @@ test('updateFishAvailabilityTransaction tags successful logs with active campaig
   const logs = await db.collection(COLLECTIONS.FISHING_LOGS).get();
   assert.equal(logs.docs[0].data().cycleId, 'active');
   assert.equal(logs.docs[0].data().cycleStartedAt, '11 Hammer');
+});
+
+test('updateFishAvailabilityTransaction creates caught fish linked to hero by telegramId', async () => {
+  const db = createMockDb({
+    cycles: {
+      active: { startedAt: '11 Hammer', createdAt: 2 }
+    },
+    [COLLECTIONS.HEROES]: {
+      h1: { name: 'Aela', telegramId: '42' }
+    },
+    [COLLECTIONS.FISHES]: {
+      cod: {
+        fishName: 'Cod',
+        fishDescription: 'Common fish',
+        fishCodeNumber: { min: 10, max: 20 },
+        fishValueSilver: { low: 100, high: 200 },
+        fishAmountAvailableNow: 2
+      }
+    }
+  });
+
+  await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 42, telegramUsername: 'angler', effectiveRollUsed: 15 }
+  });
+
+  const logs = await db.collection(COLLECTIONS.FISHING_LOGS).get();
+  assert.equal(logs.docs[0].data().heroId, 'h1');
+  assert.equal(logs.docs[0].data().heroName, 'Aela');
+
+  const caughtFish = await db.collection(COLLECTIONS.CAUGHT_FISH).get();
+  assert.equal(caughtFish.docs.length, 1);
+  const data = caughtFish.docs[0].data();
+  assert.equal(data.heroId, 'h1');
+  assert.equal(data.heroName, 'Aela');
+  assert.equal(data.telegramUserId, '42');
+  assert.equal(data.telegramUsername, 'angler');
+  assert.equal(data.telegramUsernameKey, 'angler');
+  assert.equal(data.status, 'available');
+  assert.equal(data.valueSilver, 150);
+  assert.equal(data.valueGold, 15);
+  assert.equal(data.cycleId, 'active');
+});
+
+test('updateFishAvailabilityTransaction creates caught fish linked to hero by telegram username', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.HEROES]: {
+      h1: { name: 'Aela', telegramId: '@PanShkarpetka' }
+    },
+    [COLLECTIONS.FISHES]: {
+      cod: {
+        fishName: 'Cod',
+        fishValueSilver: 50,
+        fishAmountAvailableNow: 1
+      }
+    }
+  });
+
+  await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 42, telegramUsername: 'PanShkarpetka', effectiveRollUsed: 15 }
+  });
+
+  const caughtFish = await db.collection(COLLECTIONS.CAUGHT_FISH).get();
+  const data = caughtFish.docs[0].data();
+  assert.equal(data.heroId, 'h1');
+  assert.equal(data.heroName, 'Aela');
+  assert.equal(data.telegramUsernameKey, 'panshkarpetka');
+});
+
+test('updateFishAvailabilityTransaction creates unassigned caught fish when hero is not linked', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.FISHES]: {
+      cod: { fishName: 'Cod', fishValueSilver: 50, fishAmountAvailableNow: 1 }
+    }
+  });
+
+  await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 99, effectiveRollUsed: 10 }
+  });
+
+  const caughtFish = await db.collection(COLLECTIONS.CAUGHT_FISH).get();
+  const data = caughtFish.docs[0].data();
+  assert.equal(data.heroId, null);
+  assert.equal(data.heroName, null);
+  assert.equal(data.telegramUserId, '99');
+  assert.equal(data.valueSilver, 50);
+  assert.equal(data.valueGold, 5);
 });

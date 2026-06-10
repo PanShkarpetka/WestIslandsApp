@@ -22,6 +22,7 @@ export const useHeroesStore = defineStore('heroes', () => {
                     name: data.name || '',
                     inactive: data.inactive ?? false,
                     password: data.password || '',
+                    telegramId: data.telegramId || '',
                     goldBalance: data.goldBalance ?? 0,
                     goods: data.goods || {},
                 };

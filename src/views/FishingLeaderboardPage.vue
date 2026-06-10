@@ -71,7 +71,7 @@
           <tr v-else-if="sortedAnglers.length === 0">
             <td colspan="7" class="text-center wi-muted-text py-4">Немає даних за вибраний період</td>
           </tr>
-          <tr v-for="(angler, idx) in sortedAnglers" :key="angler.username" class="angler-row">
+          <tr v-for="(angler, idx) in sortedAnglers" :key="angler.key" class="angler-row">
             <td class="rank-col">
               <span v-if="idx === 0">🥇</span>
               <span v-else-if="idx === 1">🥈</span>
@@ -229,7 +229,6 @@ import { useFishStore } from '@/store/fishStore';
 import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
 import { resolveFishValue, silverToGold } from '@/utils/fishingUtils';
-import { FISHING_EXCLUDED_USERS } from '@/config/constants';
 
 const store = useFishingLeaderboardStore();
 const fishStore = useFishStore();
@@ -317,8 +316,7 @@ function getFilterStart() {
 const filteredLogs = computed(() => {
   const start = getFilterStart();
   return store.logs.filter((log) => {
-    const username = log.telegramUsername || String(log.telegramUserId || 'unknown');
-    if (FISHING_EXCLUDED_USERS.has(username)) return false;
+    if (store.isExcludedLog(log)) return false;
     if (start && new Date(log.timestamp) < start) return false;
     return true;
   });
@@ -344,10 +342,18 @@ const successRate = computed(() => {
 const filteredAnglerStats = computed(() => {
   const map = new Map();
   for (const log of filteredLogs.value) {
-    const key = log.telegramUsername || String(log.telegramUserId || 'unknown');
+    const key = store.getLogParticipantKey(log);
     const s = map.get(key) || {
-      username: key, attempts: 0, successAttempts: 0, catches: 0, totalSilver: 0, bestFish: null, bestFishValue: 0,
+      key,
+      username: store.getLogDisplayName(log),
+      attempts: 0,
+      successAttempts: 0,
+      catches: 0,
+      totalSilver: 0,
+      bestFish: null,
+      bestFishValue: 0,
     };
+    s.username = store.getLogDisplayName(log);
     s.attempts += 1;
     const isSuccess = log.successFailureResult === 'success' || log.successFailureResult === true;
     if (isSuccess) {
@@ -443,15 +449,14 @@ const feedEntries = computed(() => {
   const end = feedDayEnd(feedDayOffset.value);
   return store.logs
     .filter((log) => {
-      const username = log.telegramUsername || String(log.telegramUserId || 'unknown');
-      if (FISHING_EXCLUDED_USERS.has(username)) return false;
+      if (store.isExcludedLog(log)) return false;
       const ts = new Date(log.timestamp);
       return ts >= start && ts < end;
     })
     .map((log) => {
       const isSuccess = log.successFailureResult === 'success' || log.successFailureResult === true;
       const fish = Array.isArray(log.fishSelected) ? log.fishSelected : [];
-      const username = log.telegramUsername || String(log.telegramUserId || 'unknown');
+      const username = store.getLogDisplayName(log);
       const topFish = fish[0] || null;
       return {
         id: log.id,

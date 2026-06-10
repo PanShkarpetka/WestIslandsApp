@@ -2,6 +2,8 @@ export const COLLECTIONS = {
   BOT_CONFIGS: 'bot-configs',
   FISHES: 'fishes',
   FISHING_LOGS: 'fishing-logs',
+  CAUGHT_FISH: 'caught-fish',
+  HEROES: 'heroes',
   USER_SESSIONS: 'fishing-sessions',
   PROCESSED_UPDATES: 'telegram-processed-updates'
 };

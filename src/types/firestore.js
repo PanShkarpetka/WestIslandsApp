@@ -12,6 +12,7 @@
  * @typedef {Object} IslandDoc
  * @property {Record<string, BuildingEntry>} buildings - Map of building key → building state
  * @property {number} buildingDiscount - Cost discount multiplier (0–1)
+ * @property {number} [fishSaleTaxRate] - Tax multiplier for fish sales (0.1 = 10%)
  * @property {string[]} manufactures - Array of manufacture document IDs
  */
 
@@ -126,7 +127,7 @@
  * @typedef {Object} TreasuryTransactionDoc
  * @property {string} id
  * @property {number} amount - Positive for deposits, negative for withdrawals
- * @property {'deposit'|'withdraw'} type
+ * @property {'deposit'|'withdraw'|'fish-tax'} type
  * @property {string} comment
  * @property {string} userId - Firebase UID, 'anon', or 'system'
  * @property {string} nickname
@@ -340,6 +341,7 @@
  * @property {boolean} downtimeAvailable
  * @property {HeroCraftingData} crafting
  * @property {string} password - player login password; defaults to "password" until manually changed
+ * @property {string} telegramId - Telegram user ID or username used to link fishing bot catches; empty until manually filled
  * @property {number} [goldBalance] - personal gold balance, never negative
  * @property {Record<string, number>} [goods] - personal goods inventory, keyed by goodId
  */
@@ -358,7 +360,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'admin-balance-adjustment'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
@@ -574,6 +576,8 @@
  * Collection: `fishing-logs/{logId}`
  * @typedef {Object} FishingLogDoc
  * @property {number|string} telegramUserId
+ * @property {string|null} [heroId] - linked hero at catch time, if known
+ * @property {string|null} [heroName] - linked hero name at catch time, if known
  * @property {string} command
  * @property {unknown[]} rawEnteredParams
  * @property {Record<string, unknown>} normalizedParams
@@ -592,6 +596,31 @@
  * @property {unknown[]} extraCheckResults
  * @property {import('firebase/firestore').Timestamp|string} timestamp
  * @property {string} [cycleId]
+ */
+
+/**
+ * Collection: `caught-fish/{caughtFishId}`
+ * @typedef {Object} CaughtFishDoc
+ * @property {string} fishId
+ * @property {string} fishName
+ * @property {string} fishDescription
+ * @property {number|{min:number,max:number}} fishCodeNumber
+ * @property {number|{low:number,high:number}} fishValueSilver
+ * @property {number|null} effectiveRollUsed
+ * @property {number} valueSilver
+ * @property {number} valueGold
+ * @property {string|null} telegramUserId
+ * @property {string} telegramUsername
+ * @property {string} telegramUsernameKey - normalized lowercase username without @ for lookups
+ * @property {string|null} heroId
+ * @property {string|null} heroName
+ * @property {string} sourceFishingLogId
+ * @property {string|null} cycleId
+ * @property {'available'|'sold'|'released'} status
+ * @property {import('firebase/firestore').Timestamp|string} createdAt
+ * @property {import('firebase/firestore').Timestamp|string|null} disposedAt
+ * @property {string} [disposedByHeroId]
+ * @property {string} [disposedByHeroName]
  */
 
 /**

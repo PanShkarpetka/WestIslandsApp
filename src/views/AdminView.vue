@@ -126,6 +126,14 @@
               density="comfortable"
             />
           </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model="newHeroForm.telegramId"
+              label="Telegram ID або username"
+              hide-details="auto"
+              density="comfortable"
+            />
+          </v-col>
           <v-col cols="12" md="4" class="d-flex align-end">
             <v-btn color="primary" prepend-icon="mdi-account-plus" :loading="heroSaving" @click="createHero">
               Додати героя
@@ -163,6 +171,34 @@
       </v-data-table>
 
       <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Баланси акаунтів</div>
+        <v-alert v-if="balanceError" type="error" variant="tonal" class="mb-3">{{ balanceError }}</v-alert>
+        <v-data-table
+          :headers="accountBalanceHeaders"
+          :items="heroRows"
+          :items-per-page="10"
+          density="compact"
+          class="elevation-1"
+        >
+          <template #item.telegramId="{ item }">
+            <span :class="item.telegramId ? '' : 'text-error'">{{ item.telegramId || 'Не привʼязано' }}</span>
+          </template>
+          <template #item.goldBalance="{ item }">
+            <span class="font-weight-medium">{{ Number(item.goldBalance || 0).toFixed(2) }} зм</span>
+          </template>
+          <template #item.actions="{ item }">
+            <v-btn size="small" variant="text" color="primary" @click="openBalanceEditor(item)">Змінити</v-btn>
+          </template>
+      </v-data-table>
+      </v-card>
+
+      <div class="d-flex align-center ga-2 mb-3">
+        <v-btn icon size="small" variant="text" @click="snapshotHistoryOpen = !snapshotHistoryOpen">
+          <v-icon>{{ snapshotHistoryOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+        </v-btn>
+        <div class="text-subtitle-1">Історія балансів героїв (знімки)</div>
+      </div>
+      <v-card v-show="snapshotHistoryOpen" variant="outlined" class="pa-4 mb-4">
         <div class="d-flex flex-wrap justify-space-between align-center ga-3 mb-3">
           <div class="text-subtitle-1">Історія балансів героїв (знімки)</div>
           <v-select
@@ -387,6 +423,11 @@
               label="dndbeyondCharacterId"
               class="mb-2"
             />
+            <v-text-field
+              v-model="editHeroForm.telegramId"
+              label="Telegram ID або username"
+              class="mb-2"
+            />
             <v-switch v-model="editHeroForm.downtimeAvailable" label="Дія не виконана" inset color="warning" />
             <v-switch v-model="editHeroForm.inactive" label="Неактивний герой" inset color="error" />
             <v-text-field
@@ -402,6 +443,38 @@
             <v-spacer />
             <v-btn variant="text" @click="heroEditDialog = false">Скасувати</v-btn>
             <v-btn color="primary" :loading="heroSaving" @click="saveHero">Зберегти</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog v-model="balanceEditDialog" max-width="420">
+        <v-card>
+          <v-card-title class="text-h6">Змінити баланс акаунта</v-card-title>
+          <v-card-text>
+            <p class="text-body-2 mb-3">
+              Герой: <strong>{{ selectedBalanceHero?.name }}</strong>
+            </p>
+            <v-text-field
+              v-model.number="balanceEditForm.goldBalance"
+              label="Новий баланс (зм)"
+              type="number"
+              min="0"
+              step="0.01"
+              class="mb-2"
+            />
+            <v-textarea
+              v-model="balanceEditForm.comment"
+              label="Коментар для журналу"
+              rows="2"
+              auto-grow
+              class="mb-2"
+            />
+            <v-alert v-if="balanceError" type="error" variant="tonal" density="compact">{{ balanceError }}</v-alert>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="balanceEditDialog = false">Скасувати</v-btn>
+            <v-btn color="primary" :loading="balanceSaving" @click="saveHeroGoldBalance">Зберегти</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -595,6 +668,7 @@ import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import { loadCraftItems } from '@/services/craftingService';
 import { DEFAULT_HERO_PASSWORD, DEFAULT_ISLAND_ID } from '@/config/constants.js';
 import { aggregateReligionActions, buildReligionSummaryText } from '@/utils/religionSummary.js';
+import { adjustHeroGoldBalance, SNAPSHOT_HISTORY_DEFAULT_OPEN } from '@/services/heroBalanceService.js';
 
 const logEntries = ref([]);
 const cycleSaving = ref(false);
@@ -660,6 +734,12 @@ const heroError = ref('');
 const heroSuccess = ref('');
 const heroEditDialog = ref(false);
 const selectedHeroId = ref('');
+const balanceEditDialog = ref(false);
+const balanceSaving = ref(false);
+const balanceError = ref('');
+const selectedBalanceHero = ref(null);
+const balanceEditForm = reactive({ goldBalance: 0, comment: '' });
+const snapshotHistoryOpen = ref(SNAPSHOT_HISTORY_DEFAULT_OPEN);
 const snapshotImportState = reactive({
   rawInput: '',
   preview: null,
@@ -826,12 +906,14 @@ const newHeroForm = reactive({
   name: '',
   religionId: '',
   dndbeyondCharacterId: '',
+  telegramId: '',
 });
 
 const editHeroForm = reactive({
   name: '',
   religionId: '',
   dndbeyondCharacterId: '',
+  telegramId: '',
   downtimeAvailable: true,
   inactive: false,
   password: '',
@@ -853,6 +935,13 @@ const heroHeaders = [
   { title: 'Релігія', key: 'religionName' },
   { title: 'Статус дії', key: 'downtimeAvailable' },
   { title: 'Стан героя', key: 'inactive' },
+  { title: '', key: 'actions', sortable: false },
+];
+
+const accountBalanceHeaders = [
+  { title: 'Герой', key: 'name' },
+  { title: 'Telegram ID', key: 'telegramId' },
+  { title: 'Баланс акаунта', key: 'goldBalance' },
   { title: '', key: 'actions', sortable: false },
 ];
 
@@ -1175,6 +1264,8 @@ function subscribeHeroData() {
         id: docSnap.id,
         name: data.name || data.heroName || data.nickname || docSnap.id,
         dndbeyondCharacterId: data.dndbeyondCharacterId || '',
+        telegramId: String(data.telegramId || '').trim(),
+        goldBalance: Number(data.goldBalance ?? 0),
         balance: data.balance || null,
         balanceDelta: data.balanceDelta || null,
         downtimeAvailable: data.downtimeAvailable !== false,
@@ -1482,10 +1573,44 @@ function openHeroEditor(hero) {
   editHeroForm.name = hero.name;
   editHeroForm.religionId = hero.religionId;
   editHeroForm.dndbeyondCharacterId = hero.dndbeyondCharacterId || '';
+  editHeroForm.telegramId = hero.telegramId || '';
   editHeroForm.downtimeAvailable = hero.downtimeAvailable;
   editHeroForm.inactive = hero.inactive;
   editHeroForm.password = hero.password || DEFAULT_HERO_PASSWORD;
   heroEditDialog.value = true;
+}
+
+function openBalanceEditor(hero) {
+  selectedBalanceHero.value = hero;
+  balanceEditForm.goldBalance = Number(hero.goldBalance ?? 0);
+  balanceEditForm.comment = '';
+  balanceError.value = '';
+  balanceEditDialog.value = true;
+}
+
+async function saveHeroGoldBalance() {
+  balanceError.value = '';
+  if (!selectedBalanceHero.value?.id) {
+    balanceError.value = 'Не вдалося визначити героя.';
+    return;
+  }
+
+  balanceSaving.value = true;
+  try {
+    await adjustHeroGoldBalance({
+      heroId: selectedBalanceHero.value.id,
+      newBalance: balanceEditForm.goldBalance,
+      comment: balanceEditForm.comment,
+      actor: { nickname: 'Admin' },
+    });
+    balanceEditDialog.value = false;
+    heroSuccess.value = 'Баланс акаунта оновлено.';
+  } catch (error) {
+    console.error('[admin] Failed to adjust hero gold balance', error);
+    balanceError.value = error?.message || 'Не вдалося оновити баланс.';
+  } finally {
+    balanceSaving.value = false;
+  }
 }
 
 async function createHero() {
@@ -1502,6 +1627,7 @@ async function createHero() {
     return;
   }
   const dndbeyondCharacterId = newHeroForm.dndbeyondCharacterId.trim();
+  const telegramId = newHeroForm.telegramId.trim();
 
   heroSaving.value = true;
   try {
@@ -1513,6 +1639,8 @@ async function createHero() {
       transaction.set(heroRef, {
         name,
         dndbeyondCharacterId,
+        telegramId,
+        goldBalance: 0,
         downtimeAvailable: true,
         inactive: false,
         password: DEFAULT_HERO_PASSWORD,
@@ -1531,6 +1659,7 @@ async function createHero() {
     newHeroForm.name = '';
     newHeroForm.religionId = '';
     newHeroForm.dndbeyondCharacterId = '';
+    newHeroForm.telegramId = '';
     heroSuccess.value = 'Героя створено, духовенство додано автоматично.';
   } catch (error) {
     console.error('[admin] Failed to create hero', error);
@@ -1558,6 +1687,7 @@ async function saveHero() {
     return;
   }
   const dndbeyondCharacterId = editHeroForm.dndbeyondCharacterId.trim();
+  const telegramId = editHeroForm.telegramId.trim();
 
   heroSaving.value = true;
   try {
@@ -1569,6 +1699,7 @@ async function saveHero() {
       const heroUpdates = {
         name,
         dndbeyondCharacterId,
+        telegramId,
         downtimeAvailable: editHeroForm.downtimeAvailable,
         inactive: editHeroForm.inactive,
         updatedAt: serverTimestamp(),
