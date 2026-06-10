@@ -1,5 +1,6 @@
 import { db } from './firebase.js';
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { DEFAULT_HERO_PASSWORD } from '../config/constants.js';
 
 export async function verifyAdminPassword(
     inputPassword,
@@ -77,7 +78,7 @@ export async function isPasswordHeroName(
         collectionFn(dbRef, 'heroes'),
         whereFn('name', '==', heroName),
     ));
-    return snap.docs.some((d) => !!(d.data()?.password || '').trim());
+    return !snap.empty;
 }
 
 export async function authenticateHero(
@@ -97,8 +98,8 @@ export async function authenticateHero(
     if (snap.empty) throw new Error('Героя не знайдено');
 
     const heroDoc = snap.docs.find((d) => {
-        const pw = (d.data()?.password || '').trim();
-        return pw && pw === password;
+        const pw = (d.data()?.password || DEFAULT_HERO_PASSWORD).trim();
+        return pw === password;
     });
     if (!heroDoc) throw new Error('Невірний пароль');
 

@@ -120,11 +120,11 @@ test('isPasswordHeroName returns false for admin', async () => {
   assert.equal(result, false);
 });
 
-test('isPasswordHeroName returns false when hero has no password', async () => {
+test('isPasswordHeroName returns true when hero exists without password', async () => {
   const result = await isPasswordHeroName('Boromir', makeHeroDeps([
     { id: 'hero-1', data: { name: 'Boromir' } },
   ]));
-  assert.equal(result, false);
+  assert.equal(result, true);
 });
 
 test('isPasswordHeroName returns true when hero has a password set', async () => {
@@ -179,13 +179,12 @@ test('authenticateHero throws when password does not match', async () => {
   );
 });
 
-test('authenticateHero throws when hero has no password field', async () => {
-  await assert.rejects(
-    () => authenticateHero('Boromir', 'pass', makeHeroDeps([
-      { id: 'hero-1', data: { name: 'Boromir' } },
-    ])),
-    { message: 'Невірний пароль' },
-  );
+test('authenticateHero uses default password when hero has no password field', async () => {
+  const result = await authenticateHero('Boromir', 'password', makeHeroDeps([
+    { id: 'hero-1', data: { name: 'Boromir' } },
+  ]));
+
+  assert.deepEqual(result, { heroId: 'hero-1', name: 'Boromir' });
 });
 
 test('authenticateHero returns heroId and name on success', async () => {

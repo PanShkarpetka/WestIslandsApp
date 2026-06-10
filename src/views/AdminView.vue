@@ -391,10 +391,10 @@
             <v-switch v-model="editHeroForm.inactive" label="Неактивний герой" inset color="error" />
             <v-text-field
               v-model="editHeroForm.password"
-              label="Пароль гравця (залиште порожнім для відключення входу)"
+              label="Пароль гравця"
               type="password"
               class="mb-2"
-              hint="Встановіть пароль, щоб герой міг входити як гравець"
+              hint="Якщо залишити порожнім, буде встановлено password"
               persistent-hint
             />
           </v-card-text>
@@ -593,7 +593,7 @@ import { usePopulationStore } from '@/store/populationStore';
 import { createNewCycleWithEffects } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import { loadCraftItems } from '@/services/craftingService';
-import { DEFAULT_ISLAND_ID } from '@/config/constants.js';
+import { DEFAULT_HERO_PASSWORD, DEFAULT_ISLAND_ID } from '@/config/constants.js';
 import { aggregateReligionActions, buildReligionSummaryText } from '@/utils/religionSummary.js';
 
 const logEntries = ref([]);
@@ -1484,7 +1484,7 @@ function openHeroEditor(hero) {
   editHeroForm.dndbeyondCharacterId = hero.dndbeyondCharacterId || '';
   editHeroForm.downtimeAvailable = hero.downtimeAvailable;
   editHeroForm.inactive = hero.inactive;
-  editHeroForm.password = hero.password || '';
+  editHeroForm.password = hero.password || DEFAULT_HERO_PASSWORD;
   heroEditDialog.value = true;
 }
 
@@ -1515,6 +1515,7 @@ async function createHero() {
         dndbeyondCharacterId,
         downtimeAvailable: true,
         inactive: false,
+        password: DEFAULT_HERO_PASSWORD,
         createdAt: serverTimestamp(),
       });
 
@@ -1572,10 +1573,7 @@ async function saveHero() {
         inactive: editHeroForm.inactive,
         updatedAt: serverTimestamp(),
       };
-      const trimmedPassword = editHeroForm.password.trim();
-      if (trimmedPassword) {
-        heroUpdates.password = trimmedPassword;
-      }
+      heroUpdates.password = editHeroForm.password.trim() || DEFAULT_HERO_PASSWORD;
       transaction.update(heroRef, heroUpdates);
 
       if (currentHero?.clergyId) {

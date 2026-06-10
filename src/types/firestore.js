@@ -339,7 +339,7 @@
  * @property {boolean} passiveOVInactive
  * @property {boolean} downtimeAvailable
  * @property {HeroCraftingData} crafting
- * @property {string} [password] - when set, enables player login
+ * @property {string} password - player login password; defaults to "password" until manually changed
  * @property {number} [goldBalance] - personal gold balance, never negative
  * @property {Record<string, number>} [goods] - personal goods inventory, keyed by goodId
  */

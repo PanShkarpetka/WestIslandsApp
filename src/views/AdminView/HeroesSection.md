@@ -9,11 +9,11 @@ Rows from `heroRows` computed — heroes joined with clergy (religion name, cler
 
 ## Add hero form
 Fields: name, religion (select), dndbeyondCharacterId.  
-On save: Firestore transaction that atomically creates both the `heroes` document and a `clergy` document linking hero to religion. Initial clergy state: `faith: 0, faithMax: 0`.
+On save: Firestore transaction that atomically creates both the `heroes` document and a `clergy` document linking hero to religion. New heroes receive the default player password `password`. Initial clergy state: `faith: 0, faithMax: 0`.
 
 ## Edit hero dialog (`heroEditDialog`)
-Fields same as add form + `downtimeAvailable` switch + `inactive` switch.  
-On save: transaction that updates `heroes` doc and updates (or creates if missing) the linked `clergy` doc's religion reference.
+Fields same as add form + `downtimeAvailable` switch + `inactive` switch + player password.  
+On save: transaction that updates `heroes` doc and updates (or creates if missing) the linked `clergy` doc's religion reference. Empty password input is reset to the default `password`.
 
 ## Balance snapshot history table
 Shows last N snapshots (configurable: 5/10/20/50) from `hero-balance-sync-logs` collection.  
