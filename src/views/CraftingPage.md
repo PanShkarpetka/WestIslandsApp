@@ -31,6 +31,11 @@ Inputs: item slug + quantity. Output: component price, each discount tier, disco
 ## Admin craft dialog
 `CraftActionForm` receives `heroes`, `items`, and `defaultHeroId`. After save, calls `onCraftSaved()` which closes dialog and reloads data.
 
+## Player craft requests
+Hero logins (`userStore.heroId`) see a "Подати крафт" action in the hero banner. It opens `CraftActionForm` in `mode="request"` with the hero selector locked to the logged-in hero. Saving requires item quantity and "Зайняло днів" values greater than zero, then creates `crafting-requests/{requestId}` with `status: "pending"`.
+
+Pending requests are not valid crafting progress: they do not update `heroes/{heroId}.crafting`, hero crafting logs, cycle crafting logs, dashboard summaries, or discount calculations. Admin approval in AdminView is the only flow that turns the request into counted crafting.
+
 ## Stores & services
 - `useUserStore` — `isAdmin`
 - `craftingService.js` — `loadCraftItems()`, `loadHeroesForCrafting()`, `getEmptyCraftingState()`

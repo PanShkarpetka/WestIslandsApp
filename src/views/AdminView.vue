@@ -5,6 +5,16 @@
 
       <v-divider class="my-4" />
 
+      <v-tabs v-model="adminTab" class="admin-tabs mb-4" color="primary" show-arrows>
+        <v-tab value="cycles" prepend-icon="mdi-calendar-sync">Цикли</v-tab>
+        <v-tab value="heroes" prepend-icon="mdi-account-group">Герої</v-tab>
+        <v-tab value="assets" prepend-icon="mdi-package-variant">Ресурси</v-tab>
+        <v-tab value="crafting" prepend-icon="mdi-anvil">Крафтинг</v-tab>
+        <v-tab value="logs" prepend-icon="mdi-format-list-bulleted">Лог подій</v-tab>
+      </v-tabs>
+
+      <v-window v-model="adminTab" class="admin-tab-window">
+        <v-window-item value="cycles">
       <v-card-title class="text-h6">Керування циклами</v-card-title>
       <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">{{ cycleError }}</v-alert>
       <v-alert v-if="cycleSuccess" type="success" variant="tonal" class="mb-4">{{ cycleSuccess }}</v-alert>
@@ -97,7 +107,9 @@
         </template>
       </v-form>
 
-      <v-divider class="my-4" />
+        </v-window-item>
+
+        <v-window-item value="heroes">
 
       <v-card-title class="text-h6">Герої</v-card-title>
       <v-alert v-if="heroError" type="error" variant="tonal" class="mb-4">{{ heroError }}</v-alert>
@@ -481,7 +493,9 @@
 
 
 
-      <v-divider class="my-4" />
+        </v-window-item>
+
+        <v-window-item value="assets">
 
       <!-- Trade Goods -->
       <v-card-title class="text-h6">Торгові товари</v-card-title>
@@ -585,9 +599,77 @@
         </v-card>
       </v-dialog>
 
-      <v-divider class="my-4" />
+        </v-window-item>
+
+        <v-window-item value="crafting">
 
       <v-card-title class="text-h6">Crafting</v-card-title>
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="d-flex flex-wrap justify-space-between align-center ga-3 mb-3">
+          <div class="text-subtitle-1">
+            Заявки на крафт
+            <v-chip v-if="pendingCraftRequestRows.length" size="small" color="warning" variant="tonal" class="ml-2">
+              {{ pendingCraftRequestRows.length }}
+            </v-chip>
+          </div>
+          <div class="d-flex flex-wrap ga-2">
+            <v-btn
+              color="success"
+              prepend-icon="mdi-check"
+              :disabled="!selectedApproveCraftRequestIds.length && !selectedRejectCraftRequestIds.length"
+              :loading="craftRequestReviewing"
+              @click="applyCraftRequestReviews"
+            >
+              Застосувати
+            </v-btn>
+          </div>
+        </div>
+
+        <v-alert v-if="craftRequestError" type="error" variant="tonal" class="mb-3">{{ craftRequestError }}</v-alert>
+        <v-alert v-if="craftRequestSuccess" type="success" variant="tonal" class="mb-3">{{ craftRequestSuccess }}</v-alert>
+        <v-alert
+          v-if="!pendingCraftRequestRows.length"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Немає заявок на підтвердження.
+        </v-alert>
+
+        <v-data-table
+          v-else
+          :headers="craftRequestHeaders"
+          :items="pendingCraftRequestRows"
+          :items-per-page="10"
+          class="elevation-1"
+          density="compact"
+        >
+          <template #item.createdAt="{ item }">
+            {{ formatTimestamp(item.createdAt) }}
+          </template>
+          <template #item.amountCrafted="{ item }">
+            <span class="font-weight-medium">{{ item.amountCrafted }}</span>
+          </template>
+          <template #item.craftDaysSpent="{ item }">
+            <span class="font-weight-medium">{{ item.craftDaysSpent }}</span>
+          </template>
+          <template #item.approve="{ item }">
+            <v-checkbox-btn
+              color="success"
+              :model-value="selectedApproveCraftRequestIds.includes(item.id)"
+              @update:model-value="setCraftRequestDecision(item.id, 'approve', $event)"
+            />
+          </template>
+          <template #item.reject="{ item }">
+            <v-checkbox-btn
+              color="error"
+              :model-value="selectedRejectCraftRequestIds.includes(item.id)"
+              @update:model-value="setCraftRequestDecision(item.id, 'reject', $event)"
+            />
+          </template>
+        </v-data-table>
+      </v-card>
+
       <CraftActionForm
         class="mb-4"
         :heroes="heroRows"
@@ -596,6 +678,53 @@
         @saved="refreshCraftingAdminData"
       />
 
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="d-flex flex-wrap justify-space-between align-center ga-3 mb-3">
+          <div class="text-subtitle-1">Лог крафту за теперішній цикл</div>
+          <v-btn
+            color="info"
+            variant="tonal"
+            prepend-icon="mdi-refresh"
+            :loading="currentCycleCraftingLogLoading"
+            @click="loadCurrentCycleCraftingLogs"
+          >
+            Оновити
+          </v-btn>
+        </div>
+        <v-alert v-if="currentCycleCraftingLogError" type="error" variant="tonal" class="mb-3">
+          {{ currentCycleCraftingLogError }}
+        </v-alert>
+        <v-alert
+          v-if="!currentCycleId"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Немає активного циклу для журналу крафту.
+        </v-alert>
+        <v-data-table
+          v-else
+          :headers="currentCycleCraftingLogHeaders"
+          :items="currentCycleCraftingLogRows"
+          :items-per-page="10"
+          class="elevation-1"
+          density="compact"
+        >
+          <template #item.createdAt="{ item }">
+            {{ formatTimestamp(item.createdAt) }}
+          </template>
+          <template #item.amountCrafted="{ item }">
+            <span class="font-weight-medium">{{ item.amountCrafted }}</span>
+          </template>
+          <template #item.craftDaysSpent="{ item }">
+            <span>{{ item.craftDaysSpent || '—' }}</span>
+          </template>
+        </v-data-table>
+      </v-card>
+
+        </v-window-item>
+
+        <v-window-item value="logs">
       <v-card-title class="text-h6">Лог подій</v-card-title>
       <v-data-table
         :headers="headers"
@@ -608,6 +737,8 @@
           {{ formatTimestamp(item.timestamp) }}
         </template>
       </v-data-table>
+        </v-window-item>
+      </v-window>
     </v-card>
   </v-container>
 
@@ -665,11 +796,18 @@ import { useIslandStore } from '@/store/islandStore';
 import { usePopulationStore } from '@/store/populationStore';
 import { createNewCycleWithEffects } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
-import { loadCraftItems } from '@/services/craftingService';
+import {
+  approveCraftingRequest,
+  loadCraftItems,
+  rejectCraftingRequest,
+  subscribePendingCraftingRequests,
+} from '@/services/craftingService';
 import { DEFAULT_HERO_PASSWORD, DEFAULT_ISLAND_ID } from '@/config/constants.js';
 import { aggregateReligionActions, buildReligionSummaryText } from '@/utils/religionSummary.js';
+import { getFirestoreTimestampMillis } from '@/utils/firestoreTimestamp.js';
 import { adjustHeroGoldBalance, SNAPSHOT_HISTORY_DEFAULT_OPEN } from '@/services/heroBalanceService.js';
 
+const adminTab = ref('cycles');
 const logEntries = ref([]);
 const cycleSaving = ref(false);
 const cycleError = ref('');
@@ -901,6 +1039,55 @@ async function deleteGood(item) {
 
 const craftItemsForAdmin = ref([]);
 const selectedHeroIdForCrafting = ref('');
+const pendingCraftRequests = ref([]);
+const currentCycleCraftingLogs = ref([]);
+const currentCycleCraftingLogLoading = ref(false);
+const currentCycleCraftingLogError = ref('');
+const selectedApproveCraftRequestIds = ref([]);
+const selectedRejectCraftRequestIds = ref([]);
+const craftRequestReviewing = ref(false);
+const craftRequestError = ref('');
+const craftRequestSuccess = ref('');
+
+const craftRequestHeaders = [
+  { title: 'Час', key: 'createdAt' },
+  { title: 'Герой', key: 'heroName' },
+  { title: 'Предмет', key: 'itemName' },
+  { title: 'Кількість', key: 'amountCrafted' },
+  { title: 'Зайняло днів', key: 'craftDaysSpent' },
+  { title: 'Підтвердити', key: 'approve', sortable: false },
+  { title: 'Відхилити', key: 'reject', sortable: false },
+];
+
+const currentCycleId = computed(() => (latestCycle.value && !latestCycle.value.finishedAt ? latestCycle.value.id : ''));
+
+const currentCycleCraftingLogHeaders = [
+  { title: 'Час', key: 'createdAt' },
+  { title: 'Герой', key: 'heroName' },
+  { title: 'Предмет', key: 'itemName' },
+  { title: 'Кількість', key: 'amountCrafted' },
+  { title: 'Днів', key: 'craftDaysSpent' },
+  { title: 'Хто записав', key: 'createdBy' },
+];
+
+const pendingCraftRequestRows = computed(() =>
+  pendingCraftRequests.value.map((request) => ({
+    ...request,
+    heroName: heroRows.value.find((hero) => hero.id === request.heroId)?.name || request.heroId,
+    itemName: request.itemName || request.itemSlug,
+  })),
+);
+
+const currentCycleCraftingLogRows = computed(() =>
+  [...currentCycleCraftingLogs.value]
+    .sort((a, b) => getFirestoreTimestampMillis(b.createdAt) - getFirestoreTimestampMillis(a.createdAt))
+    .map((log) => ({
+      ...log,
+      heroName: log.heroName || log.heroId || '—',
+      itemName: log.itemName || log.itemSlug || '—',
+      createdBy: log.createdBy || log.approvedBy || '—',
+    })),
+);
 
 const newHeroForm = reactive({
   name: '',
@@ -923,6 +1110,7 @@ let stopHeroes = null;
 let stopReligions = null;
 let stopClergy = null;
 let stopHeroBalanceSyncLogs = null;
+let stopCraftingRequests = null;
 
 const headers = [
   { title: 'Час', key: 'timestamp' },
@@ -1156,6 +1344,7 @@ async function saveCycleDates() {
     editCycleSuccess.value = 'Дати циклу оновлено.';
     await loadLatestCycle();
     await loadAllCycles();
+    await loadCurrentCycleCraftingLogs();
   } catch (error) {
     console.error('[admin] Failed to update cycle dates', error);
     editCycleError.value = 'Не вдалося оновити дати циклу.';
@@ -1206,6 +1395,7 @@ async function createCycle() {
     cycleSuccess.value = 'Новий цикл успішно створено.';
     cycleForm.notes = '';
     await loadLatestCycle();
+    await loadCurrentCycleCraftingLogs();
     cycleForm.startedDate = suggestNextCycleDate();
     cycleDaysInput.value = null;
   } catch (error) {
@@ -1735,6 +1925,87 @@ async function saveHero() {
 
 async function refreshCraftingAdminData() {
   craftItemsForAdmin.value = await loadCraftItems();
+  await loadCurrentCycleCraftingLogs();
+}
+
+async function loadCurrentCycleCraftingLogs() {
+  currentCycleCraftingLogError.value = '';
+  currentCycleCraftingLogs.value = [];
+
+  if (!currentCycleId.value) return;
+
+  currentCycleCraftingLogLoading.value = true;
+  try {
+    const snapshot = await getDocs(query(
+      collection(db, 'cycle-crafting-logs'),
+      where('cycleId', '==', currentCycleId.value),
+    ));
+    currentCycleCraftingLogs.value = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+  } catch (error) {
+    console.error('[admin] Failed to load current cycle crafting logs', error);
+    currentCycleCraftingLogError.value = 'Не вдалося завантажити лог крафту за теперішній цикл.';
+  } finally {
+    currentCycleCraftingLogLoading.value = false;
+  }
+}
+
+function setCraftRequestDecision(requestId, decision, checked) {
+  if (!requestId) return;
+  if (decision === 'approve') {
+    selectedApproveCraftRequestIds.value = checked
+      ? [...new Set([...selectedApproveCraftRequestIds.value, requestId])]
+      : selectedApproveCraftRequestIds.value.filter((id) => id !== requestId);
+    if (checked) {
+      selectedRejectCraftRequestIds.value = selectedRejectCraftRequestIds.value.filter((id) => id !== requestId);
+    }
+    return;
+  }
+
+  selectedRejectCraftRequestIds.value = checked
+    ? [...new Set([...selectedRejectCraftRequestIds.value, requestId])]
+    : selectedRejectCraftRequestIds.value.filter((id) => id !== requestId);
+  if (checked) {
+    selectedApproveCraftRequestIds.value = selectedApproveCraftRequestIds.value.filter((id) => id !== requestId);
+  }
+}
+
+async function applyCraftRequestReviews() {
+  craftRequestError.value = '';
+  craftRequestSuccess.value = '';
+
+  const approveIds = [...selectedApproveCraftRequestIds.value];
+  const rejectIds = [...selectedRejectCraftRequestIds.value];
+  if (!approveIds.length && !rejectIds.length) return;
+
+  craftRequestReviewing.value = true;
+  try {
+    for (const requestId of approveIds) {
+      await approveCraftingRequest({
+        requestId,
+        craftItems: craftItemsForAdmin.value,
+        reviewedBy: 'Admin',
+      });
+    }
+    for (const requestId of rejectIds) {
+      await rejectCraftingRequest({
+        requestId,
+        reviewedBy: 'Admin',
+      });
+    }
+
+    selectedApproveCraftRequestIds.value = [];
+    selectedRejectCraftRequestIds.value = [];
+    craftRequestSuccess.value = `Підтверджено: ${approveIds.length}, відхилено: ${rejectIds.length}.`;
+    await refreshCraftingAdminData();
+  } catch (error) {
+    console.error('[admin] Failed to review crafting requests', error);
+    craftRequestError.value = error?.message || 'Не вдалося застосувати рішення по заявках.';
+  } finally {
+    craftRequestReviewing.value = false;
+  }
 }
 
 watch(heroRows, (rows) => {
@@ -1757,6 +2028,12 @@ onMounted(async () => {
   });
   yieldBuildingStore.subscribe();
   await refreshCraftingAdminData();
+  stopCraftingRequests = subscribePendingCraftingRequests((requests) => {
+    pendingCraftRequests.value = requests;
+    const pendingIds = new Set(requests.map((request) => request.id));
+    selectedApproveCraftRequestIds.value = selectedApproveCraftRequestIds.value.filter((id) => pendingIds.has(id));
+    selectedRejectCraftRequestIds.value = selectedRejectCraftRequestIds.value.filter((id) => pendingIds.has(id));
+  });
 });
 
 onBeforeUnmount(() => {
@@ -1766,6 +2043,7 @@ onBeforeUnmount(() => {
   stopClergy?.();
   stopHeroBalanceSyncLogs?.();
   stopGoods?.();
+  stopCraftingRequests?.();
   yieldBuildingStore.stop();
 });
 

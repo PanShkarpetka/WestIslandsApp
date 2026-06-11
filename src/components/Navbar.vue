@@ -25,6 +25,12 @@
       </v-btn>
       <v-btn v-if="userStore.isAdmin" icon to="/admin" variant="text" class="nav-icon-btn" title="Адмін">
         <v-icon>mdi-shield-account</v-icon>
+        <v-badge
+          v-if="pendingCraftRequestCount"
+          :content="pendingCraftRequestCount"
+          color="error"
+          floating
+        />
         <v-tooltip activator="parent" location="bottom">Адмін</v-tooltip>
       </v-btn>
 
@@ -112,12 +118,15 @@
 <script setup>
 import { useUserStore } from '../store/userStore';
 import { useRouter } from 'vue-router';
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount, watch } from 'vue';
 import { DEFAULT_ISLAND_ID } from '../config/constants.js';
+import { subscribePendingCraftingRequestCount } from '../services/craftingService';
 
 const userStore = useUserStore();
 const router = useRouter();
 const drawer = ref(false);
+const pendingCraftRequestCount = ref(0);
+let stopPendingCraftRequestCount = null;
 
 const navItems = [
   { to: '/ships',                       icon: 'mdi-sail-boat',           label: 'Кораблі' },
@@ -148,6 +157,25 @@ function login() {
 }
 
 const isMobile = computed(() => window.innerWidth < 600);
+
+watch(
+  () => userStore.isAdmin,
+  (isAdmin) => {
+    stopPendingCraftRequestCount?.();
+    stopPendingCraftRequestCount = null;
+    pendingCraftRequestCount.value = 0;
+    if (isAdmin) {
+      stopPendingCraftRequestCount = subscribePendingCraftingRequestCount((count) => {
+        pendingCraftRequestCount.value = count;
+      });
+    }
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  stopPendingCraftRequestCount?.();
+});
 </script>
 
 <style scoped>

@@ -12,6 +12,14 @@
         <div class="d-flex flex-wrap ga-2 align-start">
           <v-btn color="info" variant="tonal" prepend-icon="mdi-refresh" @click="loadData">Оновити</v-btn>
           <v-btn
+            v-if="canSubmitCraftRequest"
+            color="success"
+            prepend-icon="mdi-file-document-plus"
+            @click="requestDialog = true"
+          >
+            Подати крафт
+          </v-btn>
+          <v-btn
             v-if="isAdmin"
             color="primary"
             prepend-icon="mdi-hammer"
@@ -268,7 +276,23 @@
         :heroes="heroes"
         :items="craftItems"
         :default-hero-id="selectedHeroId"
+        mode="admin"
         @saved="onCraftSaved"
+      />
+    </v-dialog>
+
+    <v-dialog
+      v-model="requestDialog"
+      max-width="860"
+      scrim="rgba(6, 12, 32, 0.78)"
+    >
+      <CraftActionForm
+        :heroes="heroes"
+        :items="craftItems"
+        :default-hero-id="userStore.heroId"
+        :locked-hero-id="userStore.heroId"
+        mode="request"
+        @saved="onCraftRequestSaved"
       />
     </v-dialog>
   </v-container>
@@ -288,12 +312,14 @@ import {
 import { useUserStore } from '@/store/userStore';
 
 const userStore = useUserStore();
-const isAdmin = computed(() => userStore.isAdmin);
+const isAdmin = computed(() => userStore.isAdmin ?? false);
+const canSubmitCraftRequest = computed(() => userStore.isHeroUser && !isAdmin.value);
 
 const heroes = ref([]);
 const craftItems = ref([]);
 const selectedHeroId = ref('');
 const craftDialog = ref(false);
+const requestDialog = ref(false);
 const showUncraftedItems = ref(false);
 
 const calculator = reactive({ itemSlug: '', amount: 1 });
@@ -393,7 +419,9 @@ async function loadData() {
   craftItems.value = loadedItems;
 
   if (!loadedHeroes.some((hero) => hero.id === selectedHeroId.value)) {
-    selectedHeroId.value = loadedHeroes[0]?.id || '';
+    selectedHeroId.value = userStore.heroId && loadedHeroes.some((hero) => hero.id === userStore.heroId)
+      ? userStore.heroId
+      : loadedHeroes[0]?.id || '';
   }
   if (!calculator.itemSlug && loadedItems.length) {
     calculator.itemSlug = loadedItems[0].slug;
@@ -403,6 +431,10 @@ async function loadData() {
 async function onCraftSaved() {
   craftDialog.value = false;
   await loadData();
+}
+
+async function onCraftRequestSaved() {
+  requestDialog.value = false;
 }
 
 onMounted(loadData);

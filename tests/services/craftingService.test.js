@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadHeroesForCrafting, registerCraftAction } from '../../src/services/craftingService.ts';
+import {
+  approveCraftingRequest,
+  loadHeroesForCrafting,
+  registerCraftAction,
+  rejectCraftingRequest,
+  submitCraftingRequest,
+} from '../../src/services/craftingService.ts';
 import { createMockFirestore } from '../helpers/mockFirestore.js';
 
 const SWORD_ITEM = {
@@ -37,10 +43,13 @@ function makeDeps(seed = {}) {
     mock,
     deps: {
       db: mock.db,
+      addDoc: mock.firebase.addDoc,
       doc: mock.firebase.doc,
       collection: mock.firebase.collection,
+      getDoc: mock.firebase.getDoc,
       getDocs: mock.firebase.getDocs,
       query: mock.firebase.query,
+      where: mock.firebase.where,
       orderBy: mock.firebase.orderBy,
       limit: mock.firebase.limit,
       runTransaction: mock.firebase.runTransaction,
@@ -91,6 +100,161 @@ test('loadHeroesForCrafting returns only active heroes', async () => {
     ['active', 'missingFlag'],
   );
   assert.equal(heroes.some((hero) => hero.id === 'inactive'), false);
+});
+
+test('submitCraftingRequest creates pending request without updating hero progress', async () => {
+  const { mock, deps } = makeDeps({
+    'heroes/hero1': { name: 'Gandalf', crafting: null },
+  });
+
+  await submitCraftingRequest(
+    { heroId: 'hero1', heroName: 'Gandalf', itemSlug: 'longsword', amountCrafted: 2, craftDaysSpent: 4, craftItems: [SWORD_ITEM], createdBy: 'Gandalf' },
+    deps,
+  );
+
+  const requests = Object.values(mock.list('crafting-requests'));
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].status, 'pending');
+  assert.equal(requests[0].heroName, 'Gandalf');
+  assert.equal(requests[0].itemSlug, 'longsword');
+  assert.equal(requests[0].amountCrafted, 2);
+  assert.equal(requests[0].craftDaysSpent, 4);
+  assert.equal(mock.get('heroes/hero1').crafting, null);
+  assert.equal(Object.values(mock.list('heroes/hero1/crafting-logs')).length, 0);
+});
+
+test('submitCraftingRequest uses canonical hero name instead of client-provided name', async () => {
+  const { mock, deps } = makeDeps({
+    'heroes/hero1': { name: 'Gandalf', crafting: null },
+  });
+
+  await submitCraftingRequest(
+    { heroId: 'hero1', heroName: 'Spoofed Name', itemSlug: 'longsword', amountCrafted: 1, craftDaysSpent: 1, craftItems: [SWORD_ITEM], createdBy: 'Gandalf' },
+    deps,
+  );
+
+  const requests = Object.values(mock.list('crafting-requests'));
+  assert.equal(requests[0].heroName, 'Gandalf');
+});
+
+test('submitCraftingRequest rejects missing or inactive heroes', async () => {
+  const { deps } = makeDeps({
+    'heroes/inactive': { name: 'Retired', inactive: true, crafting: null },
+  });
+
+  await assert.rejects(
+    () => submitCraftingRequest(
+      { heroId: 'missing', itemSlug: 'longsword', amountCrafted: 1, craftDaysSpent: 1, craftItems: [SWORD_ITEM], createdBy: 'Gandalf' },
+      deps,
+    ),
+    /Hero not found/,
+  );
+
+  await assert.rejects(
+    () => submitCraftingRequest(
+      { heroId: 'inactive', itemSlug: 'longsword', amountCrafted: 1, craftDaysSpent: 1, craftItems: [SWORD_ITEM], createdBy: 'Retired' },
+      deps,
+    ),
+    /Hero is inactive/,
+  );
+});
+
+test('submitCraftingRequest rejects non-positive days spent', async () => {
+  const { deps } = makeDeps({
+    'heroes/hero1': { name: 'Gandalf', crafting: null },
+  });
+
+  await assert.rejects(
+    () => submitCraftingRequest(
+      { heroId: 'hero1', heroName: 'Gandalf', itemSlug: 'longsword', amountCrafted: 2, craftDaysSpent: 0, craftItems: [SWORD_ITEM], createdBy: 'Gandalf' },
+      deps,
+    ),
+    /Craft days spent must be greater than 0/,
+  );
+});
+
+test('approveCraftingRequest updates hero crafting and marks request approved', async () => {
+  const { mock, deps } = makeDeps({
+    'heroes/hero1': { name: 'Gandalf', crafting: null },
+    'crafting-requests/request1': {
+      heroId: 'hero1',
+      heroName: 'Gandalf',
+      itemSlug: 'longsword',
+      itemName: 'Longsword',
+      amountCrafted: 2,
+      craftDaysSpent: 4,
+      status: 'pending',
+      createdBy: 'Gandalf',
+    },
+  });
+
+  const result = await approveCraftingRequest(
+    { requestId: 'request1', craftItems: [SWORD_ITEM], reviewedBy: 'Admin' },
+    deps,
+  );
+
+  assert.equal(result.heroId, 'hero1');
+  assert.equal(result.amountCrafted, 2);
+  assert.equal(result.craftDaysSpent, 4);
+
+  const request = mock.get('crafting-requests/request1');
+  assert.equal(request.status, 'approved');
+  assert.equal(request.reviewedBy, 'Admin');
+  assert.ok(request.approvedLogId);
+
+  const heroData = mock.get('heroes/hero1');
+  assert.ok(heroData.crafting.itemProgress.longsword);
+
+  const logs = Object.values(mock.list('heroes/hero1/crafting-logs'));
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].approvedFromRequestId, 'request1');
+  assert.equal(logs[0].craftDaysSpent, 4);
+});
+
+test('rejectCraftingRequest refuses already reviewed requests', async () => {
+  const { mock, deps } = makeDeps({
+    'heroes/hero1': { name: 'Gandalf', crafting: null },
+    'crafting-requests/request1': {
+      heroId: 'hero1',
+      heroName: 'Gandalf',
+      itemSlug: 'longsword',
+      itemName: 'Longsword',
+      amountCrafted: 2,
+      craftDaysSpent: 4,
+      status: 'approved',
+      createdBy: 'Gandalf',
+      approvedLogId: 'log1',
+    },
+  });
+
+  await assert.rejects(
+    () => rejectCraftingRequest({ requestId: 'request1', reviewedBy: 'Admin' }, deps),
+    /Crafting request is already reviewed/,
+  );
+
+  assert.equal(mock.get('crafting-requests/request1').status, 'approved');
+  assert.equal(mock.get('crafting-requests/request1').approvedLogId, 'log1');
+});
+
+test('rejectCraftingRequest marks pending request rejected', async () => {
+  const { mock, deps } = makeDeps({
+    'crafting-requests/request1': {
+      heroId: 'hero1',
+      heroName: 'Gandalf',
+      itemSlug: 'longsword',
+      itemName: 'Longsword',
+      amountCrafted: 2,
+      craftDaysSpent: 4,
+      status: 'pending',
+      createdBy: 'Gandalf',
+    },
+  });
+
+  await rejectCraftingRequest({ requestId: 'request1', reviewedBy: 'Admin' }, deps);
+
+  const request = mock.get('crafting-requests/request1');
+  assert.equal(request.status, 'rejected');
+  assert.equal(request.reviewedBy, 'Admin');
 });
 
 test('registerCraftAction links log to current active cycle', async () => {

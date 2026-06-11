@@ -400,6 +400,7 @@
  * @property {string} itemSlug
  * @property {string} itemName
  * @property {number} amountCrafted
+ * @property {number} [craftDaysSpent] - Days the player reports spending on this craft request
  * @property {number} componentPriceAtTime
  * @property {number} totalComponentPriceAtTime
  * @property {number} categoryBefore
@@ -415,6 +416,29 @@
  * @property {string} createdBy
  * @property {string|null} cycleId
  * @property {string} cycleStartedAt
+ * @property {string} [approvedFromRequestId]
+ * @property {string} [approvedBy]
+ */
+
+/**
+ * Collection: `crafting-requests/{requestId}`
+ * Pending player-submitted crafting entries. These do not affect hero crafting
+ * progress until an admin approves them.
+ * @typedef {Object} CraftingRequestDoc
+ * @property {string} id
+ * @property {string} heroId
+ * @property {string} heroName
+ * @property {string} itemSlug
+ * @property {string} itemName
+ * @property {number} amountCrafted
+ * @property {number} craftDaysSpent
+ * @property {'pending'|'approved'|'rejected'} status
+ * @property {import('firebase/firestore').Timestamp} createdAt
+ * @property {string} createdBy
+ * @property {import('firebase/firestore').Timestamp|null} reviewedAt
+ * @property {string|null} reviewedBy
+ * @property {string} reviewNote
+ * @property {string|null} approvedLogId
  */
 
 /**
