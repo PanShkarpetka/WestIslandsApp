@@ -28,9 +28,9 @@
             <td class="ledger-date">{{ formatDate(t.createdAt) }}</td>
             <td class="ledger-who">{{ t.nickname || t.userId }}</td>
             <td>
-              <span class="tx-type" :class="t.type === 'deposit' ? 'tx-deposit' : 'tx-withdraw'">
-                <v-icon size="13" class="mr-1">{{ t.type === 'deposit' ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold' }}</v-icon>
-                {{ t.type === 'deposit' ? 'Внесок' : 'Зняття' }}
+              <span class="tx-type" :class="txTypeMeta(t).className">
+                <v-icon size="13" class="mr-1">{{ txTypeMeta(t).icon }}</v-icon>
+                {{ txTypeMeta(t).label }}
               </span>
             </td>
             <td class="text-right">
@@ -66,6 +66,7 @@ import { computed, onMounted } from "vue"
 import { useTreasuryStore } from "@/store/treasuryStore"
 import { Timestamp } from "firebase/firestore"
 import { formatAmount } from "@/utils/formatters"
+import { getTreasuryTransactionTypeMeta } from "@/utils/treasuryTransactions"
 
 const treasury = useTreasuryStore()
 const tx = computed(() => treasury.tx)
@@ -80,6 +81,7 @@ function formatDate(v) {
 
 function reload() { treasury.loadFirstPage() }
 function loadMore() { treasury.loadNextPage() }
+function txTypeMeta(transaction) { return getTreasuryTransactionTypeMeta(transaction) }
 
 onMounted(() => treasury.loadFirstPage())
 </script>
