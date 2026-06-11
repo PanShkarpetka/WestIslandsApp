@@ -392,8 +392,8 @@ async function loadData() {
   heroes.value = loadedHeroes;
   craftItems.value = loadedItems;
 
-  if (!selectedHeroId.value && loadedHeroes.length) {
-    selectedHeroId.value = loadedHeroes[0].id;
+  if (!loadedHeroes.some((hero) => hero.id === selectedHeroId.value)) {
+    selectedHeroId.value = loadedHeroes[0]?.id || '';
   }
   if (!calculator.itemSlug && loadedItems.length) {
     calculator.itemSlug = loadedItems[0].slug;

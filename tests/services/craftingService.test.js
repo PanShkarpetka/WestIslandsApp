@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerCraftAction } from '../../src/services/craftingService.ts';
+import { loadHeroesForCrafting, registerCraftAction } from '../../src/services/craftingService.ts';
 import { createMockFirestore } from '../helpers/mockFirestore.js';
 
 const SWORD_ITEM = {
@@ -75,6 +75,22 @@ test('registerCraftAction updates hero crafting progress and writes a log entry'
   assert.equal(logs[0].componentPriceAtTime, 15);
   assert.equal(logs[0].totalComponentPriceAtTime, 45);
   assert.equal(logs[0].createdBy, 'player1');
+});
+
+test('loadHeroesForCrafting returns only active heroes', async () => {
+  const { deps } = makeDeps({
+    'heroes/active': { name: 'Aela', inactive: false, crafting: { itemProgress: {} } },
+    'heroes/missingFlag': { name: 'Borin' },
+    'heroes/inactive': { name: 'Cirdan', inactive: true },
+  });
+
+  const heroes = await loadHeroesForCrafting(deps);
+
+  assert.deepEqual(
+    heroes.map((hero) => hero.id),
+    ['active', 'missingFlag'],
+  );
+  assert.equal(heroes.some((hero) => hero.id === 'inactive'), false);
 });
 
 test('registerCraftAction links log to current active cycle', async () => {

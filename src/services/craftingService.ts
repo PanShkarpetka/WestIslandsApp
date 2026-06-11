@@ -52,16 +52,25 @@ export async function loadCraftItems() {
     .filter((item) => item.isActive);
 }
 
-export async function loadHeroesForCrafting() {
-  const snapshot = await getDocs(query(collection(db, 'heroes'), orderBy('name', 'asc')));
-  return snapshot.docs.map((docSnap) => {
-    const data = docSnap.data() || {};
-    return {
-      id: docSnap.id,
-      name: data.name || data.heroName || data.nickname || docSnap.id,
-      crafting: data.crafting || null,
-    };
-  });
+export async function loadHeroesForCrafting({
+  collection: collectionFn = collection,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  orderBy: orderByFn = orderBy,
+  db: firestoreDb = db,
+}: any = {}) {
+  const snapshot = await getDocsFn(queryFn(collectionFn(firestoreDb, 'heroes'), orderByFn('name', 'asc')));
+  return snapshot.docs
+    .map((docSnap: any) => {
+      const data = docSnap.data() || {};
+      return {
+        id: docSnap.id,
+        name: data.name || data.heroName || data.nickname || docSnap.id,
+        inactive: Boolean(data.inactive),
+        crafting: data.crafting || null,
+      };
+    })
+    .filter((hero: any) => !hero.inactive);
 }
 
 export function getEmptyCraftingState() {
