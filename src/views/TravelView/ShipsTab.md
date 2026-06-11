@@ -13,3 +13,4 @@ Output: travel time, cost, risk level.
 - Self-contained component — no Pinia store, no Firestore reads
 - All logic is client-side calculation
 - Rendered inside `v-window-item value="ships"` in TravelView
+- Weapon hazard reduction uses typed ship weapons: `cannon` counts as 1 reduction unit, `ballista` counts as 0.5. Ships without typed `weaponSlots` fall back to legacy `weaponSlotsUsed`.

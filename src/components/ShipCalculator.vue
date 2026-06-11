@@ -150,6 +150,26 @@ const sailStations = computed(() => Number(selectedShip.value?.sailStations) || 
 const weaponSlotsUsed = computed(() => Number(selectedShip.value?.weaponSlotsUsed) || 0)
 const fullSpeedPerHour = computed(() => Number(selectedShip.value?.speedMax) ? Number(selectedShip.value.speedMax) / 10 : 0)
 
+const WEAPON_DANGER_REDUCTION_WEIGHTS = {
+  cannon: 1,
+  ballista: 0.5,
+}
+
+function getWeaponDangerReductionUnits(ship) {
+  const weaponSlots = Array.isArray(ship?.weaponSlots) ? ship.weaponSlots : []
+  const typedWeapons = weaponSlots.filter(weapon => weapon?.type)
+
+  if (!typedWeapons.length) {
+    return Number(ship?.weaponSlotsUsed) || 0
+  }
+
+  return typedWeapons.reduce((total, weapon) => {
+    const slots = Number(weapon.slots) || 1
+    const weight = WEAPON_DANGER_REDUCTION_WEIGHTS[weapon.type] || 0
+    return total + slots * weight
+  }, 0)
+}
+
 const speedPerHour = computed(() => {
   if (!selectedShip.value || sailStations.value <= 0) return 0
   const activeSailors = Math.min(Number(sailors.value) || 0, sailStations.value)
@@ -232,7 +252,7 @@ const dangerArea = computed(() => {
 const dangerModifierValue = computed(() => Number(dangerModifier.value) || 0)
 const extraSailors = computed(() => Math.max(0, (Number(sailors.value) || 0) - sailStations.value))
 const sailorReduction = computed(() => extraSailors.value)
-const weaponReduction = computed(() => weaponSlotsUsed.value * 5)
+const weaponReduction = computed(() => getWeaponDangerReductionUnits(selectedShip.value) * 5)
 
 const finalChance = computed(() => {
   if (!dangerArea.value) return null
@@ -242,13 +262,13 @@ const finalChance = computed(() => {
 
 function formatPercent(value) {
   if (value === null || value === undefined) return '—'
-  return `${value.toFixed(0)}%`
+  return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}%`
 }
 
 function formatSignedPercent(value) {
   if (value === null || value === undefined) return '—'
   const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(0)}%`
+  return `${sign}${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}%`
 }
 
 const formattedFinalChance = computed(() => (finalChance.value === null ? '—' : formatPercent(finalChance.value)))
