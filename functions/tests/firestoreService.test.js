@@ -93,10 +93,20 @@ function createMockDb(seed = {}) {
       };
     },
     async runTransaction(callback) {
+      let hasWritten = false;
       const transaction = {
-        get: (ref) => ref.get(),
-        set: (ref, data, options) => ref.set(data, options),
-        update: (ref, data) => ref.set(data, { merge: true })
+        get: (ref) => {
+          if (hasWritten) throw new Error('Firestore transactions require all reads to be executed before all writes');
+          return ref.get();
+        },
+        set: (ref, data, options) => {
+          hasWritten = true;
+          return ref.set(data, options);
+        },
+        update: (ref, data) => {
+          hasWritten = true;
+          return ref.set(data, { merge: true });
+        }
       };
       return callback(transaction);
     }
@@ -238,9 +248,6 @@ test('createFishingLog tags logs with active campaign cycle', async () => {
     cycles: {
       old: { startedAt: '1 Hammer', finishedAt: '10 Hammer', createdAt: 1 },
       active: { startedAt: '11 Hammer', finishedAt: '', createdAt: 2 }
-    },
-    [COLLECTIONS.HEROES]: {
-      h1: { name: 'Aela', telegramId: '42' }
     }
   });
 
@@ -249,8 +256,6 @@ test('createFishingLog tags logs with active campaign cycle', async () => {
 
   assert.equal(log.data().cycleId, 'active');
   assert.equal(log.data().cycleStartedAt, '11 Hammer');
-  assert.equal(log.data().heroId, 'h1');
-  assert.equal(log.data().heroName, 'Aela');
 });
 
 test('updateFishAvailabilityTransaction tags successful logs with active campaign cycle', async () => {
@@ -360,4 +365,24 @@ test('updateFishAvailabilityTransaction creates unassigned caught fish when hero
   assert.equal(data.telegramUserId, '99');
   assert.equal(data.valueSilver, 50);
   assert.equal(data.valueGold, 5);
+});
+
+test('updateFishAvailabilityTransaction reads all fish before writing availability updates', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.FISHES]: {
+      cod: { fishName: 'Cod', fishValueSilver: 50, fishAmountAvailableNow: 1 },
+      tuna: { fishName: 'Tuna', fishValueSilver: 70, fishAmountAvailableNow: 1 }
+    }
+  });
+
+  const result = await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }, { id: 'tuna' }],
+    logData: { telegramUserId: 99, effectiveRollUsed: 10 }
+  });
+
+  assert.equal(result.finalCatches.length, 2);
+  const fishes = await db.collection(COLLECTIONS.FISHES).get();
+  const byId = Object.fromEntries(fishes.docs.map((doc) => [doc.id, doc.data()]));
+  assert.equal(byId.cod.fishAmountAvailableNow, 0);
+  assert.equal(byId.tuna.fishAmountAvailableNow, 0);
 });

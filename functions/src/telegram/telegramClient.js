@@ -1,3 +1,19 @@
+const TELEGRAM_API_TIMEOUT_MS = 8000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = TELEGRAM_API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function sendTelegramMessage({ token, chatId, text, messageThreadId }) {
   const endpoint = `https://api.telegram.org/bot${token}/sendMessage`;
   const body = {
@@ -10,7 +26,7 @@ export async function sendTelegramMessage({ token, chatId, text, messageThreadId
     body.message_thread_id = messageThreadId;
   }
 
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -27,7 +43,7 @@ export async function sendTelegramMessage({ token, chatId, text, messageThreadId
 
 export async function pinTelegramMessage({ token, chatId, messageId, disableNotification = true }) {
   const endpoint = `https://api.telegram.org/bot${token}/pinChatMessage`;
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -44,7 +60,7 @@ export async function pinTelegramMessage({ token, chatId, messageId, disableNoti
 
 export async function setTelegramWebhook({ token, webhookUrl }) {
   const endpoint = `https://api.telegram.org/bot${token}/setWebhook`;
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url: webhookUrl })

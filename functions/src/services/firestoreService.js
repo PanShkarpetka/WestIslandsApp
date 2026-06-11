@@ -74,9 +74,39 @@ async function findHeroByTelegramIdentity(db, { telegramUserId, telegramUsername
   if (telegramUserId == null && !telegramUsername) return null;
 
   const heroesRef = db.collection(COLLECTIONS.HEROES);
+  if (typeof heroesRef.where === 'function') {
+    const candidates = new Set();
+    const userId = String(telegramUserId || '').trim();
+    const username = String(telegramUsername || '').trim().replace(/^@+/, '');
+    const usernameKey = normalizeTelegramUsername(username);
+    if (userId) candidates.add(userId);
+    if (username) {
+      candidates.add(username);
+      candidates.add(`@${username}`);
+    }
+    if (usernameKey && usernameKey !== username) {
+      candidates.add(usernameKey);
+      candidates.add(`@${usernameKey}`);
+    }
+
+    const values = [...candidates].slice(0, 10);
+    if (!values.length) return null;
+    const snap = await heroesRef.where('telegramId', 'in', values).limit(1).get();
+    const doc = snap.docs?.[0];
+    return doc ? { id: doc.id, ...doc.data() } : null;
+  }
+
   const snap = await heroesRef.get();
   const doc = snap.docs.find((item) => matchesTelegramIdentity(item.data()?.telegramId, { telegramUserId, telegramUsername }));
   return doc ? { id: doc.id, ...doc.data() } : null;
+}
+
+async function safeFindHeroByTelegramIdentity(db, identity) {
+  try {
+    return await findHeroByTelegramIdentity(db, identity);
+  } catch (_error) {
+    return null;
+  }
 }
 
 export async function getBotConfig(db) {
@@ -354,15 +384,9 @@ async function resolveActiveCycleMeta(db) {
 export async function createFishingLog(db, logData) {
   const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
   const cycleMeta = await resolveActiveCycleMeta(db);
-  const linkedHero = await findHeroByTelegramIdentity(db, {
-    telegramUserId: logData?.telegramUserId,
-    telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname
-  });
   await logRef.set({
     ...logData,
     ...cycleMeta,
-    heroId: linkedHero?.id || null,
-    heroName: linkedHero?.name || null,
     timestamp: new Date().toISOString()
   });
 
@@ -371,7 +395,7 @@ export async function createFishingLog(db, logData) {
 
 export async function updateFishAvailabilityTransaction(db, { catches, logData }) {
   const cycleMeta = await resolveActiveCycleMeta(db);
-  const linkedHero = await findHeroByTelegramIdentity(db, {
+  const linkedHero = await safeFindHeroByTelegramIdentity(db, {
     telegramUserId: logData?.telegramUserId,
     telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname
   });
@@ -384,9 +408,14 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData }
     const finalCatches = [];
     const availabilityChanges = [];
 
+    const fishSnapshots = [];
     for (const [fishId, desiredCount] of fishDeltas.entries()) {
       const fishRef = db.collection(COLLECTIONS.FISHES).doc(fishId);
       const fishSnapshot = await transaction.get(fishRef);
+      fishSnapshots.push({ fishId, desiredCount, fishRef, fishSnapshot });
+    }
+
+    for (const { fishId, desiredCount, fishRef, fishSnapshot } of fishSnapshots) {
       if (!fishSnapshot.exists) {
         continue;
       }

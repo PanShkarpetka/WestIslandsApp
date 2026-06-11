@@ -10,7 +10,11 @@ const db = admin.firestore();
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
-export const telegramWebhook = onRequest(async (req, res) => {
+export const telegramWebhook = onRequest({
+  maxInstances: 20,
+  concurrency: 20,
+  timeoutSeconds: 30
+}, async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
     return;
@@ -81,12 +85,16 @@ export const telegramWebhook = onRequest(async (req, res) => {
     console.error('Webhook processing failed', error);
 
     if (payload?.chatId) {
-      await sendTelegramMessage({
-        token: TELEGRAM_BOT_TOKEN,
-        chatId: payload.chatId,
-        messageThreadId: payload.messageThreadId,
-        text: 'Упс. Помилка. Щось пішло не так'
-      });
+      try {
+        await sendTelegramMessage({
+          token: TELEGRAM_BOT_TOKEN,
+          chatId: payload.chatId,
+          messageThreadId: payload.messageThreadId,
+          text: 'Упс. Помилка. Щось пішло не так'
+        });
+      } catch (replyError) {
+        console.warn('Failed to send webhook error reply', replyError);
+      }
     }
 
     res.status(200).send('Ignored');
