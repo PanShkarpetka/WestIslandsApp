@@ -15,12 +15,17 @@ Manufactures are stored as an array of IDs in `island.manufactures`. The page lo
 ## Item type
 Each document has a `type` field: `'manufacture'` (default) or `'auto'`. Legacy documents without a `type` are treated as `'manufacture'`. The dialog exposes a type selector so admins can reassign items between tabs.
 
-## Income destination
-Each item has `incomeDestination`:
+## Payouts
+Each item uses `payouts[]`. Legacy `income` / `incomeDestination` documents are still read and displayed as one fixed payout.
+
+Fixed payouts support:
 - `'treasury'` — income goes to island treasury
 - `'guild:{guildId}'` — income goes to a specific guild
+- `'hero:{heroId}'` — income/goods go to a hero account balance
 
-Display label resolved from `guildStore.guilds`. Icon: `mdi-anchor` for treasury, `mdi-sword-cross` for guild.
+Coin Pig payouts use `mechanic: 'coinPig'` and `participantHeroIds`. On cycle rollover the service rolls `1d4-1` once per day of the closed previous cycle, splits the total between participants, and writes hero balance transactions.
+
+Display labels resolve guild names from `guildStore.guilds` and hero names from `heroesStore.playerHeroes`.
 
 ## Add/Edit dialog (admin only)
 Single dialog handles both modes (`dialogMode: 'add' | 'edit'`). When adding, `type` defaults to the currently active tab.
@@ -28,12 +33,14 @@ Single dialog handles both modes (`dialogMode: 'add' | 'edit'`). When adding, `t
 **Add**: creates a new document in `manufactures` collection, then `arrayUnion`s its ID into `island.manufactures`.  
 **Edit**: updates the existing document in place; updates local `manufactures.value` array optimistically.
 
-Form fields: name (required), description, income (decimal, step 0.01), incomeDestination (select), type (select).
+Form fields: name (required), description, type, and one or more payout rows. Each payout row selects either fixed payout fields or Coin Pig participants.
 
 ## Stores
 - `useIslandStore` — `data.manufactures`, `data.id`
 - `useUserStore` — `isAdmin`
 - `useGuildStore` — `guilds` (for destination options)
+- `useHeroesStore` — player heroes (for hero destinations and Coin Pig participants)
+- `useGoodsStore` — goods (for hero goods payouts)
 
 ## Watcher
 `island.manufactures` change → `loadManufactures(ids)` re-runs.

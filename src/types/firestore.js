@@ -324,9 +324,12 @@
 
 /**
  * @typedef {Object} PayoutRow
- * @property {string} destination - 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
- * @property {number} income - gold amount per cycle (negative = deduction)
+ * @property {'coinPig'} [mechanic] - omitted/absent for fixed payouts; 'coinPig' rolls 1d4-1 per closed-cycle day and splits gold between heroes
+ * @property {string} [destination] - fixed payouts: 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
+ * @property {number} [income] - fixed payouts: gold amount per cycle (negative = deduction)
  * @property {Record<string, number>} [incomeGoods] - goods per cycle, keyed by goodId (hero destinations only)
+ * @property {string[]} [participantHeroIds] - hero IDs for Coin Pig payouts
+ * @property {string} [roll] - display/config label for Coin Pig, currently '1d4-1'
  */
 
 // ─── HEROES & CRAFTING ───────────────────────────────────────────────────────
@@ -365,6 +368,9 @@
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
  * @property {string} [cycleFinishedAt]
+ * @property {string} [manufactureId]
+ * @property {string} [manufactureName]
+ * @property {'fixed'|'coinPig'} [manufactureMechanic]
  * @property {import('firebase/firestore').Timestamp} createdAt
  */
 

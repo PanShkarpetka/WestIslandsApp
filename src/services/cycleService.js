@@ -42,6 +42,53 @@ function getBuildingFaithIncome(level) {
   return BUILDING_LEVEL_BONUSES[level]?.passiveFaith || 0
 }
 
+function normalizeHeroIds(value) {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))]
+}
+
+function isCoinPigPayout(payout) {
+  return payout?.mechanic === 'coinPig'
+}
+
+function rollCoinPigTotal(durationDays, rng) {
+  const days = Math.max(0, Math.floor(Number(durationDays) || 0))
+  let total = 0
+  for (let day = 0; day < days; day += 1) {
+    total += Math.max(rollDice('1d4', rng) - 1, 0)
+  }
+  return total
+}
+
+function expandCoinPigEntry(entry, coinPigCycle, rng) {
+  if (entry.mechanic !== 'coinPig') return [entry]
+
+  const participantHeroIds = normalizeHeroIds(entry.participantHeroIds)
+  const durationDays = Math.floor(Number(coinPigCycle?.durationDays) || 0)
+  if (!participantHeroIds.length || durationDays <= 0) return []
+
+  const total = rollCoinPigTotal(durationDays, rng)
+  if (total <= 0) return []
+
+  const share = normalizeAmount(total / participantHeroIds.length)
+  if (share <= 0) return []
+
+  return participantHeroIds.map((heroId, index) => ({
+    ...entry,
+    id: `${entry.id}:hero:${heroId}`,
+    coinPigParticipantIndex: index,
+    coinPigParticipantCount: participantHeroIds.length,
+    coinPigDurationDays: durationDays,
+    coinPigTotal: total,
+    income: share,
+    incomeDestination: `hero:${heroId}`,
+    incomeGoods: {},
+    cycleId: coinPigCycle?.cycleId || entry.cycleId || null,
+    cycleStartedAt: coinPigCycle?.startedAt || entry.cycleStartedAt || null,
+    cycleFinishedAt: coinPigCycle?.finishedAt || entry.cycleFinishedAt || null,
+  }))
+}
+
 export async function resetReligionsSvTemp({
   collection: collectionFn = collection,
   getDocs: getDocsFn = getDocs,
@@ -87,6 +134,21 @@ export async function loadManufacturesByIds(ids, {
         : [{ destination: data.incomeDestination, income: data.income, incomeGoods: data.incomeGoods }]
 
       payouts.forEach((payout, index) => {
+        if (isCoinPigPayout(payout)) {
+          results.push({
+            id: `${docSnap.id}:${index}`,
+            manufactureId: docSnap.id,
+            name,
+            description,
+            mechanic: 'coinPig',
+            participantHeroIds: normalizeHeroIds(payout.participantHeroIds),
+            income: 0,
+            incomeDestination: 'treasury',
+            incomeGoods: {},
+          })
+          return
+        }
+
         results.push({
           id: `${docSnap.id}:${index}`,
           manufactureId: docSnap.id,
@@ -161,15 +223,20 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   serverTimestamp: serverTimestampFn = serverTimestamp,
   db: firestoreDb = db,
   rng = Math.random,
+  coinPigCycle = null,
 } = {}) {
   const islandSnap = await getDocFn(docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID))
   if (!islandSnap.exists()) return
 
   const manufactureIds = Array.isArray(islandSnap.data()?.manufactures) ? islandSnap.data().manufactures : []
   const loadDeps = { collection: collectionFn, getDocs: getDocsFn, query: queryFn, where: whereFn, documentId: documentIdFn, db: firestoreDb }
-  const entries = (await loadManufacturesByIds(manufactureIds, loadDeps)).filter(
-    (item) => item.income !== 0 || (item.incomeDestination?.startsWith('hero:') && Object.keys(item.incomeGoods || {}).length > 0),
-  )
+  const entries = (await loadManufacturesByIds(manufactureIds, loadDeps))
+    .flatMap((item) => expandCoinPigEntry(item, coinPigCycle, rng))
+    .filter((item) => (
+      item.income !== 0
+      || item.mechanic === 'coinPig'
+      || (item.incomeDestination?.startsWith('hero:') && Object.keys(item.incomeGoods || {}).length > 0)
+    ))
   const rawPopulationEntries = (populationItems || [])
     .map((group) => {
       const count = Number(group.count ?? 0)
@@ -278,10 +345,17 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
           goldAmount: item.income,
           goods: goodsDelta,
           type: item.income >= 0 ? 'income' : 'deduction',
-          comment: `Автонарахування з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`.slice(0, 500),
-          cycleId,
-          cycleStartedAt: startedAt,
-          cycleFinishedAt: finishedAt || null,
+          comment: (
+            item.mechanic === 'coinPig'
+              ? `Coin Pig "${item.name || 'Без назви'}": ${item.coinPigDurationDays} дн. × 1d4-1 = ${formatAmount(item.coinPigTotal)} зм, частка ${item.coinPigParticipantIndex + 1}/${item.coinPigParticipantCount} за цикл ${formatCycleLabel(item.cycleStartedAt || startedAt, item.cycleFinishedAt || finishedAt)}.`
+              : `Автонарахування з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`
+          ).slice(0, 500),
+          cycleId: item.cycleId || cycleId,
+          cycleStartedAt: item.cycleStartedAt || startedAt,
+          cycleFinishedAt: item.cycleFinishedAt || finishedAt || null,
+          manufactureId: item.manufactureId || null,
+          manufactureName: item.name || null,
+          manufactureMechanic: item.mechanic || 'fixed',
           createdAt: serverTimestampFn(),
         })
         continue
@@ -643,6 +717,8 @@ export async function createNewCycleWithEffects({
   addDoc: addDocFn = addDoc,
   updateDoc: updateDocFn = updateDoc,
   setDoc: setDocFn = setDoc,
+  documentId: documentIdFn = documentId,
+  runTransaction: runTransactionFn = runTransaction,
   query: queryFn = query,
   where: whereFn = where,
   orderBy: orderByFn = orderBy,
@@ -657,7 +733,21 @@ export async function createNewCycleWithEffects({
   const normalizedStart = parsed ? normalizeFaerunDate(parsed) : null
   if (!normalizedStart) throw new Error('INVALID_START_DATE')
 
-  const sharedDeps = { collection: collectionFn, doc: docFn, getDoc: getDocFn, getDocs: getDocsFn, addDoc: addDocFn, updateDoc: updateDocFn, query: queryFn, where: whereFn, serverTimestamp: serverTimestampFn, db: firestoreDb, rng }
+  const sharedDeps = {
+    collection: collectionFn,
+    doc: docFn,
+    getDoc: getDocFn,
+    getDocs: getDocsFn,
+    addDoc: addDocFn,
+    updateDoc: updateDocFn,
+    query: queryFn,
+    where: whereFn,
+    documentId: documentIdFn,
+    runTransaction: runTransactionFn,
+    serverTimestamp: serverTimestampFn,
+    db: firestoreDb,
+    rng,
+  }
 
   const cyclesRef = collectionFn(firestoreDb, 'cycles')
   const lastCycleSnapshot = await getDocsFn(queryFn(cyclesRef, orderByFn('createdAt', 'desc'), limitFn(1)))
@@ -665,19 +755,26 @@ export async function createNewCycleWithEffects({
   const startedAt = formatFaerunDate(normalizedStart)
   const populationAtStart = Number(population ?? 0)
   const cycleDoc = await addDocFn(cyclesRef, { startedAt, populationAtStart, createdAt: serverTimestampFn() })
+  let coinPigCycle = null
 
   if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
     const previousCycle = lastCycleDoc.data()
     const parsedPreviousStart = parseFaerunDate(previousCycle.startedAt)
-    const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, normalizedStart) : null
     const previousFinishedDate = {
       day: normalizedStart.day === 1 ? 30 : normalizedStart.day - 1,
       month: normalizedStart.day === 1 ? (normalizedStart.month === 0 ? 11 : normalizedStart.month - 1) : normalizedStart.month,
       year: normalizedStart.day === 1 && normalizedStart.month === 0 ? normalizedStart.year - 1 : normalizedStart.year,
     }
+    const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, previousFinishedDate) : null
     const previousUpdate = { finishedAt: formatFaerunDate(previousFinishedDate) }
     if (previousDuration && previousDuration > 0) previousUpdate.duration = previousDuration
     await updateDocFn(lastCycleDoc.ref, previousUpdate)
+    coinPigCycle = {
+      cycleId: lastCycleDoc.id,
+      startedAt: previousCycle.startedAt || '',
+      finishedAt: previousUpdate.finishedAt,
+      durationDays: previousDuration,
+    }
 
     const populationBefore = Number(previousCycle.populationAtStart)
     const hasPopulationBefore = Number.isFinite(populationBefore)
@@ -704,7 +801,7 @@ export async function createNewCycleWithEffects({
   })
   await applyParkBuildingGrowth(islandId, sharedDeps)
   await distributeBuildingFaithIncome(cycleDoc.id, sharedDeps)
-  await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems, sharedDeps)
+  await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems, { ...sharedDeps, coinPigCycle })
   await processBuildingYields(cycleDoc.id, normalizedStart, islandId, sharedDeps)
   await settlePreviousSpellRequestsFn()
   await generateSpellRequestsForCycleFn({

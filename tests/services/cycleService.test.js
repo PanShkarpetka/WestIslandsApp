@@ -87,6 +87,24 @@ test('loadManufacturesByIds expands multi-payout manufactures into separate entr
   assert.equal(result[1].incomeGoods['barrel'], 2);
 });
 
+test('loadManufacturesByIds preserves Coin Pig payout config', async () => {
+  const mock = createMockFirestore({
+    'manufactures/m1': {
+      name: 'Coin Pig',
+      payouts: [
+        { mechanic: 'coinPig', participantHeroIds: ['hero-1', 'hero-2', 'hero-1'], roll: '1d4-1' },
+      ],
+    },
+  });
+
+  const result = await loadManufacturesByIds(['m1'], { ...mock.firebase, db: mock.db });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].mechanic, 'coinPig');
+  assert.deepEqual(result[0].participantHeroIds, ['hero-1', 'hero-2']);
+  assert.equal(result[0].income, 0);
+});
+
 // ─── distributeManufactureIncome ─────────────────────────────────────────────
 
 test('distributeManufactureIncome adds treasury balance from population income', async () => {
@@ -155,6 +173,101 @@ test('distributeManufactureIncome does nothing when island doc is missing', asyn
   );
 
   assert.equal(mock.get('treasury/meta').balance, 100);
+});
+
+test('distributeManufactureIncome credits Coin Pig shares from previous cycle days', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Coin Pig',
+      payouts: [{ mechanic: 'coinPig', participantHeroIds: ['hero-1', 'hero-2'], roll: '1d4-1' }],
+    },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 10, goods: {} },
+    'heroes/hero-2': { name: 'Faramir', goldBalance: 4, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+  const rngValues = [0, 0.5, 0.99];
+
+  await distributeManufactureIncome(
+    'new-cycle', '4 Hammer 1490', null, 'island_rock', [],
+    {
+      ...mock.firebase,
+      db: mock.db,
+      rng: () => rngValues.shift() ?? 0,
+      coinPigCycle: {
+        cycleId: 'prev-cycle',
+        startedAt: '1 Hammer 1490',
+        finishedAt: '3 Hammer 1490',
+        durationDays: 3,
+      },
+    },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 12.5);
+  assert.equal(mock.get('heroes/hero-2').goldBalance, 6.5);
+  assert.equal(mock.get('treasury/meta').balance, 0);
+
+  const txs = Object.values(mock.list('hero-transactions')).sort((a, b) => a.heroId.localeCompare(b.heroId));
+  assert.equal(txs.length, 2);
+  assert.equal(txs[0].goldAmount, 2.5);
+  assert.equal(txs[0].cycleId, 'prev-cycle');
+  assert.equal(txs[0].cycleStartedAt, '1 Hammer 1490');
+  assert.equal(txs[0].cycleFinishedAt, '3 Hammer 1490');
+  assert.equal(txs[0].manufactureMechanic, 'coinPig');
+  assert.ok(txs[0].comment.includes('1d4-1'));
+});
+
+test('distributeManufactureIncome rounds Coin Pig participant shares to 0.01', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Coin Pig',
+      payouts: [{ mechanic: 'coinPig', participantHeroIds: ['hero-1', 'hero-2', 'hero-3'] }],
+    },
+    'heroes/hero-1': { name: 'One', goldBalance: 0, goods: {} },
+    'heroes/hero-2': { name: 'Two', goldBalance: 0, goods: {} },
+    'heroes/hero-3': { name: 'Three', goldBalance: 0, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'new-cycle', '2 Hammer 1490', null, 'island_rock', [],
+    {
+      ...mock.firebase,
+      db: mock.db,
+      rng: () => 0.5, // 1d4 = 3, so 1d4-1 = 2 total for one day
+      coinPigCycle: {
+        cycleId: 'prev-cycle',
+        startedAt: '1 Hammer 1490',
+        finishedAt: '1 Hammer 1490',
+        durationDays: 1,
+      },
+    },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 0.67);
+  assert.equal(mock.get('heroes/hero-2').goldBalance, 0.67);
+  assert.equal(mock.get('heroes/hero-3').goldBalance, 0.67);
+});
+
+test('distributeManufactureIncome skips Coin Pig when previous duration is unavailable', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Coin Pig',
+      payouts: [{ mechanic: 'coinPig', participantHeroIds: ['hero-1'] }],
+    },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 10, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await distributeManufactureIncome(
+    'new-cycle', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 10);
+  assert.equal(Object.values(mock.list('hero-transactions')).length, 0);
 });
 
 // ─── distributeManufactureIncome — bureaucrat effects ────────────────────────
@@ -399,6 +512,46 @@ test('createNewCycleWithEffects closes open previous cycle', async () => {
   assert.equal(summary.populationBefore, 90);
   assert.equal(summary.populationAfter, 120);
   assert.equal(summary.populationDelta, 30);
+});
+
+test('createNewCycleWithEffects pays Coin Pig for the closed previous cycle', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Hammer 1490', populationAtStart: 90, createdAt: 'old' },
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Coin Pig',
+      payouts: [{ mechanic: 'coinPig', participantHeroIds: ['hero-1'] }],
+    },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 1, goods: {} },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await createNewCycleWithEffects(
+    { startedDate: '4 Hammer 1490', islandId: 'island_rock', population: 120 },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      rng: () => 0.5, // 3 cycle days × (1d4=3, minus 1) = 6
+      getDocs: async (q) => {
+        if (q.__colPath === 'cycles') {
+          return {
+            docs: [{ id: 'prev', data: () => mock.get('cycles/prev'), ref: { __path: 'cycles/prev', __type: 'doc', id: 'prev' } }],
+            empty: false,
+          };
+        }
+        return mock.firebase.getDocs(q);
+      },
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 7);
+  const txs = Object.values(mock.list('hero-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].cycleId, 'prev');
+  assert.equal(txs[0].cycleStartedAt, '1 Hammer 1490');
+  assert.equal(txs[0].cycleFinishedAt, '3 Hammer 1490 рік після Потопу');
 });
 
 test('createNewCycleWithEffects throws on invalid date', async () => {

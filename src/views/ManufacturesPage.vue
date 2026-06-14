@@ -71,29 +71,47 @@
               class="payout-row"
               :class="{ 'payout-row--border': pi > 0 }"
             >
-              <div class="invoice-row">
-                <span class="invoice-label">
-                  <v-icon size="13" class="mr-1">mdi-gold</v-icon>
-                  Дохід
-                </span>
-                <span class="invoice-income" :class="payout.income >= 0 ? 'income-positive' : 'income-negative'">
-                  {{ payout.income >= 0 ? '+' : '' }}{{ formatAmount(payout.income) }} зм
-                </span>
-              </div>
-              <div class="invoice-row">
-                <span class="invoice-label">
-                  <v-icon size="13" class="mr-1">{{ destinationIcon(payout.destination) }}</v-icon>
-                  До
-                </span>
-                <span class="invoice-destination">{{ getIncomeDestinationLabel(payout.destination) }}</span>
-              </div>
-              <div v-if="payout.destination?.startsWith('hero:') && Object.keys(payout.incomeGoods || {}).length" class="invoice-row">
-                <span class="invoice-label">
-                  <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
-                  Товари
-                </span>
-                <span class="invoice-destination">{{ formatIncomeGoods(payout.incomeGoods) }}</span>
-              </div>
+              <template v-if="payout.mechanic === 'coinPig'">
+                <div class="invoice-row">
+                  <span class="invoice-label">
+                    <v-icon size="13" class="mr-1">mdi-piggy-bank</v-icon>
+                    Coin Pig
+                  </span>
+                  <span class="invoice-income income-positive">1d4-1 / день</span>
+                </div>
+                <div class="invoice-row">
+                  <span class="invoice-label">
+                    <v-icon size="13" class="mr-1">mdi-account-group</v-icon>
+                    Учасники
+                  </span>
+                  <span class="invoice-destination">{{ getParticipantNames(payout.participantHeroIds) }}</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="invoice-row">
+                  <span class="invoice-label">
+                    <v-icon size="13" class="mr-1">mdi-gold</v-icon>
+                    Дохід
+                  </span>
+                  <span class="invoice-income" :class="payout.income >= 0 ? 'income-positive' : 'income-negative'">
+                    {{ payout.income >= 0 ? '+' : '' }}{{ formatAmount(payout.income) }} зм
+                  </span>
+                </div>
+                <div class="invoice-row">
+                  <span class="invoice-label">
+                    <v-icon size="13" class="mr-1">{{ destinationIcon(payout.destination) }}</v-icon>
+                    До
+                  </span>
+                  <span class="invoice-destination">{{ getIncomeDestinationLabel(payout.destination) }}</span>
+                </div>
+                <div v-if="payout.destination?.startsWith('hero:') && Object.keys(payout.incomeGoods || {}).length" class="invoice-row">
+                  <span class="invoice-label">
+                    <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
+                    Товари
+                  </span>
+                  <span class="invoice-destination">{{ formatIncomeGoods(payout.incomeGoods) }}</span>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -150,28 +168,57 @@
             :key="pi"
             class="payout-form-block mb-3"
           >
+            <v-select
+              v-model="payout.mechanic"
+              :items="payoutMechanicOptions"
+              item-title="title"
+              item-value="value"
+              label="Механіка"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="mb-2"
+            />
             <div class="payout-form-row">
-              <v-select
-                v-model="payout.destination"
-                :items="incomeDestinationOptions"
-                item-title="title"
-                item-value="value"
-                label="Отримувач"
-                variant="outlined"
-                density="compact"
-                hide-details
-                class="flex-1"
-              />
-              <v-text-field
-                v-model.number="payout.income"
-                label="Сума (зм)"
-                type="number"
-                variant="outlined"
-                density="compact"
-                step="0.01"
-                hide-details
-                style="max-width: 110px"
-              />
+              <template v-if="payout.mechanic === 'coinPig'">
+                <v-select
+                  v-model="payout.participantHeroIds"
+                  :items="heroParticipantOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Учасники Coin Pig"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  multiple
+                  chips
+                  closable-chips
+                  class="flex-1"
+                />
+              </template>
+              <template v-else>
+                <v-select
+                  v-model="payout.destination"
+                  :items="incomeDestinationOptions"
+                  item-title="title"
+                  item-value="value"
+                  label="Отримувач"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="flex-1"
+                />
+                <v-text-field
+                  v-model.number="payout.income"
+                  label="Сума (зм)"
+                  type="number"
+                  variant="outlined"
+                  density="compact"
+                  step="0.01"
+                  hide-details
+                  style="max-width: 110px"
+                />
+              </template>
               <v-btn
                 size="small"
                 icon
@@ -185,7 +232,7 @@
             </div>
 
             <!-- Goods sub-form for hero destinations -->
-            <template v-if="payout.destination?.startsWith('hero:')">
+            <template v-if="payout.mechanic !== 'coinPig' && payout.destination?.startsWith('hero:')">
               <div class="goods-section-label mt-2 mb-1">
                 <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
                 Товари
@@ -311,7 +358,7 @@ const formError = ref('')
 const form = ref({ id: null, name: '', description: '', type: 'manufacture', payouts: [emptyPayout()] })
 
 function emptyPayout() {
-  return { destination: 'treasury', income: 0, incomeGoods: [] }
+  return { mechanic: 'fixed', destination: 'treasury', income: 0, incomeGoods: [], participantHeroIds: [] }
 }
 
 const visibleItems = computed(() =>
@@ -327,6 +374,11 @@ const typeOptions = [
   { title: 'Авто-дохід / витрата', value: 'auto' },
 ]
 
+const payoutMechanicOptions = [
+  { title: 'Фіксоване нарахування', value: 'fixed' },
+  { title: 'Coin Pig', value: 'coinPig' },
+]
+
 const incomeDestinationOptions = computed(() => ([
   { title: 'Скарбниця острова', value: 'treasury' },
   ...guildStore.guilds.map((guild) => ({
@@ -339,6 +391,13 @@ const incomeDestinationOptions = computed(() => ([
   })),
 ]))
 
+const heroParticipantOptions = computed(() =>
+  heroesStore.playerHeroes.map((hero) => ({
+    title: hero.name || hero.id,
+    value: hero.id,
+  })),
+)
+
 function addPayout() {
   form.value.payouts.push(emptyPayout())
 }
@@ -349,22 +408,43 @@ function destinationIcon(dest) {
   return 'mdi-sword-cross'
 }
 
+function normalizeParticipantHeroIds(value) {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))]
+}
+
+function normalizePayoutForView(p) {
+  if (p?.mechanic === 'coinPig') {
+    return {
+      mechanic: 'coinPig',
+      destination: 'treasury',
+      income: 0,
+      incomeGoods: {},
+      participantHeroIds: normalizeParticipantHeroIds(p.participantHeroIds),
+    }
+  }
+
+  return {
+    mechanic: 'fixed',
+    destination: normalizeIncomeDestination(p?.destination),
+    income: normalizeAmount(p?.income || 0),
+    incomeGoods: p?.incomeGoods && typeof p.incomeGoods === 'object' ? p.incomeGoods : {},
+    participantHeroIds: [],
+  }
+}
+
 function loadManufacturesFromSnap(docSnap) {
   const data = docSnap.data() || {}
   // Normalise payouts — support both new array and legacy single-field format
   let payouts
   if (Array.isArray(data.payouts) && data.payouts.length) {
-    payouts = data.payouts.map((p) => ({
-      destination: normalizeIncomeDestination(p.destination),
-      income: normalizeAmount(p.income || 0),
-      incomeGoods: p.incomeGoods && typeof p.incomeGoods === 'object' ? p.incomeGoods : {},
-    }))
+    payouts = data.payouts.map((p) => normalizePayoutForView(p))
   } else {
-    payouts = [{
+    payouts = [normalizePayoutForView({
       destination: normalizeIncomeDestination(data.incomeDestination),
       income: normalizeAmount(data.income || 0),
       incomeGoods: data.incomeGoods && typeof data.incomeGoods === 'object' ? data.incomeGoods : {},
-    }]
+    })]
   }
   return {
     key: docSnap.id,
@@ -422,9 +502,11 @@ function openEditDialog(item) {
     description: item.description || '',
     type: item.type === 'auto' ? 'auto' : 'manufacture',
     payouts: item.payouts.map((p) => ({
-      destination: p.destination,
-      income: p.income,
+      mechanic: p.mechanic === 'coinPig' ? 'coinPig' : 'fixed',
+      destination: p.destination || 'treasury',
+      income: p.income || 0,
       incomeGoods: Object.entries(p.incomeGoods || {}).map(([goodId, qty]) => ({ goodId, qty })),
+      participantHeroIds: normalizeParticipantHeroIds(p.participantHeroIds),
     })),
   }
   formError.value = ''
@@ -457,25 +539,39 @@ async function saveManufacture() {
   if (!name) { formError.value = 'Вкажіть назву мануфактури.'; return }
   if (!form.value.payouts.length) { formError.value = 'Додайте хоча б одне нарахування.'; return }
 
+  const type = form.value.type === 'auto' ? 'auto' : 'manufacture'
+  const payouts = form.value.payouts.map((p) => {
+    if (p.mechanic === 'coinPig') {
+      return {
+        mechanic: 'coinPig',
+        participantHeroIds: normalizeParticipantHeroIds(p.participantHeroIds),
+        roll: '1d4-1',
+      }
+    }
+
+    const destination = normalizeIncomeDestination(p.destination)
+    const payout = {
+      destination,
+      income: normalizeAmount(p.income || 0),
+    }
+    if (destination.startsWith('hero:')) {
+      const incomeGoods = {}
+      for (const row of (p.incomeGoods || [])) {
+        if (row.goodId && row.qty !== 0) incomeGoods[row.goodId] = Number(row.qty) || 0
+      }
+      payout.incomeGoods = incomeGoods
+    }
+    return payout
+  })
+
+  const invalidCoinPig = payouts.some((p) => p.mechanic === 'coinPig' && !p.participantHeroIds.length)
+  if (invalidCoinPig) {
+    formError.value = 'Для Coin Pig додайте хоча б одного учасника.'
+    return
+  }
+
   saving.value = true
   try {
-    const type = form.value.type === 'auto' ? 'auto' : 'manufacture'
-    const payouts = form.value.payouts.map((p) => {
-      const destination = normalizeIncomeDestination(p.destination)
-      const payout = {
-        destination,
-        income: normalizeAmount(p.income || 0),
-      }
-      if (destination.startsWith('hero:')) {
-        const incomeGoods = {}
-        for (const row of (p.incomeGoods || [])) {
-          if (row.goodId && row.qty !== 0) incomeGoods[row.goodId] = Number(row.qty) || 0
-        }
-        payout.incomeGoods = incomeGoods
-      }
-      return payout
-    })
-
     const payload = {
       name,
       description: form.value.description?.trim() || '',
@@ -497,8 +593,7 @@ async function saveManufacture() {
           description: payload.description,
           type: payload.type,
           payouts: payload.payouts.map((p) => ({
-            ...p,
-            incomeGoods: p.incomeGoods || {},
+            ...normalizePayoutForView(p),
           })),
         }
       }
@@ -538,6 +633,15 @@ function getIncomeDestinationLabel(destination) {
     return hero?.name ? `Гравець: ${hero.name}` : `Гравець: ${heroId}`
   }
   return 'Скарбниця острова'
+}
+
+function getParticipantNames(participantHeroIds) {
+  const ids = normalizeParticipantHeroIds(participantHeroIds)
+  if (!ids.length) return '—'
+  return ids.map((heroId) => {
+    const hero = heroesStore.playerHeroes.find((h) => h.id === heroId)
+    return hero?.name || heroId
+  }).join(', ')
 }
 
 function formatIncomeGoods(incomeGoods) {
