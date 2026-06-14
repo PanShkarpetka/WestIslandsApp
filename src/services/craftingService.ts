@@ -93,6 +93,8 @@ export function normalizeCraftingRequest(raw: any, id = '') {
     reviewedBy: raw?.reviewedBy || null,
     reviewNote: raw?.reviewNote || '',
     approvedLogId: raw?.approvedLogId || null,
+    cancelledAt: raw?.cancelledAt || null,
+    cancelledBy: raw?.cancelledBy || null,
   };
 }
 
@@ -186,6 +188,31 @@ export function subscribePendingCraftingRequests(callback: any, {
       callback(sortCraftingRequestsByCreatedAt(
         snapshot.docs.map((docSnap: any) => normalizeCraftingRequest(docSnap.data(), docSnap.id)),
       ));
+    },
+  );
+}
+
+export function subscribeHeroCraftingRequests(heroId: string, callback: any, {
+  collection: collectionFn = collection,
+  onSnapshot: onSnapshotFn = onSnapshot,
+  query: queryFn = query,
+  where: whereFn = where,
+  db: firestoreDb = db,
+}: any = {}) {
+  if (!heroId) {
+    callback([]);
+    return () => {};
+  }
+
+  return onSnapshotFn(
+    queryFn(
+      collectionFn(firestoreDb, 'crafting-requests'),
+      whereFn('heroId', '==', heroId),
+    ),
+    (snapshot: any) => {
+      callback(sortCraftingRequestsByCreatedAt(
+        snapshot.docs.map((docSnap: any) => normalizeCraftingRequest(docSnap.data(), docSnap.id)),
+      ).reverse());
     },
   );
 }
@@ -521,6 +548,33 @@ export async function rejectCraftingRequest({ requestId, reviewedBy = null, revi
       reviewedAt: serverTimestampFn(),
       reviewedBy,
       reviewNote,
+    });
+
+    return { requestId };
+  });
+}
+
+export async function cancelCraftingRequest({ requestId, heroId = null, cancelledBy = null }: any, {
+  doc: docFn = doc,
+  runTransaction: runTransactionFn = runTransaction,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+}: any = {}) {
+  if (!requestId) throw new Error('Crafting request is required');
+
+  const requestRef = docFn(firestoreDb, 'crafting-requests', requestId);
+  return runTransactionFn(firestoreDb, async (transaction: any) => {
+    const requestDoc = await transaction.get(requestRef);
+    if (!requestDoc.exists()) throw new Error('Crafting request not found');
+
+    const request = normalizeCraftingRequest(requestDoc.data(), requestDoc.id);
+    if (heroId && request.heroId !== heroId) throw new Error('Crafting request belongs to another hero');
+    if (request.status !== 'pending') throw new Error('Only pending crafting requests can be cancelled');
+
+    transaction.update(requestRef, {
+      status: 'cancelled',
+      cancelledAt: serverTimestampFn(),
+      cancelledBy,
     });
 
     return { requestId };

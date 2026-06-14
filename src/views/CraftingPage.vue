@@ -59,6 +59,69 @@
       </v-col>
     </v-row>
 
+    <v-card v-if="canSubmitCraftRequest" rounded="xl" class="panel-card mb-5" elevation="2">
+      <v-card-title class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-2">
+        <span>Мої заявки на крафт</span>
+        <v-chip v-if="pendingPlayerRequestCount" color="warning" variant="tonal" size="small">
+          Очікують: {{ pendingPlayerRequestCount }}
+        </v-chip>
+      </v-card-title>
+      <v-divider />
+      <v-card-text>
+        <v-alert v-if="craftRequestListError" type="error" variant="tonal" class="mb-3">
+          {{ craftRequestListError }}
+        </v-alert>
+        <v-alert v-if="craftRequestCancelSuccess" type="success" variant="tonal" class="mb-3">
+          {{ craftRequestCancelSuccess }}
+        </v-alert>
+
+        <v-table v-if="playerCraftRequests.length" density="comfortable" class="request-table">
+          <thead>
+            <tr>
+              <th>Статус</th>
+              <th>Предмет</th>
+              <th>Кількість</th>
+              <th>Днів</th>
+              <th>Подано</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="request in playerCraftRequests" :key="request.id">
+              <td>
+                <v-chip :color="getRequestStatusMeta(request.status).color" variant="tonal" size="small">
+                  {{ getRequestStatusMeta(request.status).label }}
+                </v-chip>
+              </td>
+              <td>
+                <div class="font-weight-medium">{{ request.itemName || request.itemSlug }}</div>
+              </td>
+              <td>{{ request.amountCrafted }}</td>
+              <td>{{ request.craftDaysSpent }}</td>
+              <td>{{ formatRequestDate(request.createdAt) }}</td>
+              <td class="text-right">
+                <v-btn
+                  v-if="request.status === 'pending'"
+                  color="error"
+                  variant="tonal"
+                  size="small"
+                  prepend-icon="mdi-close-circle-outline"
+                  :loading="cancellingRequestId === request.id"
+                  @click="cancelPlayerCraftRequest(request)"
+                >
+                  Скасувати
+                </v-btn>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+
+        <v-alert v-else type="info" variant="tonal">
+          Після подачі заявки її статус з'явиться тут.
+        </v-alert>
+      </v-card-text>
+    </v-card>
+
     <v-row class="mb-5" dense>
       <v-col cols="12" md="6" lg="3" v-for="card in summaryCards" :key="card.label">
         <v-card class="metric-card" rounded="lg">
@@ -299,10 +362,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import CraftingProgressBar from '@/components/crafting/CraftingProgressBar.vue';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
-import { loadCraftItems, loadHeroesForCrafting, getEmptyCraftingState } from '@/services/craftingService';
+import {
+  cancelCraftingRequest,
+  getEmptyCraftingState,
+  loadCraftItems,
+  loadHeroesForCrafting,
+  subscribeHeroCraftingRequests,
+} from '@/services/craftingService';
 import {
   calculateFutureCraftPrice,
   getItemDiscountBreakdown,
@@ -321,6 +390,11 @@ const selectedHeroId = ref('');
 const craftDialog = ref(false);
 const requestDialog = ref(false);
 const showUncraftedItems = ref(false);
+const playerCraftRequests = ref([]);
+const craftRequestListError = ref('');
+const craftRequestCancelSuccess = ref('');
+const cancellingRequestId = ref('');
+let stopPlayerCraftRequests = null;
 
 const calculator = reactive({ itemSlug: '', amount: 1 });
 
@@ -368,6 +442,9 @@ const highestDiscount = computed(() =>
 );
 
 const highestDiscountLabel = computed(() => `${highestDiscount.value.toFixed(1)} / 25%`);
+const pendingPlayerRequestCount = computed(() =>
+  playerCraftRequests.value.filter((request) => request.status === 'pending').length,
+);
 
 const summaryCards = computed(() => {
   const rows = craftRows.value;
@@ -413,6 +490,32 @@ function formatNumber(value) {
   return Number(value || 0).toFixed(2);
 }
 
+function getTimestampMillis(value) {
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  if (typeof value?.seconds === 'number') return value.seconds * 1000;
+  if (typeof value === 'number') return value;
+  return 0;
+}
+
+function formatRequestDate(value) {
+  const millis = getTimestampMillis(value);
+  if (!millis) return '—';
+  return new Intl.DateTimeFormat('uk-UA', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(millis));
+}
+
+function getRequestStatusMeta(status) {
+  if (status === 'approved') return { label: 'Підтверджено', color: 'success' };
+  if (status === 'rejected') return { label: 'Відхилено', color: 'error' };
+  if (status === 'cancelled') return { label: 'Скасовано', color: 'grey' };
+  return { label: 'Очікує адміна', color: 'warning' };
+}
+
 async function loadData() {
   const [loadedHeroes, loadedItems] = await Promise.all([loadHeroesForCrafting(), loadCraftItems()]);
   heroes.value = loadedHeroes;
@@ -437,7 +540,48 @@ async function onCraftRequestSaved() {
   requestDialog.value = false;
 }
 
+function subscribePlayerRequests() {
+  stopPlayerCraftRequests?.();
+  stopPlayerCraftRequests = null;
+  craftRequestListError.value = '';
+  playerCraftRequests.value = [];
+
+  if (!canSubmitCraftRequest.value || !userStore.heroId) return;
+
+  stopPlayerCraftRequests = subscribeHeroCraftingRequests(
+    userStore.heroId,
+    (requests) => {
+      playerCraftRequests.value = requests;
+    },
+  );
+}
+
+async function cancelPlayerCraftRequest(request) {
+  if (!request?.id || request.status !== 'pending') return;
+
+  craftRequestListError.value = '';
+  craftRequestCancelSuccess.value = '';
+  cancellingRequestId.value = request.id;
+
+  try {
+    await cancelCraftingRequest({
+      requestId: request.id,
+      heroId: userStore.heroId,
+      cancelledBy: userStore.nickname || null,
+    });
+    craftRequestCancelSuccess.value = 'Заявку скасовано.';
+  } catch (error) {
+    console.error('[crafting] failed to cancel request', error);
+    craftRequestListError.value = error?.message || 'Не вдалося скасувати заявку.';
+  } finally {
+    cancellingRequestId.value = '';
+  }
+}
+
+watch(() => [canSubmitCraftRequest.value, userStore.heroId], subscribePlayerRequests, { immediate: true });
+
 onMounted(loadData);
+onBeforeUnmount(() => stopPlayerCraftRequests?.());
 </script>
 
 <style scoped>
@@ -576,6 +720,10 @@ onMounted(loadData);
   color: var(--wi-text);
   font-family: var(--wi-font-body);
   border-bottom: 1px solid rgba(90, 62, 32, 0.25) !important;
+  background: transparent !important;
+}
+
+.request-table {
   background: transparent !important;
 }
 

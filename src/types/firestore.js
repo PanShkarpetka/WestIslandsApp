@@ -438,13 +438,15 @@
  * @property {string} itemName
  * @property {number} amountCrafted
  * @property {number} craftDaysSpent
- * @property {'pending'|'approved'|'rejected'} status
+ * @property {'pending'|'approved'|'rejected'|'cancelled'} status
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {string} createdBy
  * @property {import('firebase/firestore').Timestamp|null} reviewedAt
  * @property {string|null} reviewedBy
  * @property {string} reviewNote
  * @property {string|null} approvedLogId
+ * @property {import('firebase/firestore').Timestamp|null} [cancelledAt]
+ * @property {string|null} [cancelledBy]
  */
 
 /**

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   approveCraftingRequest,
+  cancelCraftingRequest,
   loadHeroesForCrafting,
   registerCraftAction,
   rejectCraftingRequest,
@@ -255,6 +256,66 @@ test('rejectCraftingRequest marks pending request rejected', async () => {
   const request = mock.get('crafting-requests/request1');
   assert.equal(request.status, 'rejected');
   assert.equal(request.reviewedBy, 'Admin');
+});
+
+test('cancelCraftingRequest marks own pending request cancelled', async () => {
+  const { mock, deps } = makeDeps({
+    'crafting-requests/request1': {
+      heroId: 'hero1',
+      heroName: 'Gandalf',
+      itemSlug: 'longsword',
+      itemName: 'Longsword',
+      amountCrafted: 2,
+      craftDaysSpent: 4,
+      status: 'pending',
+      createdBy: 'Gandalf',
+    },
+  });
+
+  await cancelCraftingRequest({ requestId: 'request1', heroId: 'hero1', cancelledBy: 'Gandalf' }, deps);
+
+  const request = mock.get('crafting-requests/request1');
+  assert.equal(request.status, 'cancelled');
+  assert.equal(request.cancelledBy, 'Gandalf');
+  assert.equal(request.reviewedBy, undefined);
+});
+
+test('cancelCraftingRequest refuses reviewed or other-hero requests', async () => {
+  const { mock, deps } = makeDeps({
+    'crafting-requests/approved': {
+      heroId: 'hero1',
+      heroName: 'Gandalf',
+      itemSlug: 'longsword',
+      itemName: 'Longsword',
+      amountCrafted: 2,
+      craftDaysSpent: 4,
+      status: 'approved',
+      createdBy: 'Gandalf',
+      approvedLogId: 'log1',
+    },
+    'crafting-requests/otherHero': {
+      heroId: 'hero2',
+      heroName: 'Aela',
+      itemSlug: 'dagger',
+      itemName: 'Dagger',
+      amountCrafted: 1,
+      craftDaysSpent: 1,
+      status: 'pending',
+      createdBy: 'Aela',
+    },
+  });
+
+  await assert.rejects(
+    () => cancelCraftingRequest({ requestId: 'approved', heroId: 'hero1', cancelledBy: 'Gandalf' }, deps),
+    /Only pending crafting requests can be cancelled/,
+  );
+  await assert.rejects(
+    () => cancelCraftingRequest({ requestId: 'otherHero', heroId: 'hero1', cancelledBy: 'Gandalf' }, deps),
+    /Crafting request belongs to another hero/,
+  );
+
+  assert.equal(mock.get('crafting-requests/approved').status, 'approved');
+  assert.equal(mock.get('crafting-requests/otherHero').status, 'pending');
 });
 
 test('registerCraftAction links log to current active cycle', async () => {
