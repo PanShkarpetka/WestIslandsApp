@@ -1,4 +1,5 @@
 import { ACTIVE_SESSION_TIMEOUT_MS, BOT_CONFIG_DOC, COLLECTIONS, DEFAULT_CONFIG, SESSION_STEPS } from '../config/constants.js';
+import { rollFishingTreasure } from './fishingService.js';
 
 function mergeDeep(target, source) {
   const output = { ...target };
@@ -393,7 +394,8 @@ export async function createFishingLog(db, logData) {
   return logRef.id;
 }
 
-export async function updateFishAvailabilityTransaction(db, { catches, logData }) {
+export async function updateFishAvailabilityTransaction(db, { catches, logData, rng = Math.random }) {
+  const config = await getBotConfig(db);
   const cycleMeta = await resolveActiveCycleMeta(db);
   const linkedHero = await safeFindHeroByTelegramIdentity(db, {
     telegramUserId: logData?.telegramUserId,
@@ -407,6 +409,7 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData }
 
     const finalCatches = [];
     const availabilityChanges = [];
+    const treasuresFound = [];
 
     const fishSnapshots = [];
     for (const [fishId, desiredCount] of fishDeltas.entries()) {
@@ -443,20 +446,11 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData }
     }
 
     const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
-    transaction.set(logRef, {
-      ...logData,
-      ...cycleMeta,
-      heroId: linkedHero?.id || null,
-      heroName: linkedHero?.name || null,
-      fishSelected: finalCatches,
-      fishQuantityCaught: finalCatches.length,
-      fishAvailabilityChanges: availabilityChanges,
-      timestamp: new Date().toISOString()
-    });
 
     finalCatches.forEach((fish) => {
       const valueSilver = resolveFishValueSilver(fish, logData?.effectiveRollUsed);
-      transaction.set(db.collection(COLLECTIONS.CAUGHT_FISH).doc(), {
+      const caughtFishRef = db.collection(COLLECTIONS.CAUGHT_FISH).doc();
+      transaction.set(caughtFishRef, {
         fishId: fish.id,
         fishName: fish.fishName,
         fishDescription: fish.fishDescription,
@@ -476,8 +470,53 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData }
         createdAt: new Date().toISOString(),
         disposedAt: null
       });
+      const treasure = rollFishingTreasure({ config: config.treasures, rng });
+      if (treasure) {
+        const treasureRef = db.collection(COLLECTIONS.CAUGHT_TREASURES).doc();
+        const treasureData = {
+          ...treasure,
+          telegramUserId: logData?.telegramUserId == null ? null : String(logData.telegramUserId),
+          telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname || '',
+          telegramUsernameKey: normalizeTelegramUsername(logData?.telegramUsername || logData?.telegramUserNickname),
+          heroId: linkedHero?.id || null,
+          heroName: linkedHero?.name || null,
+          sourceFishingLogId: logRef.id,
+          sourceCaughtFishId: caughtFishRef.id,
+          fishId: fish.id,
+          fishName: fish.fishName,
+          cycleId: cycleMeta.cycleId || null,
+          status: 'available',
+          createdAt: new Date().toISOString(),
+          removedAt: null
+        };
+        treasuresFound.push({
+          id: treasureRef.id,
+          treasureId: treasure.treasureId,
+          treasureName: treasure.treasureName,
+          valueGold: treasure.valueGold,
+          valueRangeGold: treasure.valueRangeGold,
+          chance: treasure.chance,
+          fishId: fish.id,
+          fishName: fish.fishName,
+          heroId: linkedHero?.id || null,
+          heroName: linkedHero?.name || null
+        });
+        transaction.set(treasureRef, treasureData);
+      }
     });
 
-    return { finalCatches, availabilityChanges, logId: logRef.id };
+    transaction.set(logRef, {
+      ...logData,
+      ...cycleMeta,
+      heroId: linkedHero?.id || null,
+      heroName: linkedHero?.name || null,
+      fishSelected: finalCatches,
+      fishQuantityCaught: finalCatches.length,
+      treasuresFound,
+      fishAvailabilityChanges: availabilityChanges,
+      timestamp: new Date().toISOString()
+    });
+
+    return { finalCatches, availabilityChanges, treasuresFound, logId: logRef.id };
   });
 }

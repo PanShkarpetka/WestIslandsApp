@@ -3,6 +3,7 @@ export const COLLECTIONS = {
   FISHES: 'fishes',
   FISHING_LOGS: 'fishing-logs',
   CAUGHT_FISH: 'caught-fish',
+  CAUGHT_TREASURES: 'caught-treasures',
   HEROES: 'heroes',
   USER_SESSIONS: 'fishing-sessions',
   PROCESSED_UPDATES: 'telegram-processed-updates'
@@ -70,6 +71,15 @@ export const DEFAULT_CONFIG = {
     strategy: 'random',
     maxDistinctFishPerRun: 3,
     skipUnavailable: true
+  },
+  treasures: {
+    enabled: true,
+    table: [
+      { id: 'diamond', name: 'Diamond', chance: 1 / 1000, valueGold: { min: 50, max: 350 } },
+      { id: 'small-ruby', name: 'Small Ruby', chance: 1 / 250, valueGold: { min: 20, max: 100 } },
+      { id: 'silver-ring', name: 'Silver Ring', chance: 1 / 100, valueGold: { min: 1, max: 50 } },
+      { id: 'pearl', name: 'Pearl', chance: 1 / 40, valueGold: { min: 1, max: 50 } }
+    ]
   }
 };
 

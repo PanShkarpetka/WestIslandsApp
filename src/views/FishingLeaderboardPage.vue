@@ -89,6 +89,36 @@
       </v-table>
     </div>
 
+    <div v-if="treasureRankings.length > 0" class="section-title">
+      <v-icon class="mr-2" size="16">mdi-diamond-stone</v-icon>
+      Рейтинг скарбів
+    </div>
+
+    <div v-if="treasureRankings.length > 0" class="rankings-table-wrap mb-6">
+      <v-table density="compact" class="rankings-table">
+        <thead>
+          <tr>
+            <th class="rank-col">#</th>
+            <th>Рибалка</th>
+            <th>Скарби</th>
+            <th>Усього зм</th>
+            <th>Найкращий скарб</th>
+            <th>Найкращий зм</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, idx) in treasureRankings" :key="row.key" class="angler-row">
+            <td class="rank-col">{{ idx + 1 }}</td>
+            <td class="angler-name">{{ row.username }}</td>
+            <td class="wi-gold-text">{{ row.treasureCount }}</td>
+            <td>{{ formatAmount(row.totalValueGold) }}</td>
+            <td class="wi-muted-text">{{ row.bestTreasure || '—' }}</td>
+            <td>{{ formatAmount(row.bestTreasureValueGold) }}</td>
+          </tr>
+        </tbody>
+      </v-table>
+    </div>
+
     <!-- Rare catches hall of fame -->
     <div v-if="store.rareCatches.length > 0" class="section-title">
       <v-icon class="mr-2" size="16">mdi-trophy</v-icon>
@@ -213,6 +243,9 @@
           зловив <strong>{{ entry.fishName }}</strong>
           <span v-if="entry.fishCount > 1"> +{{ entry.fishCount - 1 }} ін.</span>
           ({{ formatGoldFromSilver(entry.fishValue) }} <span class="wi-coin">зм</span>)
+          <span v-if="entry.treasureCount" class="feed-treasure">
+            · 💎 скарбів: {{ entry.treasureCount }}, {{ formatAmount(entry.treasureValueGold) }} зм
+          </span>
         </span>
         <span v-else-if="!entry.success" class="feed-text wi-muted-text"> нічого не спіймав</span>
         <span class="feed-time wi-muted-text ml-auto">{{ timeAgo(entry.timestamp) }}</span>
@@ -229,6 +262,7 @@ import { useFishStore } from '@/store/fishStore';
 import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
 import { resolveFishValue, silverToGold } from '@/utils/fishingUtils';
+import { aggregateTreasureRankings, getLogTreasures } from '@/utils/fishingTreasures';
 
 const store = useFishingLeaderboardStore();
 const fishStore = useFishStore();
@@ -409,6 +443,11 @@ const sortedAnglers = computed(() => {
   return arr;
 });
 
+const treasureRankings = computed(() => aggregateTreasureRankings(filteredLogs.value, {
+  getParticipantKey: (log) => store.getLogParticipantKey(log),
+  getDisplayName: (log) => store.getLogDisplayName(log),
+}));
+
 // Feed day navigation — default to today
 const feedDayOffset = ref(0); // 0 = today, -1 = yesterday, etc.
 
@@ -458,6 +497,8 @@ const feedEntries = computed(() => {
       const fish = Array.isArray(log.fishSelected) ? log.fishSelected : [];
       const username = store.getLogDisplayName(log);
       const topFish = fish[0] || null;
+      const treasures = getLogTreasures(log);
+      const treasureValueGold = treasures.reduce((sum, treasure) => sum + Number(treasure.valueGold || 0), 0);
       return {
         id: log.id,
         username,
@@ -465,6 +506,8 @@ const feedEntries = computed(() => {
         fishName: topFish?.fishName || null,
         fishValue: topFish ? resolveFishValue(topFish, log.effectiveRollUsed) : 0,
         fishCount: fish.length,
+        treasureCount: treasures.length,
+        treasureValueGold,
         timestamp: log.timestamp,
       };
     });
@@ -728,6 +771,10 @@ function timeAgo(ts) {
 
 .feed-text {
   color: var(--wi-text);
+}
+
+.feed-treasure {
+  color: var(--wi-gold-light);
 }
 
 .feed-time {

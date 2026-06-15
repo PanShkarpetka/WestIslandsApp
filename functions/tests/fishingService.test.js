@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveFishingAttempt } from '../src/services/fishingService.js';
+import { resolveFishingAttempt, rollFishingTreasure } from '../src/services/fishingService.js';
 
 function makeRng(values) {
   let index = 0;
@@ -152,4 +152,34 @@ test('critical success does not bypass ship requirement for uncapped sum', () =>
 
   assert.equal(withShip.finalSum > 65, true);
   assert.equal(withShip.selectedFish.fishName, 'ShipOnlyFish');
+});
+
+const treasureConfig = {
+  enabled: true,
+  table: [
+    { id: 'diamond', name: 'Diamond', chance: 1 / 1000, valueGold: { min: 50, max: 350 } },
+    { id: 'small-ruby', name: 'Small Ruby', chance: 1 / 250, valueGold: { min: 20, max: 100 } },
+    { id: 'silver-ring', name: 'Silver Ring', chance: 1 / 100, valueGold: { min: 1, max: 50 } },
+    { id: 'pearl', name: 'Pearl', chance: 1 / 40, valueGold: { min: 1, max: 50 } }
+  ]
+};
+
+test('misses fishing treasure when roll is outside all chances', () => {
+  const result = rollFishingTreasure({ config: treasureConfig, rng: makeRng([0.5, 0.5, 0.5, 0.5]) });
+  assert.equal(result, null);
+});
+
+test('rolls the rarest matching treasure first', () => {
+  const result = rollFishingTreasure({ config: treasureConfig, rng: makeRng([0, 0.5]) });
+  assert.equal(result.treasureId, 'diamond');
+  assert.equal(result.treasureName, 'Diamond');
+  assert.equal(result.valueGold, 200);
+});
+
+test('rolls treasure value within configured range', () => {
+  const low = rollFishingTreasure({ config: treasureConfig, rng: makeRng([0.5, 0.5, 0.5, 0.02, 0]) });
+  const high = rollFishingTreasure({ config: treasureConfig, rng: makeRng([0.5, 0.5, 0.5, 0.02, 0.999]) });
+  assert.equal(low.treasureId, 'pearl');
+  assert.equal(low.valueGold, 1);
+  assert.equal(high.valueGold, 50);
 });

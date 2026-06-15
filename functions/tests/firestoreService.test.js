@@ -113,6 +113,15 @@ function createMockDb(seed = {}) {
   };
 }
 
+function makeRng(values) {
+  let index = 0;
+  return () => {
+    const value = values[index] ?? 0;
+    index += 1;
+    return value;
+  };
+}
+
 test('stock update guard never drops below zero', () => {
   const result = applyAvailabilityGuard(1, 5);
   assert.equal(result.awarded, 1);
@@ -318,6 +327,87 @@ test('updateFishAvailabilityTransaction creates caught fish linked to hero by te
   assert.equal(data.valueSilver, 150);
   assert.equal(data.valueGold, 15);
   assert.equal(data.cycleId, 'active');
+});
+
+test('updateFishAvailabilityTransaction creates separate treasure without changing fish value', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        treasures: {
+          enabled: true,
+          table: [
+            { id: 'diamond', name: 'Diamond', chance: 1 / 1000, valueGold: { min: 50, max: 350 } }
+          ]
+        }
+      }
+    },
+    [COLLECTIONS.HEROES]: {
+      h1: { name: 'Aela', telegramId: '42' }
+    },
+    [COLLECTIONS.FISHES]: {
+      cod: {
+        fishName: 'Cod',
+        fishDescription: 'Common fish',
+        fishCodeNumber: { min: 10, max: 20 },
+        fishValueSilver: 50,
+        fishAmountAvailableNow: 1
+      }
+    }
+  });
+
+  const result = await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 42, telegramUsername: 'angler', effectiveRollUsed: 15 },
+    rng: makeRng([0, 0.5])
+  });
+
+  assert.equal(result.treasuresFound.length, 1);
+  assert.equal(result.treasuresFound[0].treasureName, 'Diamond');
+  assert.equal(result.treasuresFound[0].valueGold, 200);
+
+  const caughtFish = await db.collection(COLLECTIONS.CAUGHT_FISH).get();
+  assert.equal(caughtFish.docs[0].data().valueGold, 5);
+
+  const treasures = await db.collection(COLLECTIONS.CAUGHT_TREASURES).get();
+  assert.equal(treasures.docs.length, 1);
+  const treasure = treasures.docs[0].data();
+  assert.equal(treasure.treasureName, 'Diamond');
+  assert.equal(treasure.valueGold, 200);
+  assert.equal(treasure.heroId, 'h1');
+  assert.equal(treasure.status, 'available');
+  assert.equal(treasure.fishName, 'Cod');
+
+  const logs = await db.collection(COLLECTIONS.FISHING_LOGS).get();
+  assert.equal(logs.docs[0].data().treasuresFound[0].treasureName, 'Diamond');
+});
+
+test('updateFishAvailabilityTransaction does not roll treasure for unavailable fish', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        treasures: {
+          enabled: true,
+          table: [
+            { id: 'diamond', name: 'Diamond', chance: 1, valueGold: { min: 50, max: 350 } }
+          ]
+        }
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      cod: { fishName: 'Cod', fishValueSilver: 50, fishAmountAvailableNow: 0 }
+    }
+  });
+
+  const result = await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 99, effectiveRollUsed: 10 },
+    rng: makeRng([0, 0.5])
+  });
+
+  assert.equal(result.finalCatches.length, 0);
+  assert.equal(result.treasuresFound.length, 0);
+  const treasures = await db.collection(COLLECTIONS.CAUGHT_TREASURES).get();
+  assert.equal(treasures.docs.length, 0);
 });
 
 test('updateFishAvailabilityTransaction creates caught fish linked to hero by telegram username', async () => {

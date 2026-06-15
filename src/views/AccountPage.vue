@@ -140,6 +140,50 @@
         </v-card-text>
       </v-card>
 
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-diamond-stone</v-icon>
+          Скарби
+        </div>
+        <v-card-text class="account-card-body">
+          <div v-if="fishAccountState.error" class="account-error-msg">
+            <v-icon size="14" class="mr-1">mdi-alert-circle</v-icon>
+            {{ fishAccountState.error }}
+          </div>
+          <div v-else-if="treasureLoading" class="account-empty-state">
+            <v-icon class="mr-1" size="14">mdi-compass</v-icon>
+            Завантаження скарбів...
+          </div>
+          <div v-else-if="treasureError" class="account-error-msg">
+            <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>
+            {{ treasureError }}
+          </div>
+          <div v-else-if="!caughtTreasures.length" class="account-empty-state">
+            <v-icon class="mr-1" size="14">mdi-treasure-chest-outline</v-icon>
+            Знайдених скарбів ще немає.
+          </div>
+          <div v-else class="treasure-list">
+            <div v-for="treasure in caughtTreasures" :key="treasure.id" class="treasure-row">
+              <div class="treasure-info">
+                <span class="treasure-name">{{ treasure.treasureName }}</span>
+                <span class="treasure-meta wi-muted-text">з риби {{ treasure.fishName || 'невідомо' }}</span>
+              </div>
+              <span class="wi-number treasure-price">{{ formatAmount(treasure.valueGold) }} зм</span>
+              <v-btn
+                size="x-small"
+                variant="outlined"
+                class="goods-withdraw-btn"
+                :loading="treasureActionLoading === treasure.id"
+                :disabled="Boolean(treasureActionLoading)"
+                @click="removeTreasure(treasure)"
+              >
+                Прибрати
+              </v-btn>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+
       <v-card class="account-card" elevation="0">
         <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-history</v-icon>
@@ -263,6 +307,11 @@ import {
   releaseCaughtFish,
   sellCaughtFish,
 } from '@/services/caughtFishService.js'
+import {
+  getCaughtTreasureLookup,
+  isCaughtTreasureOwnedByHero,
+  removeCaughtTreasure,
+} from '@/services/caughtTreasureService.js'
 
 const userStore = useUserStore()
 const goodsStore = useGoodsStore()
@@ -271,11 +320,15 @@ const hero = ref({ id: '', name: '', goldBalance: 0, goods: {}, telegramId: '' }
 const transactions = ref([])
 const transactionsError = ref('')
 const caughtFish = ref([])
+const caughtTreasures = ref([])
 const selectedFishIds = ref([])
 const fishLoading = ref(false)
+const treasureLoading = ref(false)
 const fishError = ref('')
+const treasureError = ref('')
 const fishActionError = ref('')
 const fishActionLoading = ref('')
+const treasureActionLoading = ref('')
 const fishSaleTaxRate = ref(0.1)
 const loading = ref(true)
 const loadError = ref('')
@@ -290,6 +343,7 @@ const withdrawing = ref(false)
 let unsubscribeHero = null
 let unsubscribeTx = null
 let unsubscribeFish = null
+let unsubscribeTreasures = null
 let unsubscribeIsland = null
 
 const fishAccountState = computed(() => getCaughtFishAccountState(hero.value))
@@ -315,6 +369,7 @@ function txTypeLabel(type) {
   if (type === 'withdrawal') return 'Зняття'
   if (type === 'fish-sale') return 'Продаж риби'
   if (type === 'fish-release') return 'Відпускання риби'
+  if (type === 'treasure-remove') return 'Скарб прибрано'
   if (type === 'admin-balance-adjustment') return 'Корекція балансу'
   return 'Списання'
 }
@@ -323,6 +378,7 @@ function txTypeClass(type) {
   if (type === 'income' || type === 'fish-sale') return 'wi-success-text'
   if (type === 'withdrawal') return 'wi-gold-text'
   if (type === 'fish-release') return 'wi-sea-text'
+  if (type === 'treasure-remove') return 'wi-sea-text'
   return 'wi-danger-text'
 }
 
@@ -396,6 +452,42 @@ function subscribeCaughtFish() {
   })
 }
 
+function subscribeCaughtTreasures() {
+  unsubscribeTreasures?.()
+  unsubscribeTreasures = null
+  caughtTreasures.value = []
+  treasureError.value = ''
+
+  if (!fishAccountState.value.canLoadFish) {
+    treasureLoading.value = false
+    return
+  }
+
+  treasureLoading.value = true
+  const lookup = getCaughtTreasureLookup(fishAccountState.value.telegramId)
+  if (!lookup) {
+    treasureLoading.value = false
+    return
+  }
+
+  const treasureQuery = query(
+    collection(db, 'caught-treasures'),
+    where(lookup.field, '==', lookup.value),
+  )
+
+  unsubscribeTreasures = onSnapshot(treasureQuery, (snap) => {
+    caughtTreasures.value = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .filter((treasure) => treasure.status === 'available')
+      .filter((treasure) => isCaughtTreasureOwnedByHero(treasure, { heroId: userStore.heroId, telegramId: fishAccountState.value.telegramId }))
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+    treasureLoading.value = false
+  }, (err) => {
+    treasureError.value = err?.message || 'Не вдалося завантажити скарби.'
+    treasureLoading.value = false
+  })
+}
+
 async function sellSelectedFish() {
   fishActionError.value = ''
   fishActionLoading.value = 'sell'
@@ -412,6 +504,25 @@ async function sellSelectedFish() {
     fishActionError.value = e?.message || 'Не вдалося продати рибу.'
   } finally {
     fishActionLoading.value = ''
+  }
+}
+
+async function removeTreasure(treasure) {
+  treasureActionLoading.value = treasure.id
+  treasureError.value = ''
+  try {
+    await removeCaughtTreasure({
+      heroId: userStore.heroId,
+      heroName: hero.value.name || userStore.nickname,
+      telegramId: hero.value.telegramId,
+      treasureId: treasure.id,
+      actorName: userStore.nickname,
+      isAdmin: useUserStore().isAdmin ?? false,
+    })
+  } catch (e) {
+    treasureError.value = e?.message || 'Не вдалося прибрати скарб.'
+  } finally {
+    treasureActionLoading.value = ''
   }
 }
 
@@ -556,12 +667,14 @@ onMounted(() => {
 
 watch(() => hero.value.telegramId, () => {
   subscribeCaughtFish()
+  subscribeCaughtTreasures()
 })
 
 onBeforeUnmount(() => {
   unsubscribeHero?.()
   unsubscribeTx?.()
   unsubscribeFish?.()
+  unsubscribeTreasures?.()
   unsubscribeIsland?.()
   goodsStore.unsubscribeGoods()
 })
@@ -660,14 +773,16 @@ onBeforeUnmount(() => {
 }
 
 .goods-list,
-.fish-list {
+.fish-list,
+.treasure-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
 .goods-row,
-.fish-row {
+.fish-row,
+.treasure-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -699,7 +814,8 @@ onBeforeUnmount(() => {
 }
 
 .goods-info,
-.fish-info {
+.fish-info,
+.treasure-info {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -713,7 +829,8 @@ onBeforeUnmount(() => {
 }
 
 .goods-name,
-.fish-name {
+.fish-name,
+.treasure-name {
   font-family: var(--wi-font-body);
   color: var(--wi-text);
   font-size: 0.9rem;
@@ -731,11 +848,13 @@ onBeforeUnmount(() => {
 }
 
 .goods-unit,
-.fish-meta {
+.fish-meta,
+.treasure-meta {
   font-size: 0.8rem;
 }
 
-.fish-price {
+.fish-price,
+.treasure-price {
   font-size: 0.95rem;
   white-space: nowrap;
   margin-left: auto;

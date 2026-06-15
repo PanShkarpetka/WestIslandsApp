@@ -608,3 +608,38 @@ test('supports /admin_fish_catches_yesterday command', async () => {
   assert.match(reply, /yesterday-user: Yesterday Fish/);
   assert.doesNotMatch(reply, /today-user: Today Fish/);
 });
+
+test('adds jackpot message after admin test catch when treasure is found', async () => {
+  const telegramUserId = '511';
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        fishingState: { lastResetDateKey: getDailyResetKeyNoonUtc() },
+        treasures: {
+          enabled: true,
+          table: [
+            { id: 'diamond', name: 'Diamond', chance: 1, valueGold: { min: 237, max: 237 } }
+          ]
+        }
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      'fish-1': {
+        fishName: 'Treasure Cod',
+        fishDescription: 'Shiny',
+        fishCodeNumber: { min: 36, max: 36 },
+        fishValueSilver: 5,
+        fishAmountAvailableNow: 1,
+        fishAmountDaily: 1
+      }
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: `${COMMANDS.TEST_CATCH_BY_CODE} 36`, telegramUserId, telegramUsername: 'angler' }
+  });
+
+  assert.match(reply, /Улов: <b>Treasure Cod<\/b>/);
+  assert.match(reply, /💎 Джекпот! Усередині риби знайдено: <b>Diamond<\/b> — 237 зм\./);
+});

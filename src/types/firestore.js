@@ -372,7 +372,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'admin-balance-adjustment'|'mage-guild-reward'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'mage-guild-reward'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
@@ -598,7 +598,16 @@
  * @property {{ enabled: boolean, diceSides: number, applyTo: string }} guidance
  * @property {{ basic: BaitConfig, simple: BaitConfig, advanced: BaitConfig }} bait
  * @property {{ strategy: string, maxDistinctFishPerRun: number, skipUnavailable: boolean, allowDuplicates: boolean }} fishSelection
+ * @property {{ enabled: boolean, table: TreasureConfigEntry[] }} treasures
  * @property {FishingStateData} fishingState
+ */
+
+/**
+ * @typedef {Object} TreasureConfigEntry
+ * @property {string} id
+ * @property {string} name
+ * @property {number} chance - Probability per awarded fish, e.g. 0.001 for 1/1000
+ * @property {{ min: number, max: number }} valueGold
  */
 
 /**
@@ -649,6 +658,7 @@
  * @property {'success'|'failure'} successFailureResult
  * @property {Pick<FishDoc, 'id'|'fishName'|'fishDescription'|'fishCodeNumber'|'fishValueSilver'|'fishAdditionalRollsRequiredForSuccessfulCatch'>[]} fishSelected
  * @property {number} fishQuantityCaught
+ * @property {FishingTreasureSnapshot[]} [treasuresFound]
  * @property {Array<{ fishId: string, before: number, requested: number, awarded: number, after: number }>} fishAvailabilityChanges
  * @property {unknown[]} extraCheckResults
  * @property {import('firebase/firestore').Timestamp|string} timestamp
@@ -678,6 +688,48 @@
  * @property {import('firebase/firestore').Timestamp|string|null} disposedAt
  * @property {string} [disposedByHeroId]
  * @property {string} [disposedByHeroName]
+ */
+
+/**
+ * Embedded snapshot in `fishing-logs/{logId}.treasuresFound`.
+ * @typedef {Object} FishingTreasureSnapshot
+ * @property {string} id - caught-treasures document ID
+ * @property {string} treasureId
+ * @property {string} treasureName
+ * @property {number} valueGold
+ * @property {{ min: number, max: number }} valueRangeGold
+ * @property {number} chance
+ * @property {string} fishId
+ * @property {string} fishName
+ * @property {string|null} heroId
+ * @property {string|null} heroName
+ */
+
+/**
+ * Collection: `caught-treasures/{treasureDocId}`
+ * @typedef {Object} CaughtTreasureDoc
+ * @property {string} treasureId
+ * @property {string} treasureName
+ * @property {number} valueGold
+ * @property {{ min: number, max: number }} valueRangeGold
+ * @property {number} chance
+ * @property {number} roll
+ * @property {string|null} telegramUserId
+ * @property {string} telegramUsername
+ * @property {string} telegramUsernameKey
+ * @property {string|null} heroId
+ * @property {string|null} heroName
+ * @property {string} sourceFishingLogId
+ * @property {string} sourceCaughtFishId
+ * @property {string} fishId
+ * @property {string} fishName
+ * @property {string|null} cycleId
+ * @property {'available'|'removed'} status
+ * @property {import('firebase/firestore').Timestamp|string} createdAt
+ * @property {import('firebase/firestore').Timestamp|string|null} removedAt
+ * @property {string} [removedByHeroId]
+ * @property {string} [removedByHeroName]
+ * @property {boolean} [removedByAdmin]
  */
 
 /**

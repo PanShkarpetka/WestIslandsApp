@@ -297,6 +297,7 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
     return {
       result,
       resolvedCatches: [],
+      treasuresFound: [],
       pendingAdditionalRoll: null
     };
   }
@@ -309,6 +310,7 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
     return {
       result,
       resolvedCatches: [],
+      treasuresFound: [],
       pendingAdditionalRoll: {
         fishId: result.selectedFish.id,
         fishName: result.selectedFish.fishName,
@@ -329,6 +331,7 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
   return {
     result,
     resolvedCatches: txResult.finalCatches,
+    treasuresFound: txResult.treasuresFound,
     pendingAdditionalRoll: null
   };
 }
@@ -358,6 +361,7 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
 
       await clearUserSession(db, telegramUserId);
       return formatFishingResult(session.payload.result, txResult.finalCatches, {
+        treasuresFound: txResult.treasuresFound,
         additionalRollPassed: false,
         additionalRollCaughtDespiteFailure: true,
         additionalRollFailureDescription: failureDescription
@@ -394,7 +398,10 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
   onDcChanged?.(buildDcChangedMessage(outcome));
 
   await clearUserSession(db, telegramUserId);
-  return formatFishingResult(session.payload.result, txResult.finalCatches, { additionalRollPassed: true });
+  return formatFishingResult(session.payload.result, txResult.finalCatches, {
+    treasuresFound: txResult.treasuresFound,
+    additionalRollPassed: true
+  });
 }
 
 export async function handleTelegramMessage({ db, payload, onDcChanged }) {
@@ -598,7 +605,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
     const outcome = await registerFishingOutcome(db, { success: true });
     onDcChanged?.(buildDcChangedMessage(outcome));
 
-    return formatFishingResult(fakeResult, txResult.finalCatches);
+    return formatFishingResult(fakeResult, txResult.finalCatches, { treasuresFound: txResult.treasuresFound });
   }
 
   if ([COMMANDS.CANCEL, COMMANDS.RESET].includes(commandToken)) {
@@ -613,7 +620,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
   if (isFishCommand) {
     try {
       const singleLine = parseSingleLineFishCommand(text, config);
-      const { result, resolvedCatches, pendingAdditionalRoll } = await processFishing({
+      const { result, resolvedCatches, treasuresFound, pendingAdditionalRoll } = await processFishing({
         db,
         telegramUserId,
         telegramUsername: usernameFromPayload(payload),
@@ -632,7 +639,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
       }
 
       await clearUserSession(db, telegramUserId);
-      return formatFishingResult(result, resolvedCatches);
+      return formatFishingResult(result, resolvedCatches, { treasuresFound });
     } catch (error) {
       return `Помилка введення : ${error.message}`;
     }

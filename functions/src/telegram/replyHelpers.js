@@ -22,6 +22,32 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;');
 }
 
+function formatGold(value) {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount)) return '0';
+  return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
+}
+
+function formatTreasureLines(treasures) {
+  const list = Array.isArray(treasures) ? treasures.filter(Boolean) : [];
+  if (!list.length) return [];
+
+  if (list.length === 1) {
+    const treasure = list[0];
+    return [
+      `💎 Джекпот! Усередині риби знайдено: <b>${escapeHtml(treasure.treasureName || treasure.name || 'скарб')}</b> — ${formatGold(treasure.valueGold)} зм.`
+    ];
+  }
+
+  return [
+    '💎 <b>Знайдено скарби-джекпоти!</b>',
+    ...list.map((treasure) => {
+      const source = treasure.fishName ? ` у рибі ${escapeHtml(treasure.fishName)}` : '';
+      return `• <b>${escapeHtml(treasure.treasureName || treasure.name || 'скарб')}</b>${source} — ${formatGold(treasure.valueGold)} зм`;
+    })
+  ];
+}
+
 function formatList(values, { withParens = false, withSign = false } = {}) {
   const list = Array.isArray(values) ? values : [values];
 
@@ -89,6 +115,8 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
     lines.push('Опис:');
     lines.push(`<blockquote>${escapeHtml(fish.fishDescription)}</blockquote>`);
   }
+
+  lines.push(...formatTreasureLines(options.treasuresFound));
 
   if (options.pendingAdditionalRoll) {
     const firstRequirement = options.pendingAdditionalRoll.requirements[0];

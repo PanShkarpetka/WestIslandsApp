@@ -169,6 +169,57 @@ export function resolveFishByCode(fishes, code) {
   };
 }
 
+function normalizeTreasureConfig(config = {}) {
+  if (config.enabled === false) return [];
+  const table = Array.isArray(config.table) ? config.table : [];
+  return table
+    .map((entry) => {
+      const min = Math.max(0, Math.round(Number(entry?.valueGold?.min ?? 0)));
+      const max = Math.max(min, Math.round(Number(entry?.valueGold?.max ?? min)));
+      const chance = Number(entry?.chance ?? 0);
+      return {
+        id: String(entry?.id || '').trim(),
+        name: String(entry?.name || entry?.id || '').trim(),
+        chance,
+        valueGold: { min, max }
+      };
+    })
+    .filter((entry) => entry.id && entry.name && entry.chance > 0)
+    .sort((a, b) => a.chance - b.chance);
+}
+
+function rollIntInclusive(min, max, rng = Math.random) {
+  const low = Math.min(Number(min), Number(max));
+  const high = Math.max(Number(min), Number(max));
+  return Math.floor(rng() * (high - low + 1)) + low;
+}
+
+export function rollFishingTreasure({ config = {}, rng = Math.random } = {}) {
+  const table = normalizeTreasureConfig(config);
+  if (!table.length) return null;
+
+  let treasure = null;
+  let roll = null;
+  for (const entry of table) {
+    roll = rng();
+    if (roll < entry.chance) {
+      treasure = entry;
+      break;
+    }
+  }
+  if (!treasure) return null;
+
+  const valueGold = rollIntInclusive(treasure.valueGold.min, treasure.valueGold.max, rng);
+  return {
+    treasureId: treasure.id,
+    treasureName: treasure.name,
+    valueGold,
+    valueRangeGold: { ...treasure.valueGold },
+    chance: treasure.chance,
+    roll
+  };
+}
+
 export const __testables = {
   applyBaitBonus,
   applyGuidance,
@@ -176,5 +227,7 @@ export const __testables = {
   getRollCap,
   getFishCodeRange,
   findFishByRoll,
-  findCatchableFish
+  findCatchableFish,
+  normalizeTreasureConfig,
+  rollIntInclusive
 };
