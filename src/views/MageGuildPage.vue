@@ -182,13 +182,22 @@
             </div>
           </div>
           <v-select v-model="dialogForm.heroId" :items="heroOptions" label="Герой" variant="outlined" density="compact" hide-details="auto" class="mb-3" />
+          <v-select v-model="dialogForm.guildId" :items="guildOptions" label="Гільдія для частки магів" variant="outlined" density="compact" hide-details="auto" class="mb-3" />
+          <v-text-field v-model.number="dialogForm.guildTaxPercent" label="Частка гільдії магів, %" type="number" min="0" :max="maxGuildTaxPercent" step="1" variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-percent" />
+          <div v-if="selectedRequest" class="mage-payout-preview">
+            <div><span>Винагорода</span><strong>{{ formatAmount(payoutPreview.gross, 2) }} зм</strong></div>
+            <div><span>Податок острова</span><strong>{{ formatAmount(payoutPreview.treasuryTax, 2) }} зм</strong></div>
+            <div><span>Гільдія магів</span><strong>{{ formatAmount(payoutPreview.guildTax, 2) }} зм</strong></div>
+            <div><span>Герою</span><strong>{{ formatAmount(payoutPreview.heroNet, 2) }} зм</strong></div>
+            <div v-if="isPayoutInvalid" class="mage-payout-warning">Сумарний податок не може перевищувати 100%.</div>
+          </div>
           <v-text-field v-model="dialogForm.telegramPostUrl" label="Посилання на Telegram пост" variant="outlined" density="compact" hide-details="auto" placeholder="https://t.me/..." prepend-inner-icon="mdi-message-text" />
         </v-card-text>
         <v-divider style="border-color: var(--wi-border)" />
         <v-card-actions class="mage-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="closeFulfillmentDialog">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="store.actionLoading" prepend-icon="mdi-check" @click="confirmFulfillment">Зберегти</v-btn>
+          <v-btn class="save-btn" :loading="store.actionLoading" :disabled="isPayoutInvalid" prepend-icon="mdi-check" @click="confirmFulfillment">Зберегти</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -198,12 +207,16 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { doc, getDoc } from 'firebase/firestore'
 import { useMageGuildStore } from '@/store/mageGuildStore'
 import { useUserStore } from '@/store/userStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { useIslandStore } from '@/store/islandStore'
+import { useGuildStore } from '@/store/guildStore'
 import { formatAmount } from '@/utils/formatters'
 import { normalizeSpellLevel, normalizeSpellTier } from '@/utils/mageGuildRequests'
+import { DEFAULT_ISLAND_ID } from '@/config/constants'
+import { db } from '@/services/firebase'
 
 const SPELL_LEVEL_COLORS = {
   0: '#607d8b', 1: '#5a8a3c', 2: '#3a6080', 3: '#6a3a8a',
@@ -220,17 +233,28 @@ const store = useMageGuildStore()
 const userStore = useUserStore()
 const populationStore = usePopulationStore()
 const islandStore = useIslandStore()
+const guildStore = useGuildStore()
 
-const isAdmin = computed(() => userStore.isAdmin)
+const isAdmin = computed(() => userStore.isAdmin ?? false)
 const activeRequestDocument = computed(() => store.latestRequestDocument)
 const historyDocuments = computed(() => store.productionDocuments.slice(1))
 const heroOptions = computed(() => store.heroes.map((hero) => ({ title: hero.name, value: hero.id })))
+const guildOptions = computed(() => guildStore.guilds.map((guild) => ({ title: guild.name || guild.shortName || guild.id, value: guild.id })))
 const fulfillmentForms = reactive({})
 const submittingKey = ref('')
 const fulfillmentDialog = ref(false)
 const selectedRequest = ref(null)
 const selectedRequestDocumentId = ref('')
-const dialogForm = reactive({ heroId: '', telegramPostUrl: '' })
+const dialogForm = reactive({ heroId: '', guildId: '', guildTaxPercent: 0, telegramPostUrl: '' })
+const islandTaxRate = ref(0)
+const maxGuildTaxPercent = computed(() => Math.max(0, roundAmount((1 - islandTaxRate.value) * 100)))
+const isPayoutInvalid = computed(() => payoutPreview.value.heroNet < 0 || Number(dialogForm.guildTaxPercent || 0) < 0)
+const payoutPreview = computed(() => {
+  const gross = Number(selectedRequest.value?.compensation ?? 0) || 0
+  const treasuryTax = roundAmount(gross * islandTaxRate.value)
+  const guildTax = roundAmount(gross * ((Number(dialogForm.guildTaxPercent) || 0) / 100))
+  return { gross, treasuryTax, guildTax, heroNet: roundAmount(gross - treasuryTax - guildTax) }
+})
 
 function getRequestKey(request) { return request?.localId || request?.id || 'request' }
 function getDocumentRequestKey(documentId, request) { return `${documentId}:${getRequestKey(request)}` }
@@ -238,11 +262,23 @@ function getDocumentRequestKey(documentId, request) { return `${documentId}:${ge
 function ensureRequestForms(requests, documentId) {
   for (const request of requests || []) {
     const key = getDocumentRequestKey(documentId, request)
-    if (!fulfillmentForms[key]) fulfillmentForms[key] = { heroId: '', telegramPostUrl: '' }
+    if (!fulfillmentForms[key]) fulfillmentForms[key] = { heroId: '', guildId: '', guildTaxPercent: 0, telegramPostUrl: '' }
   }
 }
 
 function formatCompensation(value) { return formatAmount(value, 0) }
+function roundAmount(value) { return Math.round((Number(value) || 0) * 100) / 100 }
+
+async function loadIslandTaxRate(islandId = DEFAULT_ISLAND_ID) {
+  try {
+    const snapshot = await getDoc(doc(db, 'islands', islandId || DEFAULT_ISLAND_ID))
+    const value = Number(snapshot.exists() ? snapshot.data()?.taxRate ?? 0 : 0)
+    islandTaxRate.value = Number.isFinite(value) && value > 0 ? value : 0
+  } catch (error) {
+    console.error('[mageGuild] Failed to load island tax rate', error)
+    islandTaxRate.value = 0
+  }
+}
 
 function getSpellColor(spellLevel) {
   const level = normalizeSpellLevel(spellLevel)
@@ -266,13 +302,15 @@ function openFulfillmentDialog(request, documentId) {
   selectedRequest.value = request
   selectedRequestDocumentId.value = documentId
   dialogForm.heroId = fulfillmentForms[key].heroId || ''
+  dialogForm.guildId = fulfillmentForms[key].guildId || guildOptions.value[0]?.value || ''
+  dialogForm.guildTaxPercent = Number(fulfillmentForms[key].guildTaxPercent ?? 0) || 0
   dialogForm.telegramPostUrl = fulfillmentForms[key].telegramPostUrl || ''
   fulfillmentDialog.value = true
 }
 
 function closeFulfillmentDialog() {
   fulfillmentDialog.value = false; selectedRequest.value = null
-  selectedRequestDocumentId.value = ''; dialogForm.heroId = ''; dialogForm.telegramPostUrl = ''
+  selectedRequestDocumentId.value = ''; dialogForm.heroId = ''; dialogForm.guildId = ''; dialogForm.guildTaxPercent = 0; dialogForm.telegramPostUrl = ''
 }
 
 function isSubmitting(documentId, request) {
@@ -281,6 +319,7 @@ function isSubmitting(documentId, request) {
 
 async function confirmFulfillment() {
   if (!selectedRequest.value || !selectedRequestDocumentId.value) return
+  if (isPayoutInvalid.value) return
   const requestKey = getDocumentRequestKey(selectedRequestDocumentId.value, selectedRequest.value)
   submittingKey.value = requestKey
   try {
@@ -288,10 +327,13 @@ async function confirmFulfillment() {
       spellRequestId: selectedRequestDocumentId.value,
       requestId: getRequestKey(selectedRequest.value),
       heroId: dialogForm.heroId,
+      guildId: dialogForm.guildId,
+      mageGuildTaxRate: (Number(dialogForm.guildTaxPercent) || 0) / 100,
+      islandId: islandStore.currentId || DEFAULT_ISLAND_ID,
       telegramPostUrl: dialogForm.telegramPostUrl,
       actorName: userStore.nickname || 'Адміністратор',
     })
-    fulfillmentForms[requestKey] = { heroId: dialogForm.heroId, telegramPostUrl: dialogForm.telegramPostUrl }
+    fulfillmentForms[requestKey] = { heroId: dialogForm.heroId, guildId: dialogForm.guildId, guildTaxPercent: dialogForm.guildTaxPercent, telegramPostUrl: dialogForm.telegramPostUrl }
     closeFulfillmentDialog()
   } finally { submittingKey.value = '' }
 }
@@ -312,11 +354,12 @@ watch(() => store.requestDocuments, (docs) => {
 
 watch(() => islandStore.currentId, async (id) => {
   populationStore.startListening(id)
+  await loadIslandTaxRate(id)
   await ensureCurrentCycleRequests()
 }, { immediate: true })
 
-onMounted(() => store.startListening())
-onBeforeUnmount(() => { store.stopListening(); populationStore.stopListening() })
+onMounted(() => { store.startListening(); guildStore.subscribeGuilds() })
+onBeforeUnmount(() => { store.stopListening(); populationStore.stopListening(); guildStore.unsubscribeGuilds() })
 </script>
 
 <style scoped>
@@ -622,6 +665,27 @@ onBeforeUnmount(() => { store.stopListening(); populationStore.stopListening() }
   font-size: 0.82rem;
   color: var(--wi-text-muted);
 }
+
+.mage-payout-preview {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(90, 62, 32, 0.45);
+  border-radius: 4px;
+  background: rgba(26, 18, 9, 0.35);
+  font-family: var(--wi-font-body);
+  font-size: 0.86rem;
+}
+
+.mage-payout-preview div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mage-payout-preview span { color: var(--wi-text-muted); }
+.mage-payout-preview strong { color: var(--wi-gold); font-family: var(--wi-font-number); }
 
 .mage-dialog-actions { padding: 12px 20px !important; }
 

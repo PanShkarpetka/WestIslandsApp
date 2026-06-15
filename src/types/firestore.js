@@ -12,6 +12,7 @@
  * @typedef {Object} IslandDoc
  * @property {Record<string, BuildingEntry>} buildings - Map of building key → building state
  * @property {number} buildingDiscount - Cost discount multiplier (0–1)
+ * @property {number} [taxRate] - Base island tax multiplier for new financial flows (0.1 = 10%).
  * @property {number} [fishSaleTaxRate] - Tax multiplier for fish sales (0.1 = 10%)
  * @property {string[]} manufactures - Array of manufacture document IDs
  */
@@ -127,12 +128,16 @@
  * @typedef {Object} TreasuryTransactionDoc
  * @property {string} id
  * @property {number} amount - Positive for deposits, negative for withdrawals
- * @property {'deposit'|'withdraw'|'fish-tax'} type
+ * @property {'deposit'|'withdraw'|'fish-tax'|'mage-guild-tax'} type
  * @property {string} comment
  * @property {string} userId - Firebase UID, 'anon', or 'system'
  * @property {string} nickname
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {number} balanceAfter
+ * @property {string} [spellRequestId]
+ * @property {string} [requestId]
+ * @property {number} [taxRate]
+ * @property {number} [grossAmount]
  * @property {string} cycleId
  * @property {string} cycleStartedAt - Faerun date string
  * @property {string|null} cycleFinishedAt - Faerun date string or null if cycle is open
@@ -163,11 +168,15 @@
  * @typedef {Object} GuildLogDoc
  * @property {string} id
  * @property {number} amount
- * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'} type
+ * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'|'mage-guild-tax'} type
  * @property {string} comment
  * @property {string} userNickname
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {number} treasureAfter
+ * @property {string} [spellRequestId]
+ * @property {string} [requestId]
+ * @property {number} [taxRate]
+ * @property {number} [grossAmount]
  * @property {Record<string, number>} [goods] - Goods delta (positive = added, negative = removed); set for goods transactions
  * @property {Record<string, number>} [goodsAfter] - Goods snapshot after the transaction
  */
@@ -363,7 +372,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'admin-balance-adjustment'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'admin-balance-adjustment'|'mage-guild-reward'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
@@ -371,6 +380,14 @@
  * @property {string} [manufactureId]
  * @property {string} [manufactureName]
  * @property {'fixed'|'coinPig'} [manufactureMechanic]
+ * @property {string} [spellRequestId]
+ * @property {string} [requestId]
+ * @property {string} [mageGuildId]
+ * @property {number} [grossAmount]
+ * @property {number} [treasuryTaxAmount]
+ * @property {number} [treasuryTaxRate]
+ * @property {number} [guildTaxAmount]
+ * @property {number} [guildTaxRate]
  * @property {import('firebase/firestore').Timestamp} createdAt
  */
 
@@ -511,6 +528,14 @@
  * @property {string} fulfilledByHeroRefPath
  * @property {string} telegramPostUrl
  * @property {string} updatedBy
+ * @property {number} [grossReward]
+ * @property {number} [heroNetReward]
+ * @property {number} [treasuryTax]
+ * @property {number} [treasuryTaxRate]
+ * @property {number} [guildTax]
+ * @property {number} [guildTaxRate]
+ * @property {string} [mageGuildId]
+ * @property {string} [mageGuildName]
  */
 
 /**

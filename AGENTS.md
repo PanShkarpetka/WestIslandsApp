@@ -128,6 +128,10 @@ The pirate theme lives in `src/styles/theme.css`. All Vuetify components are glo
 - `DEFAULT_ISLAND_ID` — `'island_rock'` — the single active island's Firestore document ID
 - `PSEUDO_RELIGION_ID` — `'psevdo'` — placeholder religion used for heroes with no religion assigned
 
+### Island tax rate
+- `islands/island_rock.taxRate` is the base island tax multiplier (`0.1` = 10%). New financial features must read this value instead of hardcoding a 10% tax.
+- `fishSaleTaxRate` may still exist as a specialized/legacy fish-sale tax field; do not treat it as the general island tax.
+
 ### `src/utils/formatters.js`
 - `formatAmount(value, decimals = 2)` — formats a number to fixed decimal string; returns `'0.00'` for non-finite values. Used for all currency display.
 

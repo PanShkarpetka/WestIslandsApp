@@ -14,7 +14,9 @@ Color-coded by spell level (`SPELL_LEVEL_COLORS`, levels 0-9). Left border accen
 Each card shows: level badge (tier icon + level number), spell name, status badge, downtime days, compensation amount, fulfilled-by hero name, Telegram post link.
 
 ## Fulfillment dialog (admin only)
-Opens from a spell card's "Виконано" button. Fields: hero selector, Telegram post URL. Calls `store.markFulfilled()` with document ID, request ID, heroId, telegramPostUrl, actorName.
+Opens from a spell card's "Виконано" button. Fields: hero selector, mage guild treasury selector, mage guild percentage, Telegram post URL. Calls `store.markFulfilled()` with document ID, request ID, heroId, guildId, mageGuildTaxRate, islandId, telegramPostUrl, actorName.
+
+The dialog shows a payout preview: gross compensation, island tax, mage guild share, and hero net reward. `mageGuildTaxRate` is entered in the UI as a percent and sent to the service as a multiplier (`20%` → `0.2`).
 
 `fulfillmentForms` is a reactive map keyed by `{documentId}:{requestId}` to persist partial form state across dialog opens.
 
@@ -47,7 +49,15 @@ Unfulfilled requests first → highest compensation → alphabetical by spell na
 This means popular spells get cheaper over time and neglected ones get more expensive.
 
 ### Fulfillment write
-Firestore transaction: reads the `spell-requests` document and the hero document, updates the matching request in the `requests` array in-place (sets `fulfilled`, `fulfilledByHeroId`, `fulfilledByHeroName`, `telegramPostUrl`), then writes back the full array.
+Firestore transaction: reads the `spell-requests` document, hero document, `treasury/meta`, selected `guilds/{guildId}`, and `islands/{islandId}`. It updates the matching request in the `requests` array in-place and applies the payout atomically.
+
+Payout formula:
+- `grossReward` = request `compensation`
+- `treasuryTax` = `grossReward * islands/{islandId}.taxRate`
+- `guildTax` = `grossReward * mageGuildTaxRate`
+- `heroNetReward` = `grossReward - treasuryTax - guildTax`
+
+The transaction updates `heroes/{heroId}.goldBalance`, `treasury/meta.balance`, and `guilds/{guildId}.treasure`; it also writes logs to `hero-transactions`, `treasury-transactions`, and `guilds/{guildId}/logs`. The request item stores a financial snapshot (`grossReward`, `heroNetReward`, tax amounts/rates, `mageGuildId`, `mageGuildName`) for history.
 
 ## Stores
 - `useMageGuildStore` — `startListening()` / `stopListening()`, `latestRequestDocument`, `productionDocuments`, `heroes`, `openCount`, `fulfilledCount`, `markFulfilled()`, `ensureCurrentCycleRequests()`
