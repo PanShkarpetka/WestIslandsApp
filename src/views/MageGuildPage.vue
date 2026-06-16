@@ -112,7 +112,7 @@
                 prepend-icon="mdi-check"
                 @click="openFulfillmentDialog(request, activeRequestDocument.id)"
               >
-                Виконано
+                Виконати
               </v-btn>
             </div>
           </div>
@@ -245,7 +245,8 @@ const submittingKey = ref('')
 const fulfillmentDialog = ref(false)
 const selectedRequest = ref(null)
 const selectedRequestDocumentId = ref('')
-const dialogForm = reactive({ heroId: '', guildId: '', guildTaxPercent: 0, telegramPostUrl: '' })
+const DEFAULT_MAGE_GUILD_TAX_PERCENT = 10
+const dialogForm = reactive({ heroId: '', guildId: '', guildTaxPercent: DEFAULT_MAGE_GUILD_TAX_PERCENT, telegramPostUrl: '' })
 const islandTaxRate = ref(0)
 const maxGuildTaxPercent = computed(() => Math.max(0, roundAmount((1 - islandTaxRate.value) * 100)))
 const isPayoutInvalid = computed(() => payoutPreview.value.heroNet < 0 || Number(dialogForm.guildTaxPercent || 0) < 0)
@@ -262,7 +263,7 @@ function getDocumentRequestKey(documentId, request) { return `${documentId}:${ge
 function ensureRequestForms(requests, documentId) {
   for (const request of requests || []) {
     const key = getDocumentRequestKey(documentId, request)
-    if (!fulfillmentForms[key]) fulfillmentForms[key] = { heroId: '', guildId: '', guildTaxPercent: 0, telegramPostUrl: '' }
+    if (!fulfillmentForms[key]) fulfillmentForms[key] = { heroId: '', guildId: '', guildTaxPercent: DEFAULT_MAGE_GUILD_TAX_PERCENT, telegramPostUrl: '' }
   }
 }
 
@@ -296,21 +297,30 @@ function historyTitle(doc) {
   return `${doc.cycleLabel || doc.cycleId || doc.id} · ${fulfilled}/${total} виконано`
 }
 
+function findDefaultMageGuildId() {
+  const normalizedNeedles = ['гільдія магів', 'гильдия магов', 'mage guild', 'mages']
+  const match = guildStore.guilds.find((guild) => {
+    const values = [guild.name, guild.shortName, guild.id].map((value) => String(value || '').trim().toLowerCase())
+    return values.some((value) => normalizedNeedles.includes(value))
+  })
+  return match?.id || guildOptions.value[0]?.value || ''
+}
+
 function openFulfillmentDialog(request, documentId) {
   const key = getDocumentRequestKey(documentId, request)
   ensureRequestForms([request], documentId)
   selectedRequest.value = request
   selectedRequestDocumentId.value = documentId
   dialogForm.heroId = fulfillmentForms[key].heroId || ''
-  dialogForm.guildId = fulfillmentForms[key].guildId || guildOptions.value[0]?.value || ''
-  dialogForm.guildTaxPercent = Number(fulfillmentForms[key].guildTaxPercent ?? 0) || 0
+  dialogForm.guildId = fulfillmentForms[key].guildId || findDefaultMageGuildId()
+  dialogForm.guildTaxPercent = Number(fulfillmentForms[key].guildTaxPercent ?? DEFAULT_MAGE_GUILD_TAX_PERCENT) || 0
   dialogForm.telegramPostUrl = fulfillmentForms[key].telegramPostUrl || ''
   fulfillmentDialog.value = true
 }
 
 function closeFulfillmentDialog() {
   fulfillmentDialog.value = false; selectedRequest.value = null
-  selectedRequestDocumentId.value = ''; dialogForm.heroId = ''; dialogForm.guildId = ''; dialogForm.guildTaxPercent = 0; dialogForm.telegramPostUrl = ''
+  selectedRequestDocumentId.value = ''; dialogForm.heroId = ''; dialogForm.guildId = ''; dialogForm.guildTaxPercent = DEFAULT_MAGE_GUILD_TAX_PERCENT; dialogForm.telegramPostUrl = ''
 }
 
 function isSubmitting(documentId, request) {

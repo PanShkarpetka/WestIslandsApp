@@ -204,6 +204,21 @@
       </v-data-table>
       </v-card>
 
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Використані дні поточного циклу</div>
+        <v-data-table
+          :headers="usedDaysHeaders"
+          :items="usedDaysRows"
+          :items-per-page="10"
+          density="compact"
+          class="elevation-1"
+        >
+          <template #item.totalDays="{ item }">
+            <span class="font-weight-medium">{{ item.totalDays }}</span>
+          </template>
+        </v-data-table>
+      </v-card>
+
       <div class="d-flex align-center ga-2 mb-3">
         <v-btn icon size="small" variant="text" @click="snapshotHistoryOpen = !snapshotHistoryOpen">
           <v-icon>{{ snapshotHistoryOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
@@ -547,6 +562,44 @@
         </v-card>
       </v-dialog>
 
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="text-subtitle-1 mb-3">Товари на балансах персонажів</div>
+        <v-alert v-if="heroGoodsError" type="error" variant="tonal" class="mb-3">{{ heroGoodsError }}</v-alert>
+        <v-alert v-if="heroGoodsSuccess" type="success" variant="tonal" class="mb-3">{{ heroGoodsSuccess }}</v-alert>
+        <v-row class="mb-2">
+          <v-col cols="12" md="3">
+            <v-select v-model="heroGoodsForm.heroId" :items="heroOptions" label="Герой" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-select v-model="heroGoodsForm.goodId" :items="goodOptions" label="Товар" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="2">
+            <v-text-field v-model.number="heroGoodsForm.delta" label="Зміна" type="number" step="1" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="3">
+            <v-text-field v-model="heroGoodsForm.comment" label="Коментар" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col cols="12" md="1" class="d-flex align-end">
+            <v-btn color="primary" :loading="heroGoodsSaving" @click="saveHeroGoodsAdjustment">Застосувати</v-btn>
+          </v-col>
+        </v-row>
+        <v-data-table
+          :headers="heroGoodsHeaders"
+          :items="heroGoodsRows"
+          :items-per-page="20"
+          density="compact"
+          class="elevation-1"
+        >
+          <template #item.qty="{ item }">
+            <span class="font-weight-medium">{{ item.qty }}</span>
+          </template>
+          <template #item.actions="{ item }">
+            <v-btn size="small" variant="text" color="primary" @click="prepareHeroGoodsAdjustment(item, 1)">+1</v-btn>
+            <v-btn size="small" variant="text" color="error" @click="prepareHeroGoodsAdjustment(item, -1)">-1</v-btn>
+          </template>
+        </v-data-table>
+      </v-card>
+
       <v-divider class="my-4" />
 
       <!-- Yield Buildings -->
@@ -737,6 +790,7 @@
           {{ formatTimestamp(item.timestamp) }}
         </template>
       </v-data-table>
+
         </v-window-item>
       </v-window>
     </v-card>
@@ -806,6 +860,8 @@ import { DEFAULT_HERO_PASSWORD, DEFAULT_ISLAND_ID } from '@/config/constants.js'
 import { aggregateReligionActions, buildReligionSummaryText } from '@/utils/religionSummary.js';
 import { getFirestoreTimestampMillis } from '@/utils/firestoreTimestamp.js';
 import { adjustHeroGoldBalance, SNAPSHOT_HISTORY_DEFAULT_OPEN } from '@/services/heroBalanceService.js';
+import { adjustHeroGoods } from '@/services/heroGoodsService.js';
+import { subscribeCurrentCycleUsedDays } from '@/services/usedDaysService.js';
 
 const adminTab = ref('cycles');
 const logEntries = ref([]);
@@ -982,6 +1038,40 @@ const goodsRows = computed(() =>
   goodsList.value.map((g) => ({ id: g.id, name: g.name, unit: g.unit || '—' }))
 );
 
+const heroGoodsSaving = ref(false);
+const heroGoodsError = ref('');
+const heroGoodsSuccess = ref('');
+const heroGoodsForm = reactive({ heroId: '', goodId: '', delta: 1, comment: '' });
+
+const heroGoodsHeaders = [
+  { title: 'Герой', key: 'heroName' },
+  { title: 'Товар', key: 'goodName' },
+  { title: 'Кількість', key: 'qty' },
+  { title: 'Одиниця', key: 'unit' },
+  { title: '', key: 'actions', sortable: false },
+];
+
+const heroGoodsRows = computed(() => {
+  const goodsById = new Map(goodsList.value.map((good) => [good.id, good]));
+  return heroRows.value
+    .flatMap((hero) => Object.entries(hero.goods || {})
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([goodId, qty]) => {
+        const good = goodsById.get(goodId);
+        return {
+          heroId: hero.id,
+          heroName: hero.name,
+          goodId,
+          goodName: good?.name || goodId,
+          qty: Number(qty || 0),
+          unit: good?.unit || '—',
+        };
+      }))
+    .sort((a, b) => a.heroName.localeCompare(b.heroName, 'uk-UA') || a.goodName.localeCompare(b.goodName, 'uk-UA'));
+});
+
+const goodOptions = computed(() => goodsRows.value.map((good) => ({ title: `${good.name}${good.unit && good.unit !== '—' ? ` (${good.unit})` : ''}`, value: good.id })));
+
 function openGoodsEditor(item) {
   selectedGoodId.value = item.id;
   editGoodForm.name = item.name;
@@ -1034,6 +1124,36 @@ async function deleteGood(item) {
   } catch (e) {
     console.error('[admin] Failed to delete good', e);
     goodsError.value = 'Не вдалося видалити товар.';
+  }
+}
+
+function prepareHeroGoodsAdjustment(item, delta) {
+  heroGoodsForm.heroId = item.heroId;
+  heroGoodsForm.goodId = item.goodId;
+  heroGoodsForm.delta = delta;
+  heroGoodsForm.comment = '';
+}
+
+async function saveHeroGoodsAdjustment() {
+  heroGoodsError.value = '';
+  heroGoodsSuccess.value = '';
+  heroGoodsSaving.value = true;
+  try {
+    const result = await adjustHeroGoods({
+      heroId: heroGoodsForm.heroId,
+      goodId: heroGoodsForm.goodId,
+      delta: heroGoodsForm.delta,
+      comment: heroGoodsForm.comment,
+      actor: { nickname: 'Admin' },
+    });
+    heroGoodsSuccess.value = `${result.heroName}: ${result.goodName} ${result.delta > 0 ? '+' : ''}${result.delta}.`;
+    heroGoodsForm.delta = 1;
+    heroGoodsForm.comment = '';
+  } catch (error) {
+    console.error('[admin] Failed to adjust hero goods', error);
+    heroGoodsError.value = error?.message || 'Не вдалося змінити товари героя.';
+  } finally {
+    heroGoodsSaving.value = false;
   }
 }
 
@@ -1111,6 +1231,7 @@ let stopReligions = null;
 let stopClergy = null;
 let stopHeroBalanceSyncLogs = null;
 let stopCraftingRequests = null;
+let stopUsedDays = null;
 
 const headers = [
   { title: 'Час', key: 'timestamp' },
@@ -1180,6 +1301,27 @@ const heroRows = computed(() =>
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'uk-UA')),
 );
+
+const heroOptions = computed(() => heroRows.value.map((hero) => ({ title: hero.name, value: hero.id })));
+const usedDaysByHero = ref(new Map());
+const usedDaysHeaders = [
+  { title: 'Герой', key: 'heroName' },
+  { title: 'Крафт', key: 'craftingDays' },
+  { title: 'Магічна допомога', key: 'mageGuildDays' },
+  { title: 'Релігія', key: 'religionDays' },
+  { title: 'Разом', key: 'totalDays' },
+];
+const usedDaysRows = computed(() => heroRows.value.map((hero) => {
+  const breakdown = usedDaysByHero.value.get(hero.id) || {};
+  return {
+    heroId: hero.id,
+    heroName: hero.name,
+    craftingDays: Number(breakdown.craftingDays || 0),
+    mageGuildDays: Number(breakdown.mageGuildDays || 0),
+    religionDays: Number(breakdown.religionDays || 0),
+    totalDays: Number(breakdown.totalDays || 0),
+  };
+}));
 
 const applyImportDisabled = computed(() => {
   const preview = snapshotImportState.preview;
@@ -1456,6 +1598,7 @@ function subscribeHeroData() {
         dndbeyondCharacterId: data.dndbeyondCharacterId || '',
         telegramId: String(data.telegramId || '').trim(),
         goldBalance: Number(data.goldBalance ?? 0),
+        goods: data.goods || {},
         balance: data.balance || null,
         balanceDelta: data.balanceDelta || null,
         downtimeAvailable: data.downtimeAvailable !== false,
@@ -1831,6 +1974,7 @@ async function createHero() {
         dndbeyondCharacterId,
         telegramId,
         goldBalance: 0,
+        goods: {},
         downtimeAvailable: true,
         inactive: false,
         password: DEFAULT_HERO_PASSWORD,
@@ -2034,6 +2178,12 @@ onMounted(async () => {
     selectedApproveCraftRequestIds.value = selectedApproveCraftRequestIds.value.filter((id) => pendingIds.has(id));
     selectedRejectCraftRequestIds.value = selectedRejectCraftRequestIds.value.filter((id) => pendingIds.has(id));
   });
+  stopUsedDays = subscribeCurrentCycleUsedDays({}, (rows) => {
+    usedDaysByHero.value = rows;
+  }, (error) => {
+    console.warn('[admin] Failed to load used days', error);
+    usedDaysByHero.value = new Map();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -2044,6 +2194,7 @@ onBeforeUnmount(() => {
   stopHeroBalanceSyncLogs?.();
   stopGoods?.();
   stopCraftingRequests?.();
+  stopUsedDays?.();
   yieldBuildingStore.stop();
 });
 

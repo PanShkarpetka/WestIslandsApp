@@ -10,7 +10,7 @@ Admin control panel. The page is organized into Vuetify tabs so large admin work
 |-----|----------|
 | Cycles | [AdminView/CyclesSection.md](AdminView/CyclesSection.md) |
 | Heroes | [AdminView/HeroesSection.md](AdminView/HeroesSection.md), [AdminView/CampaignSummarySection.md](AdminView/CampaignSummarySection.md) |
-| Resources | Trade goods and yield buildings management |
+| Resources | Trade goods, character item balances, and yield buildings management |
 | Crafting | [AdminView/CraftingSection.md](AdminView/CraftingSection.md) |
 | Event log | `logs` collection, ordered by `timestamp` desc, loaded once on mount |
 
@@ -21,10 +21,12 @@ All started in `onMounted`, stopped in `onBeforeUnmount`:
 - `clergy` collection snapshot -> `clergyRows.value`
 - `hero-balance-sync-logs` query snapshot (last 1000, ordered by `syncedAt` desc) -> `heroBalanceSyncLogs.value`
 - `crafting-requests` pending query snapshot -> `pendingCraftRequests.value`
+- current-cycle used days snapshots -> `usedDaysByHero`
 - `populationStore.startListening(islandId)`
 
 ## Computed Cross-Section Data
 - `heroRows` - heroes joined with clergy (religion, clergyId), sorted alphabetically
+- `usedDaysRows` - current-cycle crafting, mage help, religion, and total used days per hero
 - `religionOptions` - for hero form selects
 - `clergyByHeroId` / `religionById` - lookup maps
 

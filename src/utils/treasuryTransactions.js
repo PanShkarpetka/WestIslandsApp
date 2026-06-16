@@ -10,7 +10,7 @@ export function getTreasuryTransactionTypeMeta(transaction = {}) {
     return { label: 'Зняття', icon: 'mdi-arrow-down-bold', className: 'tx-withdraw' }
   }
 
-  if (type === 'fish-tax') {
+  if (type === 'fish-tax' || type === 'mage-guild-tax') {
     return { label: 'Податок', icon: 'mdi-cash-plus', className: 'tx-deposit' }
   }
 

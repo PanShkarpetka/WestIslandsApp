@@ -372,7 +372,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'mage-guild-reward'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'mage-guild-reward'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]

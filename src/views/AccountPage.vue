@@ -184,6 +184,24 @@
         </v-card-text>
       </v-card>
 
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-timer-sand</v-icon>
+          Використані дні циклу
+        </div>
+        <v-card-text class="account-card-body">
+          <div class="balance-display">
+            <span class="wi-number balance-amount">{{ usedDays.totalDays }}</span>
+            <span class="balance-unit wi-muted-text">дн.</span>
+          </div>
+          <div class="used-days-breakdown mt-2">
+            <span>Крафт: {{ usedDays.craftingDays }}</span>
+            <span>Магічна допомога: {{ usedDays.mageGuildDays }}</span>
+            <span>Релігія: {{ usedDays.religionDays }}</span>
+          </div>
+        </v-card-text>
+      </v-card>
+
       <v-card class="account-card" elevation="0">
         <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-history</v-icon>
@@ -312,6 +330,7 @@ import {
   isCaughtTreasureOwnedByHero,
   removeCaughtTreasure,
 } from '@/services/caughtTreasureService.js'
+import { subscribeCurrentCycleUsedDays } from '@/services/usedDaysService.js'
 
 const userStore = useUserStore()
 const goodsStore = useGoodsStore()
@@ -339,12 +358,14 @@ const goodsWithdrawAmount = ref(1)
 const selectedGood = ref(null)
 const withdrawError = ref('')
 const withdrawing = ref(false)
+const usedDays = ref({ craftingDays: 0, mageGuildDays: 0, religionDays: 0, religionActions: 0, totalDays: 0 })
 
 let unsubscribeHero = null
 let unsubscribeTx = null
 let unsubscribeFish = null
 let unsubscribeTreasures = null
 let unsubscribeIsland = null
+let unsubscribeUsedDays = null
 
 const fishAccountState = computed(() => getCaughtFishAccountState(hero.value))
 
@@ -371,14 +392,17 @@ function txTypeLabel(type) {
   if (type === 'fish-release') return 'Відпускання риби'
   if (type === 'treasure-remove') return 'Скарб прибрано'
   if (type === 'admin-balance-adjustment') return 'Корекція балансу'
+  if (type === 'admin-goods-adjustment') return 'Корекція товарів'
+  if (type === 'mage-guild-reward') return 'Магічна допомога'
   return 'Списання'
 }
 
 function txTypeClass(type) {
-  if (type === 'income' || type === 'fish-sale') return 'wi-success-text'
+  if (type === 'income' || type === 'fish-sale' || type === 'mage-guild-reward') return 'wi-success-text'
   if (type === 'withdrawal') return 'wi-gold-text'
   if (type === 'fish-release') return 'wi-sea-text'
   if (type === 'treasure-remove') return 'wi-sea-text'
+  if (type === 'admin-balance-adjustment' || type === 'admin-goods-adjustment') return 'wi-gold-text'
   return 'wi-danger-text'
 }
 
@@ -663,6 +687,12 @@ onMounted(() => {
   unsubscribeIsland = onSnapshot(doc(db, 'islands', DEFAULT_ISLAND_ID), (snap) => {
     fishSaleTaxRate.value = Number(snap.data()?.fishSaleTaxRate ?? 0.1) || 0.1
   })
+
+  unsubscribeUsedDays = subscribeCurrentCycleUsedDays({ heroIds: [userStore.heroId] }, (usedDaysByHero) => {
+    usedDays.value = usedDaysByHero.get(userStore.heroId) || { craftingDays: 0, mageGuildDays: 0, religionDays: 0, religionActions: 0, totalDays: 0 }
+  }, (err) => {
+    console.warn('[account] Failed to load used days', err)
+  })
 })
 
 watch(() => hero.value.telegramId, () => {
@@ -676,6 +706,7 @@ onBeforeUnmount(() => {
   unsubscribeFish?.()
   unsubscribeTreasures?.()
   unsubscribeIsland?.()
+  unsubscribeUsedDays?.()
   goodsStore.unsubscribeGoods()
 })
 </script>
@@ -743,6 +774,15 @@ onBeforeUnmount(() => {
 
 .balance-unit {
   font-size: 1rem;
+}
+
+.used-days-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-family: var(--wi-font-body);
+  color: var(--wi-text-muted);
+  font-size: 0.86rem;
 }
 
 .withdraw-btn,

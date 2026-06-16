@@ -8,6 +8,11 @@ test('treasury transaction type meta renders fish tax as positive tax income', (
     icon: 'mdi-cash-plus',
     className: 'tx-deposit',
   })
+  assert.deepEqual(getTreasuryTransactionTypeMeta({ type: 'mage-guild-tax', amount: 10 }), {
+    label: 'Податок',
+    icon: 'mdi-cash-plus',
+    className: 'tx-deposit',
+  })
 })
 
 test('treasury transaction type meta keeps deposits and withdrawals explicit', () => {

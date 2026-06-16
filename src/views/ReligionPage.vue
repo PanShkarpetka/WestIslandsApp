@@ -1402,10 +1402,12 @@ async function confirmReligionChange() {
       addDoc(collection(db, 'religion-actions'), {
         actionType: doc(db, 'religion-action-types', 'changeReligion'),
         hero: heroRef || null,
+        heroId: heroRef?.id || null,
         clergy: clergyRef,
         fromReligion: currentReligionRef,
         toReligion: newReligionRef,
         faithPenalty: fine,
+        cycleId: latestCycle.value?.id || null,
         user: userStore.nickname || 'Адміністратор',
         createdAt: serverTimestamp(),
       }),
@@ -1434,10 +1436,12 @@ async function createFaithAwardAction(delta) {
   await addDoc(collection(db, 'religion-actions'), {
     actionType: doc(db, 'religion-action-types', 'awardAdventure'),
     hero: heroRef,
+    heroId: heroRef?.id || null,
     clergy: clergyRef,
     religion: religionRef,
     faithDelta: delta,
     message: logMessage.value?.trim() || '',
+    cycleId: latestCycle.value?.id || null,
     user: userStore.nickname || 'Адміністратор',
     createdAt: serverTimestamp(),
   })
