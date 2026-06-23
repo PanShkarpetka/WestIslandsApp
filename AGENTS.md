@@ -53,6 +53,14 @@ functions/src/
 
 The fishing game uses D20 rolls + modifiers vs. a DC, bait selection, optional guidance re-roll, and per-day fish availability tracked in Firestore. Seasonal weather can modify fishing DC, computed roll sum, fish value, and treasure chance; it never changes the one-fish-per-attempt limit. Duplicate Telegram updates are deduplicated via Firestore before processing.
 
+### Firebase credentials and Telegram admin ops
+
+- Telegram bot admin commands (`/admin_fish_*`) must be protected by `TELEGRAM_ADMIN_USER_IDS` and/or `TELEGRAM_ADMIN_USERNAMES`; do not add new admin commands that bypass this allowlist.
+- Keep Firebase service account JSON files outside the repository. Never commit service account keys, private keys, `functions/service-account.json`, or `migrations/firebaseAdmin.local.json`.
+- Migration scripts in `migrations/` use Firebase Admin credentials in this order: `FIREBASE_SERVICE_ACCOUNT_JSON`, `GOOGLE_APPLICATION_CREDENTIALS`, ignored `migrations/firebaseAdmin.local.json`, then Application Default Credentials.
+- `migrations/firebaseAdmin.local.json` may contain a machine-local path to an external key file; it is intentionally ignored and must stay untracked.
+- Cloud Functions use `admin.initializeApp()` with the deployed runtime identity; do not point deployed Functions at a checked-in service account file.
+
 ### Key Domain Concepts
 
 - **Islands** — primary entity; most data is scoped to an island ID
