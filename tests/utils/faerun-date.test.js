@@ -1,13 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  DEFAULT_YEAR,
   clampDay,
   formatFaerunDate,
   parseFaerunDate,
+  addFaerunDays,
   diffInDays,
   getFaerunSeason,
   normalizeFaerunDate,
 } from '../../src/utils/faerun-date.js';
+
+test('DEFAULT_YEAR is the current campaign year', () => {
+  assert.equal(DEFAULT_YEAR, 818);
+});
 
 test('clampDay keeps values within 1..30', () => {
   assert.equal(clampDay(0), 1);
@@ -46,7 +52,12 @@ test('diffInDays returns day difference across dates', () => {
 
 test('normalizeFaerunDate returns normalized data', () => {
   const normalized = normalizeFaerunDate({ day: 0, month: 'Eleint' });
-  assert.deepEqual(normalized, { day: 1, month: 8, year: 815 });
+  assert.deepEqual(normalized, { day: 1, month: 8, year: 818 });
+});
+
+test('addFaerunDays advances across month and year boundaries', () => {
+  assert.deepEqual(addFaerunDays({ day: 30, month: 'Nightal', year: 815 }, 1), { day: 1, month: 0, year: 816 });
+  assert.deepEqual(addFaerunDays({ day: 28, month: 'Uktar', year: 815 }, 3), { day: 1, month: 11, year: 815 });
 });
 
 test('getFaerunSeason maps each month to the expected season', () => {

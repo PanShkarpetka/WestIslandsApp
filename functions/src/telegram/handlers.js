@@ -3,6 +3,7 @@ import { resolveFishingAttempt, resolveFishByCode } from '../services/fishingSer
 import {
   clearUserSession,
   createFishingLog,
+  getActiveCycleWeather,
   getAllFishingLogs,
   getAvailableFishes,
   getBotConfig,
@@ -258,8 +259,9 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
     getBotConfig(db),
     getAvailableFishes(db)
   ]);
+  const weather = await getActiveCycleWeather(db);
 
-  const result = resolveFishingAttempt({ normalizedInput, config, fishes });
+  const result = resolveFishingAttempt({ normalizedInput, config, fishes, weather });
 
   const baseLog = {
     telegramUserId,
@@ -277,6 +279,13 @@ async function processFishing({ db, telegramUserId, telegramUsername, normalized
     shipBonusRoll: result.shipBonusRoll,
     preCapComputedSum: result.computedSum,
     finalComputedSum: result.finalSum,
+    weather,
+    weatherEffects: result.weatherEffects,
+    weatherSumModifier: result.weatherSumModifier,
+    baseEachRollDc: result.baseEachRollDc,
+    effectiveEachRollDc: result.effectiveEachRollDc,
+    fishValueMultiplier: result.weatherEffects.fishValueMultiplier,
+    treasureChanceMultiplier: result.weatherEffects.treasureChanceMultiplier,
     eachRollDc: result.eachRollDc,
     passedEachRollDc: result.passedEachRollDc,
     failedRollIndexes: result.failedRollIndexes,
@@ -531,6 +540,7 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
     }
 
     const fishes = await getAvailableFishes(db);
+    const weather = await getActiveCycleWeather(db);
     const { resolvedFish, effectiveRoll } = resolveFishByCode(fishes, code);
 
     if (!resolvedFish) {
@@ -553,7 +563,12 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
       rolledFish: null,
       effectiveRollUsed: effectiveRoll,
       selectedFish: resolvedFish,
-      success: true
+      success: true,
+      weather,
+      weatherEffects: weather?.effects || null,
+      weatherSumModifier: 0,
+      baseEachRollDc: 10,
+      effectiveEachRollDc: 10
     };
 
     const baseLog = {
@@ -572,6 +587,13 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
       shipBonusRoll: null,
       preCapComputedSum: effectiveRoll,
       finalComputedSum: effectiveRoll,
+      weather,
+      weatherEffects: weather?.effects || null,
+      weatherSumModifier: 0,
+      baseEachRollDc: 10,
+      effectiveEachRollDc: 10,
+      fishValueMultiplier: Number(weather?.effects?.fishValueMultiplier ?? 1),
+      treasureChanceMultiplier: Number(weather?.effects?.treasureChanceMultiplier ?? 1),
       eachRollDc: 10,
       passedEachRollDc: true,
       failedRollIndexes: [],

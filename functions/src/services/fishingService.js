@@ -39,6 +39,29 @@ function applyShipBonus({ useShip, rng }) {
   return rollDie(4, rng);
 }
 
+function rollWeatherSumModifier(sumModifier, rng) {
+  if (!sumModifier || typeof sumModifier !== 'object') return 0;
+  if (sumModifier.type === 'fixed') return Number(sumModifier.value || 0);
+
+  const match = String(sumModifier.notation || '').trim().match(/^([+-]?)(\d*)d(\d+)$/i);
+  if (!match) return 0;
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const count = Math.max(1, Number(match[2] || 1));
+  const sides = Math.max(1, Number(match[3] || 1));
+  return sign * rollDice({ count, sides, rng }).reduce((sum, value) => sum + value, 0);
+}
+
+function normalizeWeatherEffects(weather) {
+  const effects = weather?.effects || {};
+  return {
+    dcModifier: Number(effects.dcModifier ?? 0),
+    sumModifier: effects.sumModifier || { type: 'fixed', value: 0, label: '' },
+    fishValueMultiplier: Number(effects.fishValueMultiplier ?? 1),
+    treasureChanceMultiplier: Number(effects.treasureChanceMultiplier ?? 1)
+  };
+}
+
 function getRollCap({ baitType, useShip, hasCriticalSuccess = false }) {
   if (useShip) {
     return Number.POSITIVE_INFINITY;
@@ -96,9 +119,10 @@ function findCatchableFish({ fishes, roll }) {
   return { fish: null, effectiveRoll: null, originalMatchedFish: null };
 }
 
-export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = Math.random }) {
+export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = Math.random, weather = null }) {
   const rawRolls = rollDice({ count: 3, sides: 20, rng });
   const modifiedRolls = rawRolls.map((roll, idx) => roll + normalizedInput.modifiers[idx]);
+  const weatherEffects = normalizeWeatherEffects(weather);
 
   const guidance = applyGuidance({
     useGuidance: normalizedInput.useGuidance,
@@ -109,9 +133,11 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
 
   const baitBonusRoll = applyBaitBonus({ baitType: normalizedInput.baitType, config, rng });
   const shipBonusRoll = applyShipBonus({ useShip: normalizedInput.useShip, rng });
+  const weatherSumModifier = rollWeatherSumModifier(weatherEffects.sumModifier, rng);
   const finalRolls = guidance.adjustedRolls;
 
-  const eachRollDc = Number(config.dc?.eachRollDc || 10);
+  const baseEachRollDc = Number(config.dc?.eachRollDc || 10);
+  const eachRollDc = Math.max(1, baseEachRollDc + weatherEffects.dcModifier);
   const failedRollIndexes = finalRolls
     .map((value, idx) => (value >= eachRollDc ? null : idx))
     .filter((idx) => idx !== null);
@@ -119,7 +145,8 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
 
   const computedSum = finalRolls.reduce((sum, value) => sum + value, 0)
     + (baitBonusRoll || 0)
-    + (shipBonusRoll || 0);
+    + (shipBonusRoll || 0)
+    + weatherSumModifier;
 
   const hasCriticalSuccess = rawRolls.some((roll) => roll === 20);
   const cap = getRollCap({
@@ -142,6 +169,11 @@ export function resolveFishingAttempt({ normalizedInput, config, fishes, rng = M
     guidance,
     baitBonusRoll,
     shipBonusRoll,
+    weather,
+    weatherEffects,
+    baseEachRollDc,
+    effectiveEachRollDc: eachRollDc,
+    weatherSumModifier,
     eachRollDc,
     failedRollIndexes,
     passedEachRollDc,
@@ -194,15 +226,16 @@ function rollIntInclusive(min, max, rng = Math.random) {
   return Math.floor(rng() * (high - low + 1)) + low;
 }
 
-export function rollFishingTreasure({ config = {}, rng = Math.random } = {}) {
+export function rollFishingTreasure({ config = {}, rng = Math.random, chanceMultiplier = 1 } = {}) {
   const table = normalizeTreasureConfig(config);
   if (!table.length) return null;
+  const multiplier = Math.max(0, Number(chanceMultiplier ?? 1));
 
   let treasure = null;
   let roll = null;
   for (const entry of table) {
     roll = rng();
-    if (roll < entry.chance) {
+    if (roll < Math.min(1, entry.chance * multiplier)) {
       treasure = entry;
       break;
     }

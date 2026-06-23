@@ -1,3 +1,5 @@
+import { describeWeatherEffects } from '../utils/faerunWeather.js';
+
 function fishCodeLabel(fish) {
   const code = fish?.fishCodeNumber;
   if (typeof code === 'number') {
@@ -64,6 +66,10 @@ function formatList(values, { withParens = false, withSign = false } = {}) {
 export function formatFishingResult(result, resolvedCatches, options = {}) {
   const lines = [];
   lines.push('🎣 <b>Результат риболовлі</b>\n');
+  if (result.weather) {
+    lines.push(`🌦️ Погода: <b>${escapeHtml(result.weather.title || 'невідомо')}</b>`);
+    lines.push(`🌦️ Ефект: ${escapeHtml(describeWeatherEffects(result.weatherEffects || result.weather.effects))}`);
+  }
   lines.push(`🧮 Модифікатори: ${formatList(result.normalizedInput.modifiers, { withParens: true, withSign: true })}`);
   lines.push(`🎲 Сирі кидки d20: ${formatList(result.rawRolls, { withParens: true})}`);
   lines.push(`📌 Після модифікаторів: <b>${formatList(result.modifiedRolls)}</b>`);
@@ -87,6 +93,10 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
     lines.push(`🚢 Бонус корабля: ${formatList(result.shipBonusRoll, { withParens: true, withSign: true })}`);
   }
 
+  if (result.weatherSumModifier) {
+    lines.push(`🌦️ Модифікатор погоди до суми: ${formatList(result.weatherSumModifier, { withParens: true, withSign: true })}`);
+  }
+
   if (result.computedSum !== result.finalSum) {
     lines.push(`📊 Сума до обмеження діапазоном наживки: ${result.computedSum}`);
     lines.push(`📊 Сума для пошуку риби (після обмеження): <b><u>${result.finalSum}</u></b>`);
@@ -94,7 +104,10 @@ export function formatFishingResult(result, resolvedCatches, options = {}) {
     lines.push(`📊 Сума для пошуку риби: <b><u>${result.finalSum}</u></b>`);
   }
 
-  lines.push(`🎯 Перевірка DC ${result.eachRollDc} для кожного кидка: <b>${result.passedEachRollDc ? 'УСПІХ ✅' : 'ПРОВАЛ ❌'}</b>`);
+  const dcLabel = result.baseEachRollDc && result.baseEachRollDc !== result.eachRollDc
+    ? `${result.baseEachRollDc} → ${result.eachRollDc}`
+    : String(result.eachRollDc);
+  lines.push(`🎯 Перевірка DC ${dcLabel} для кожного кидка: <b>${result.passedEachRollDc ? 'УСПІХ ✅' : 'ПРОВАЛ ❌'}</b>`);
   if (!result.passedEachRollDc) {
     lines.push(`⚠️ Номери невдалих кидків: ${result.failedRollIndexes.map((idx) => idx + 1).join(', ')}`);
   }

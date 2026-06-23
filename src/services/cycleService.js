@@ -15,7 +15,8 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
-import { diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from '../utils/faerun-date.js'
+import { DEFAULT_YEAR, diffInDays, formatFaerunDate, normalizeFaerunDate, parseFaerunDate } from '../utils/faerun-date.js'
+import { generateCycleWeatherForecast } from '../utils/faerun-weather.js'
 import { rollDice } from '../utils/dice.js'
 import { db } from './firebase.js'
 import { formatAmount } from '../utils/formatters.js'
@@ -687,7 +688,7 @@ export async function fulfillYieldEventManually(islandId, buildingKey, eventId, 
   const event = yields[eventIdx]
   if (event.processed) throw new Error('Ця подія вже виконана.')
 
-  const nowLabel = event.date || formatFaerunDate({ day: 1, month: 0, year: 815 })
+  const nowLabel = event.date || formatFaerunDate({ day: 1, month: 0, year: DEFAULT_YEAR })
   const deps = { docFn, getDocFn, updateDocFn, addDocFn, collectionFn, serverTimestampFn, firestoreDb, rng, manuallyFulfilled: true }
   const { rolledAmounts } = await _distributeYieldEvent(event, buildingKey, buildingEntry, nowLabel, null, deps)
 
@@ -755,6 +756,10 @@ export async function createNewCycleWithEffects({
   const startedAt = formatFaerunDate(normalizedStart)
   const populationAtStart = Number(population ?? 0)
   const cycleDoc = await addDocFn(cyclesRef, { startedAt, populationAtStart, createdAt: serverTimestampFn() })
+  const weatherForecast = generateCycleWeatherForecast({ cycleId: cycleDoc.id, startedAt })
+  if (weatherForecast.length) {
+    await updateDocFn(cycleDoc, { weatherForecast })
+  }
   let coinPigCycle = null
 
   if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {

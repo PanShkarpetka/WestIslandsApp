@@ -14,7 +14,7 @@ export const FAERUN_MONTHS = [
 ]
 
 export const DAYS_IN_MONTH = 30
-export const DEFAULT_YEAR = 815
+export const DEFAULT_YEAR = 818
 
 export const FAERUN_SEASONS = {
   winter: {
@@ -120,6 +120,26 @@ export function normalizeFaerunDate(date) {
     day: clampDay(date.day),
     month: monthIndex,
     year: date.year ?? DEFAULT_YEAR,
+  }
+}
+
+export function addFaerunDays(date, days = 0) {
+  const normalized = normalizeFaerunDate(date)
+  if (!normalized) return null
+
+  const yearLength = FAERUN_MONTHS.length * DAYS_IN_MONTH
+  const ordinal = normalized.year * yearLength
+    + normalized.month * DAYS_IN_MONTH
+    + (normalized.day - 1)
+    + Number(days || 0)
+
+  const year = Math.floor(ordinal / yearLength)
+  const dayOfYear = ((ordinal % yearLength) + yearLength) % yearLength
+
+  return {
+    day: (dayOfYear % DAYS_IN_MONTH) + 1,
+    month: Math.floor(dayOfYear / DAYS_IN_MONTH),
+    year,
   }
 }
 

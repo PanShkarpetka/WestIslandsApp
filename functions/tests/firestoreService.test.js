@@ -381,6 +381,71 @@ test('updateFishAvailabilityTransaction creates separate treasure without changi
   assert.equal(logs.docs[0].data().treasuresFound[0].treasureName, 'Diamond');
 });
 
+test('weather fish value multiplier is stored on caught fish and log', async () => {
+  const db = createMockDb({
+    cycles: {
+      active: {
+        startedAt: '1 Flamerule 815 рік після Потопу',
+        createdAt: new Date().toISOString(),
+        weatherForecast: [{
+          dayOffset: 0,
+          weatherId: 'tropical-storm',
+          title: 'Тропічний шторм',
+          effects: {
+            dcModifier: 2,
+            sumModifier: { type: 'fixed', value: 0, label: '' },
+            fishValueMultiplier: 1.25,
+            treasureChanceMultiplier: 2
+          }
+        }]
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      cod: {
+        fishName: 'Cod',
+        fishDescription: 'Common fish',
+        fishCodeNumber: { min: 10, max: 20 },
+        fishValueSilver: 100,
+        fishAmountAvailableNow: 1
+      }
+    }
+  });
+
+  await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 42, effectiveRollUsed: 15 }
+  });
+
+  const caughtFish = await db.collection(COLLECTIONS.CAUGHT_FISH).get();
+  assert.equal(caughtFish.docs.length, 1);
+  assert.equal(caughtFish.docs[0].data().baseValueSilver, 100);
+  assert.equal(caughtFish.docs[0].data().fishValueMultiplier, 1.25);
+  assert.equal(caughtFish.docs[0].data().valueSilver, 125);
+  assert.equal(caughtFish.docs[0].data().valueGold, 12.5);
+
+  const logs = await db.collection(COLLECTIONS.FISHING_LOGS).get();
+  assert.equal(logs.docs[0].data().weather.title, 'Тропічний шторм');
+  assert.equal(logs.docs[0].data().fishValueMultiplier, 1.25);
+  assert.equal(logs.docs[0].data().treasureChanceMultiplier, 2);
+});
+
+test('updateFishAvailabilityTransaction keeps one awarded fish when one catch is requested', async () => {
+  const db = createMockDb({
+    [COLLECTIONS.FISHES]: {
+      cod: { fishName: 'Cod', fishValueSilver: 50, fishAmountAvailableNow: 5 }
+    }
+  });
+
+  const result = await updateFishAvailabilityTransaction(db, {
+    catches: [{ id: 'cod' }],
+    logData: { telegramUserId: 99, effectiveRollUsed: 10 }
+  });
+
+  assert.equal(result.finalCatches.length, 1);
+  const logs = await db.collection(COLLECTIONS.FISHING_LOGS).get();
+  assert.equal(logs.docs[0].data().fishQuantityCaught, 1);
+});
+
 test('updateFishAvailabilityTransaction does not roll treasure for unavailable fish', async () => {
   const db = createMockDb({
     [COLLECTIONS.BOT_CONFIGS]: {

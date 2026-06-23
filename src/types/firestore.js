@@ -296,7 +296,28 @@
  * @property {string} startedAt - Faerun date string
  * @property {string|null} finishedAt - Faerun date string, null if cycle is open
  * @property {number} [populationAtStart]
+ * @property {WeatherForecastDay[]} [weatherForecast] - Stored 7-day seasonal weather forecast generated from the cycle start.
  * @property {import('firebase/firestore').Timestamp} createdAt
+ */
+
+/**
+ * @typedef {Object} WeatherForecastDay
+ * @property {string} date - Faerun date string for this forecast day.
+ * @property {number} dayOffset - 0-based offset from cycle start.
+ * @property {'winter'|'spring'|'summer'|'autumn'} seasonId
+ * @property {string} weatherId
+ * @property {string} title
+ * @property {string} summary
+ * @property {string} icon - MDI icon name.
+ * @property {WeatherFishingEffects} effects
+ */
+
+/**
+ * @typedef {Object} WeatherFishingEffects
+ * @property {number} dcModifier - Applied to the current fishing attempt DC only.
+ * @property {{ type: 'fixed', value: number, label: string }|{ type: 'dice', notation: string, label: string }} sumModifier
+ * @property {number} fishValueMultiplier
+ * @property {number} treasureChanceMultiplier
  */
 
 /**
@@ -656,6 +677,13 @@
  * @property {number} finalComputedSum
  * @property {unknown[]} dcChecksPerformed
  * @property {'success'|'failure'} successFailureResult
+ * @property {WeatherForecastDay|null} [weather]
+ * @property {WeatherFishingEffects|null} [weatherEffects]
+ * @property {number} [baseEachRollDc]
+ * @property {number} [effectiveEachRollDc]
+ * @property {number} [weatherSumModifier]
+ * @property {number} [fishValueMultiplier]
+ * @property {number} [treasureChanceMultiplier]
  * @property {Pick<FishDoc, 'id'|'fishName'|'fishDescription'|'fishCodeNumber'|'fishValueSilver'|'fishAdditionalRollsRequiredForSuccessfulCatch'>[]} fishSelected
  * @property {number} fishQuantityCaught
  * @property {FishingTreasureSnapshot[]} [treasuresFound]
@@ -674,6 +702,8 @@
  * @property {number|{min:number,max:number}} fishCodeNumber
  * @property {number|{low:number,high:number}} fishValueSilver
  * @property {number|null} effectiveRollUsed
+ * @property {number} [baseValueSilver] - Fish value before weather multiplier.
+ * @property {number} [fishValueMultiplier] - Weather multiplier applied at catch time.
  * @property {number} valueSilver
  * @property {number} valueGold
  * @property {string|null} telegramUserId
@@ -699,6 +729,7 @@
  * @property {number} valueGold
  * @property {{ min: number, max: number }} valueRangeGold
  * @property {number} chance
+ * @property {number} [chanceMultiplier] - Weather multiplier applied to treasure chance.
  * @property {string} fishId
  * @property {string} fishName
  * @property {string|null} heroId
@@ -713,6 +744,7 @@
  * @property {number} valueGold
  * @property {{ min: number, max: number }} valueRangeGold
  * @property {number} chance
+ * @property {number} [chanceMultiplier] - Weather multiplier applied to treasure chance.
  * @property {number} roll
  * @property {string|null} telegramUserId
  * @property {string} telegramUsername

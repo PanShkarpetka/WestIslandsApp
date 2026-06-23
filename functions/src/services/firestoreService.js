@@ -1,5 +1,6 @@
 import { ACTIVE_SESSION_TIMEOUT_MS, BOT_CONFIG_DOC, COLLECTIONS, DEFAULT_CONFIG, SESSION_STEPS } from '../config/constants.js';
 import { rollFishingTreasure } from './fishingService.js';
+import { resolveCycleWeather } from '../utils/faerunWeather.js';
 
 function mergeDeep(target, source) {
   const output = { ...target };
@@ -372,22 +373,37 @@ async function resolveActiveCycleMeta(db) {
       .find((cycle) => cycle.startedAt && !cycle.finishedAt);
 
     if (!activeCycle) return {};
+    const weather = resolveCycleWeather(activeCycle);
 
     return {
       cycleId: activeCycle.id,
-      cycleStartedAt: activeCycle.startedAt || ''
+      cycleStartedAt: activeCycle.startedAt || '',
+      weather
     };
   } catch (_error) {
     return {};
   }
 }
 
+export async function getActiveCycleWeather(db) {
+  const meta = await resolveActiveCycleMeta(db);
+  return meta.weather || null;
+}
+
 export async function createFishingLog(db, logData) {
   const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
   const cycleMeta = await resolveActiveCycleMeta(db);
+  const weather = logData?.weather || cycleMeta.weather || null;
+  const weatherEffects = logData?.weatherEffects || weather?.effects || null;
+  const fishValueMultiplier = Math.max(0, Number(weatherEffects?.fishValueMultiplier ?? 1));
+  const treasureChanceMultiplier = Math.max(0, Number(weatherEffects?.treasureChanceMultiplier ?? 1));
   await logRef.set({
     ...logData,
     ...cycleMeta,
+    weather,
+    weatherEffects,
+    fishValueMultiplier,
+    treasureChanceMultiplier,
     timestamp: new Date().toISOString()
   });
 
@@ -397,6 +413,10 @@ export async function createFishingLog(db, logData) {
 export async function updateFishAvailabilityTransaction(db, { catches, logData, rng = Math.random }) {
   const config = await getBotConfig(db);
   const cycleMeta = await resolveActiveCycleMeta(db);
+  const weather = logData?.weather || cycleMeta.weather || null;
+  const weatherEffects = logData?.weatherEffects || weather?.effects || null;
+  const fishValueMultiplier = Math.max(0, Number(weatherEffects?.fishValueMultiplier ?? 1));
+  const treasureChanceMultiplier = Math.max(0, Number(weatherEffects?.treasureChanceMultiplier ?? 1));
   const linkedHero = await safeFindHeroByTelegramIdentity(db, {
     telegramUserId: logData?.telegramUserId,
     telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname
@@ -448,7 +468,8 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData, 
     const logRef = db.collection(COLLECTIONS.FISHING_LOGS).doc();
 
     finalCatches.forEach((fish) => {
-      const valueSilver = resolveFishValueSilver(fish, logData?.effectiveRollUsed);
+      const baseValueSilver = resolveFishValueSilver(fish, logData?.effectiveRollUsed);
+      const valueSilver = baseValueSilver * fishValueMultiplier;
       const caughtFishRef = db.collection(COLLECTIONS.CAUGHT_FISH).doc();
       transaction.set(caughtFishRef, {
         fishId: fish.id,
@@ -457,6 +478,8 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData, 
         fishCodeNumber: fish.fishCodeNumber,
         fishValueSilver: fish.fishValueSilver,
         effectiveRollUsed: logData?.effectiveRollUsed ?? null,
+        baseValueSilver,
+        fishValueMultiplier,
         valueSilver,
         valueGold: valueSilver / 10,
         telegramUserId: logData?.telegramUserId == null ? null : String(logData.telegramUserId),
@@ -470,11 +493,12 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData, 
         createdAt: new Date().toISOString(),
         disposedAt: null
       });
-      const treasure = rollFishingTreasure({ config: config.treasures, rng });
+      const treasure = rollFishingTreasure({ config: config.treasures, rng, chanceMultiplier: treasureChanceMultiplier });
       if (treasure) {
         const treasureRef = db.collection(COLLECTIONS.CAUGHT_TREASURES).doc();
         const treasureData = {
           ...treasure,
+          chanceMultiplier: treasureChanceMultiplier,
           telegramUserId: logData?.telegramUserId == null ? null : String(logData.telegramUserId),
           telegramUsername: logData?.telegramUsername || logData?.telegramUserNickname || '',
           telegramUsernameKey: normalizeTelegramUsername(logData?.telegramUsername || logData?.telegramUserNickname),
@@ -496,6 +520,7 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData, 
           valueGold: treasure.valueGold,
           valueRangeGold: treasure.valueRangeGold,
           chance: treasure.chance,
+          chanceMultiplier: treasureChanceMultiplier,
           fishId: fish.id,
           fishName: fish.fishName,
           heroId: linkedHero?.id || null,
@@ -508,6 +533,10 @@ export async function updateFishAvailabilityTransaction(db, { catches, logData, 
     transaction.set(logRef, {
       ...logData,
       ...cycleMeta,
+      weather,
+      weatherEffects,
+      fishValueMultiplier,
+      treasureChanceMultiplier,
       heroId: linkedHero?.id || null,
       heroName: linkedHero?.name || null,
       fishSelected: finalCatches,

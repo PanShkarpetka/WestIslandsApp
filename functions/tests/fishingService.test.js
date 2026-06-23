@@ -68,6 +68,43 @@ test('fails fishing when any roll is below eachRollDc', () => {
   assert.equal(result.success, false);
 });
 
+test('weather modifies effective dc without mutating base dc', () => {
+  const fishes = [
+    { id: 'f1', fishName: 'Snapper', fishAmountAvailableNow: 1, fishCodeNumber: { min: 1, max: 100 } }
+  ];
+
+  const result = resolveFishingAttempt({
+    normalizedInput: { modifiers: [0, 0, 0], useGuidance: false, baitType: 'basic', useShip: false },
+    config: baseConfig,
+    fishes,
+    weather: { title: 'Storm', effects: { dcModifier: 1 } },
+    rng: makeRng([0.45, 0.45, 0.45])
+  });
+
+  assert.equal(result.baseEachRollDc, 10);
+  assert.equal(result.eachRollDc, 11);
+  assert.equal(baseConfig.dc.eachRollDc, 10);
+  assert.equal(result.passedEachRollDc, false);
+});
+
+test('weather sum modifier changes the fish search sum', () => {
+  const fishes = [
+    { id: 'f1', fishName: 'Rainfish', fishAmountAvailableNow: 1, fishCodeNumber: { min: 37, max: 37 } }
+  ];
+
+  const result = resolveFishingAttempt({
+    normalizedInput: { modifiers: [0, 0, 0], useGuidance: false, baitType: 'basic', useShip: false },
+    config: baseConfig,
+    fishes,
+    weather: { title: 'Warm Rain', effects: { sumModifier: { type: 'dice', notation: '+1d4', label: '+1d4' } } },
+    rng: makeRng([0.5, 0.5, 0.5, 0.99])
+  });
+
+  assert.equal(result.weatherSumModifier, 4);
+  assert.equal(result.finalSum, 37);
+  assert.equal(result.selectedFish.fishName, 'Rainfish');
+});
+
 test('uses previous fish by code range when rolled fish is unavailable', () => {
   const fishes = [
     { id: 'f1', fishName: 'Trout', fishAmountAvailableNow: 1, fishCodeNumber: { min: 61, max: 65 } },
@@ -182,4 +219,18 @@ test('rolls treasure value within configured range', () => {
   assert.equal(low.treasureId, 'pearl');
   assert.equal(low.valueGold, 1);
   assert.equal(high.valueGold, 50);
+});
+
+test('treasure chance multiplier affects treasure roll chance', () => {
+  const miss = rollFishingTreasure({ config: treasureConfig, chanceMultiplier: 1, rng: makeRng([0.03, 0.03, 0.03, 0.03]) });
+  const hit = rollFishingTreasure({ config: treasureConfig, chanceMultiplier: 2, rng: makeRng([0.03, 0.03, 0.03, 0.03, 0]) });
+
+  assert.equal(miss, null);
+  assert.equal(hit.treasureId, 'pearl');
+});
+
+test('treasure chance multiplier can explicitly disable treasure rolls', () => {
+  const result = rollFishingTreasure({ config: treasureConfig, chanceMultiplier: 0, rng: makeRng([0, 0, 0, 0]) });
+
+  assert.equal(result, null);
 });

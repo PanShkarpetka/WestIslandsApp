@@ -51,7 +51,7 @@ functions/src/
 └── config/constants.js
 ```
 
-The fishing game uses D20 rolls + modifiers vs. a DC, bait selection, optional guidance re-roll, and per-day fish availability tracked in Firestore. Duplicate Telegram updates are deduplicated via Firestore before processing.
+The fishing game uses D20 rolls + modifiers vs. a DC, bait selection, optional guidance re-roll, and per-day fish availability tracked in Firestore. Seasonal weather can modify fishing DC, computed roll sum, fish value, and treasure chance; it never changes the one-fish-per-attempt limit. Duplicate Telegram updates are deduplicated via Firestore before processing.
 
 ### Key Domain Concepts
 
@@ -59,7 +59,8 @@ The fishing game uses D20 rolls + modifiers vs. a DC, bait selection, optional g
 - **Treasury** — silver currency, transactions, chest management
 - **Religion** — faith tracking, distributions, donations (overflow logic)
 - **Crafting** — discount formulas by category/subcategory/specialization; progress per hero; item slugs as identifiers
-- **Fishing bot** — Telegram-driven mini-game with dice mechanics, bait, and daily resets
+- **Fishing bot** — Telegram-driven mini-game with dice mechanics, bait, weather effects, and daily resets
+- **Cycles, seasons, and weather** — the active cycle has a Faerun start date, a derived season, and a deterministic 7-day seasonal weather forecast. The public widget shows the current weather; admins can view the week-ahead forecast.
 
 ## Firestore Schema
 
@@ -141,6 +142,15 @@ The pirate theme lives in `src/styles/theme.css`. All Vuetify components are glo
 - `diffInDays(dateA, dateB)` — difference in Faerun calendar days (360-day year, 12 months × 30 days)
 - `DEFAULT_YEAR` — the current campaign year constant
 
+### Seasons and weather
+- `src/utils/faerun-date.js` exposes `getFaerunSeason(dateOrString)`. Seasons are derived from Faerun months, not stored manually in Firestore.
+- `src/utils/faerun-weather.js` generates and resolves deterministic seasonal forecasts for the frontend. `functions/src/utils/faerunWeather.js` mirrors the same domain logic for Telegram/Cloud Functions; keep both in sync when changing weather rules.
+- `CycleDoc.weatherForecast` stores the initial deterministic 7-day forecast generated from `cycleId + startedAt`. Existing cycles without this field should use the deterministic fallback helper instead of requiring migrations.
+- Current displayed weather is resolved by real calendar day offset from the cycle document's `createdAt`, using the `Europe/Kiev` day boundary. This advances weather at real midnight without changing `startedAt`; creating/updating the active cycle resets the forecast anchor.
+- Weather must keep progressing after the stored 7-day forecast. Use deterministic generation for arbitrary `dayOffset` instead of clamping to the last stored day. Admin forecast views should show the next 7 real-day entries from today, not only the first week from cycle start.
+- Weather should stay seasonal for an Oceania-like island climate: no ordinary snow as a typical winter result; winter can have cool rain, strong wind, storms, or rare anomalous cold, while summer can include heat, scorching sun, humidity, tropical rain, and tropical storms.
+- Fishing effects may adjust `effectiveEachRollDc`, `finalComputedSum`, `fishValueMultiplier`, and `treasureChanceMultiplier`, but weather must not increase catch quantity beyond one fish.
+
 ## Testing
 
 Tests use Node's native test runner. All test files live in `tests/` mirroring the `src/` structure:
@@ -149,11 +159,16 @@ Tests use Node's native test runner. All test files live in `tests/` mirroring t
 tests/
 ├── services/   # authService, craftingService, cycleService, logService
 ├── store/      # guildStore, treasuryStore, userStore
-└── utils/      # courierDistanceCalculator, faerun-date, mageGuildRequests, votes
+└── utils/      # courierDistanceCalculator, faerun-date, faerun-weather, mageGuildRequests, votes
 ```
 
 Run a single file: `node --test tests/utils/votes.test.js`
 Tests do **not** cover Vue components or pages — only services, stores, and utility functions.
+
+For weather/fishing changes, run the frontend weather utility tests plus the mirrored function tests, then build:
+- `node --test tests/utils/faerun-weather.test.js`
+- `node --test functions/tests/faerunWeather.test.js functions/tests/fishingService.test.js functions/tests/firestoreService.test.js`
+- `npm run build`
 
 ## Page Documentation
 

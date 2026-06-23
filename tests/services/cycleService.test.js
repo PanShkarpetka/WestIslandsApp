@@ -478,6 +478,8 @@ test('createNewCycleWithEffects creates cycle doc with startedAt', async () => {
   const cycles = Object.values(mock.list('cycles'));
   assert.equal(cycles.length, 1);
   assert.ok(cycles[0].startedAt);
+  assert.equal(cycles[0].weatherForecast.length, 7);
+  assert.equal(cycles[0].weatherForecast[0].date, '1 Hammer 1490 рік після Потопу');
 });
 
 test('createNewCycleWithEffects closes open previous cycle', async () => {
