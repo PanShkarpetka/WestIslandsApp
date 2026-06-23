@@ -122,6 +122,14 @@ function createMockDb(seed = {}) {
   };
 }
 
+function adminIds(...ids) {
+  return new Set(ids.map(String));
+}
+
+function adminUsernames(...usernames) {
+  return new Set(usernames.map((username) => String(username).replace(/^@+/, '').toLowerCase()));
+}
+
 test('accepts /yes while waiting for an additional roll confirmation', async () => {
   const telegramUserId = '501';
   const db = createMockDb({
@@ -488,7 +496,8 @@ test('accepts admin command with bot mention', async () => {
       text: `${COMMANDS.LIST_AVAILABLE_FISHES_TODAY}@FishingBot`,
       telegramUserId,
       telegramUsername: 'angler'
-    }
+    },
+    adminTelegramUserIds: adminIds(telegramUserId)
   });
 
   assert.match(reply, /Available fishes today/);
@@ -518,7 +527,80 @@ test('supports manual forced daily reset command', async () => {
 
   const reply = await handleTelegramMessage({
     db,
-    payload: { text: COMMANDS.FORCE_DAILY_RESET, telegramUserId, telegramUsername: 'angler' }
+    payload: { text: COMMANDS.FORCE_DAILY_RESET, telegramUserId, telegramUsername: 'angler' },
+    adminTelegramUserIds: adminIds(telegramUserId)
+  });
+
+  assert.equal(reply, 'Forced daily reset completed: fish randomized, DC reset to 10, counters reset.');
+
+  const config = await db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC).get();
+  assert.equal(config.data().dc.eachRollDc, 10);
+  assert.equal(config.data().fishingState.caughtCounter, 0);
+  assert.equal(config.data().fishingState.notCaughtCounter, 0);
+});
+
+test('rejects admin commands from unauthorized Telegram users without mutating state', async () => {
+  const telegramUserId = '5083';
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        dc: { eachRollDc: 14 },
+        fishingState: {
+          lastResetDateKey: new Date().toISOString().slice(0, 10),
+          caughtCounter: 4,
+          notCaughtCounter: 9
+        }
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      'fish-1': {
+        fishName: 'Test Fish',
+        fishAmountDaily: 3,
+        fishAmountAvailableNow: 3
+      }
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: COMMANDS.FORCE_DAILY_RESET, telegramUserId, telegramUsername: 'angler' },
+    adminTelegramUserIds: adminIds('different-admin')
+  });
+
+  assert.equal(reply, 'Admin command not authorized.');
+
+  const config = await db.collection(COLLECTIONS.BOT_CONFIGS).doc(BOT_CONFIG_DOC).get();
+  assert.equal(config.data().dc.eachRollDc, 14);
+  assert.equal(config.data().fishingState.caughtCounter, 4);
+  assert.equal(config.data().fishingState.notCaughtCounter, 9);
+});
+
+test('accepts admin commands from configured Telegram usernames', async () => {
+  const telegramUserId = '5084';
+  const db = createMockDb({
+    [COLLECTIONS.BOT_CONFIGS]: {
+      [BOT_CONFIG_DOC]: {
+        dc: { eachRollDc: 14 },
+        fishingState: {
+          lastResetDateKey: new Date().toISOString().slice(0, 10),
+          caughtCounter: 4,
+          notCaughtCounter: 9
+        }
+      }
+    },
+    [COLLECTIONS.FISHES]: {
+      'fish-1': {
+        fishName: 'Test Fish',
+        fishAmountDaily: 3,
+        fishAmountAvailableNow: 3
+      }
+    }
+  });
+
+  const reply = await handleTelegramMessage({
+    db,
+    payload: { text: COMMANDS.FORCE_DAILY_RESET, telegramUserId, telegramUsername: 'PanShkarpetka' },
+    adminTelegramUsernames: adminUsernames('@ElifasTeQ', '@fierybeaver', '@PanShkarpetka')
   });
 
   assert.equal(reply, 'Forced daily reset completed: fish randomized, DC reset to 10, counters reset.');
@@ -561,7 +643,8 @@ test('lists only successful catches from current day for /admin_fish_catches_tod
 
   const reply = await handleTelegramMessage({
     db,
-    payload: { text: COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY, telegramUserId, telegramUsername: 'angler' }
+    payload: { text: COMMANDS.LIST_SUCCESSFUL_CATCHES_TODAY, telegramUserId, telegramUsername: 'angler' },
+    adminTelegramUserIds: adminIds(telegramUserId)
   });
 
   assert.match(reply, /Successful catches today/);
@@ -601,7 +684,8 @@ test('supports /admin_fish_catches_yesterday command', async () => {
 
   const reply = await handleTelegramMessage({
     db,
-    payload: { text: COMMANDS.LIST_SUCCESSFUL_CATCHES_YESTERDAY, telegramUserId, telegramUsername: 'angler' }
+    payload: { text: COMMANDS.LIST_SUCCESSFUL_CATCHES_YESTERDAY, telegramUserId, telegramUsername: 'angler' },
+    adminTelegramUserIds: adminIds(telegramUserId)
   });
 
   assert.match(reply, /Successful catches yesterday/);
@@ -637,7 +721,8 @@ test('adds jackpot message after admin test catch when treasure is found', async
 
   const reply = await handleTelegramMessage({
     db,
-    payload: { text: `${COMMANDS.TEST_CATCH_BY_CODE} 36`, telegramUserId, telegramUsername: 'angler' }
+    payload: { text: `${COMMANDS.TEST_CATCH_BY_CODE} 36`, telegramUserId, telegramUsername: 'angler' },
+    adminTelegramUserIds: adminIds(telegramUserId)
   });
 
   assert.match(reply, /Улов: <b>Treasure Cod<\/b>/);

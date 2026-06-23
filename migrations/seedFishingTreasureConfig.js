@@ -1,9 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { firebaseAdminRequire, initializeMigrationApp } from './firebaseAdmin.js'
 
-const require = createRequire(new URL('../functions/package.json', import.meta.url))
-const { initializeApp, cert } = require('firebase-admin/app')
-const { getFirestore, FieldValue } = require('firebase-admin/firestore')
+const { getFirestore, FieldValue } = firebaseAdminRequire('firebase-admin/firestore')
 
 const APPLY = process.argv.includes('--apply')
 
@@ -31,8 +28,7 @@ function mergeTreasureConfig(existing = {}) {
 }
 
 async function main() {
-  const serviceAccount = JSON.parse(readFileSync(new URL('../functions/service-account.json', import.meta.url), 'utf8'))
-  initializeApp({ credential: cert(serviceAccount) })
+  initializeMigrationApp()
   const db = getFirestore()
   const ref = db.collection('bot-configs').doc('fishing')
   const snap = await ref.get()

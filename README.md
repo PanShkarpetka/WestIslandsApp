@@ -21,6 +21,26 @@ cp functions/.env.example functions/.env
 ```
 Required:
 - `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_ADMIN_USERNAMES` for bot admin commands, for example `@ElifasTeQ,@fierybeaver,@PanShkarpetka`
+
+### 2.1) Local migration credentials
+Migration scripts in `migrations/` use Firebase Admin credentials from the environment. Keep service account JSON files outside this repository.
+
+Preferred one-shell setup:
+```powershell
+$env:GOOGLE_APPLICATION_CREDENTIALS = "D:\path\to\firebase-adminsdk.json"
+```
+
+For future shells, set it persistently:
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "D:\path\to\firebase-adminsdk.json",
+  "User"
+)
+```
+
+This machine also has an ignored `migrations/firebaseAdmin.local.json` pointing to the external key path for migration commands that do not inherit the Windows user environment.
 
 ### 3) Webhook setup
 After deploy, set Telegram webhook to the function URL:

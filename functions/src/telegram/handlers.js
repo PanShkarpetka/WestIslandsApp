@@ -192,6 +192,19 @@ function isRecognizedCommand(text) {
   return Object.values(COMMANDS).includes(commandToken);
 }
 
+function normalizeTelegramUsername(value) {
+  return String(value || '').trim().replace(/^@+/, '').toLowerCase();
+}
+
+function isAuthorizedAdminTelegramUser({ telegramUserId, telegramUsername }, { adminTelegramUserIds, adminTelegramUsernames }) {
+  if (adminTelegramUserIds?.has(String(telegramUserId))) {
+    return true;
+  }
+
+  const normalizedUsername = normalizeTelegramUsername(telegramUsername);
+  return Boolean(normalizedUsername && adminTelegramUsernames?.has(normalizedUsername));
+}
+
 function buildFishPriceReport(fishes, codes) {
   const lines = ['💰 <b>Fish prices</b>'];
   let total = 0;
@@ -413,7 +426,13 @@ async function resolveAdditionalRollAnswer({ db, telegramUserId, session, passed
   });
 }
 
-export async function handleTelegramMessage({ db, payload, onDcChanged }) {
+export async function handleTelegramMessage({
+  db,
+  payload,
+  onDcChanged,
+  adminTelegramUserIds = new Set(),
+  adminTelegramUsernames = new Set()
+}) {
   const { text, telegramUserId } = payload;
   const normalizedText = text.toLowerCase();
   const commandToken = getCommandToken(text);
@@ -426,6 +445,10 @@ export async function handleTelegramMessage({ db, payload, onDcChanged }) {
   const isAdminCommand = normalizedText.startsWith('/admin_');
   if (!isRecognizedCommand(text)) {
     return null;
+  }
+
+  if (isAdminCommand && !isAuthorizedAdminTelegramUser(payload, { adminTelegramUserIds, adminTelegramUsernames })) {
+    return 'Admin command not authorized.';
   }
 
   await resetFishingDailyStateIfNeeded(db);

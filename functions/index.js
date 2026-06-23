@@ -9,6 +9,18 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_ADMIN_USER_IDS = new Set(
+  String(process.env.TELEGRAM_ADMIN_USER_IDS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+);
+const TELEGRAM_ADMIN_USERNAMES = new Set(
+  String(process.env.TELEGRAM_ADMIN_USERNAMES || '')
+    .split(',')
+    .map((username) => username.trim().replace(/^@+/, '').toLowerCase())
+    .filter(Boolean)
+);
 
 export const telegramWebhook = onRequest({
   maxInstances: 20,
@@ -43,6 +55,8 @@ export const telegramWebhook = onRequest({
     const reply = await handleTelegramMessage({
       db,
       payload,
+      adminTelegramUserIds: TELEGRAM_ADMIN_USER_IDS,
+      adminTelegramUsernames: TELEGRAM_ADMIN_USERNAMES,
       onDcChanged: (message) => {
         if (message) {
           dcChangedMessages.push(message);

@@ -64,6 +64,7 @@ node_modules/
 # dotenv environment variables file
 .env
 functions/service-account.json
+migrations/firebaseAdmin.local.json
 .DS_Store
 **/.DS_Store
 /.idea/.gitignore
