@@ -22,6 +22,7 @@
         title="Інформація про цикл"
         :current-start-date="currentCycleStartDate"
         :previous-cycle-duration="previousCycleDurationLabel"
+        :season="currentSeason"
       />
     </v-container>
   </section>
@@ -32,7 +33,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore'
 import CycleSummaryCard from '@/components/CycleSummaryCard.vue'
 import { db } from '@/services/firebase'
-import { diffInDays, parseFaerunDate } from '@/utils/faerun-date'
+import { diffInDays, getFaerunSeason, parseFaerunDate } from '@/utils/faerun-date'
 
 const loading = ref(true)
 const error = ref('')
@@ -41,6 +42,7 @@ const previousCycle = ref(null)
 let unsubscribe = null
 
 const currentCycleStartDate = computed(() => latestCycle.value?.startedAt || 'Цикл ще не розпочато')
+const currentSeason = computed(() => getFaerunSeason(latestCycle.value?.startedAt))
 const previousCycleDurationLabel = computed(() => {
   const startedAt = parseFaerunDate(previousCycle.value?.startedAt)
   const finishedAt = parseFaerunDate(previousCycle.value?.finishedAt)

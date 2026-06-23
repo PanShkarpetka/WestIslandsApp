@@ -14,6 +14,11 @@
       <span class="cycle-card__value">{{ previousDurationLabel }}</span>
     </div>
 
+    <div v-if="season" class="cycle-card__season" :class="`cycle-card__season--${season.id}`">
+      <v-icon size="18">{{ season.icon }}</v-icon>
+      <span>{{ season.label }}</span>
+    </div>
+
     <div v-if="$slots.chips" class="cycle-card__chips">
       <slot name="chips" />
     </div>
@@ -27,6 +32,7 @@ const props = defineProps({
   title: { type: String, default: 'Поточний цикл' },
   currentStartDate: { type: String, default: '' },
   previousCycleDuration: { type: String, default: '' },
+  season: { type: Object, default: null },
 })
 
 const currentStartDateLabel = computed(() => props.currentStartDate || '—')
@@ -83,5 +89,54 @@ const previousDurationLabel = computed(() => props.previousCycleDuration || 'н�
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.cycle-card__season {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(200, 150, 42, 0.34);
+  border-radius: 999px;
+  color: var(--wi-gold);
+  background: rgba(200, 150, 42, 0.1);
+  font-family: var(--wi-font-heading);
+  font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cycle-card__season--winter {
+  color: var(--wi-sea);
+  border-color: rgba(58, 96, 128, 0.45);
+  background: rgba(58, 96, 128, 0.16);
+}
+
+.cycle-card__season--spring {
+  color: var(--wi-success);
+  border-color: rgba(90, 138, 60, 0.42);
+  background: rgba(90, 138, 60, 0.14);
+}
+
+.cycle-card__season--summer {
+  color: var(--wi-gold-light);
+}
+
+.cycle-card__season--autumn {
+  color: var(--wi-copper);
+  border-color: rgba(123, 79, 46, 0.48);
+  background: rgba(123, 79, 46, 0.16);
+}
+
+@media (max-width: 760px) {
+  .cycle-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .cycle-card__season {
+    margin-left: 0;
+  }
 }
 </style>

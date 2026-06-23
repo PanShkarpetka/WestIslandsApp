@@ -5,6 +5,7 @@ import {
   formatFaerunDate,
   parseFaerunDate,
   diffInDays,
+  getFaerunSeason,
   normalizeFaerunDate,
 } from '../../src/utils/faerun-date.js';
 
@@ -46,4 +47,41 @@ test('diffInDays returns day difference across dates', () => {
 test('normalizeFaerunDate returns normalized data', () => {
   const normalized = normalizeFaerunDate({ day: 0, month: 'Eleint' });
   assert.deepEqual(normalized, { day: 1, month: 8, year: 815 });
+});
+
+test('getFaerunSeason maps each month to the expected season', () => {
+  const cases = [
+    ['Hammer', 'winter'],
+    ['Alturiak', 'winter'],
+    ['Ches', 'spring'],
+    ['Tarsakh', 'spring'],
+    ['Mirtul', 'spring'],
+    ['Kythorn', 'summer'],
+    ['Flamerule', 'summer'],
+    ['Eleasis', 'summer'],
+    ['Eleint', 'autumn'],
+    ['Marpenoth', 'autumn'],
+    ['Uktar', 'autumn'],
+    ['Nightal', 'winter'],
+  ];
+
+  for (const [month, expectedSeason] of cases) {
+    assert.equal(getFaerunSeason({ day: 1, month, year: 815 }).id, expectedSeason);
+  }
+});
+
+test('getFaerunSeason accepts a Faerun date string', () => {
+  const season = getFaerunSeason('1 Hammer 815 рік після Потопу');
+  assert.deepEqual(season, {
+    id: 'winter',
+    name: 'Зима',
+    label: 'Пора року: Зима',
+    icon: 'mdi-snowflake',
+  });
+});
+
+test('getFaerunSeason returns null for invalid input', () => {
+  assert.equal(getFaerunSeason('bad input'), null);
+  assert.equal(getFaerunSeason(null), null);
+  assert.equal(getFaerunSeason({ day: 1, month: 'Unknown', year: 815 }), null);
 });

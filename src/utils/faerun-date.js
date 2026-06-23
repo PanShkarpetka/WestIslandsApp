@@ -16,6 +16,48 @@ export const FAERUN_MONTHS = [
 export const DAYS_IN_MONTH = 30
 export const DEFAULT_YEAR = 815
 
+export const FAERUN_SEASONS = {
+  winter: {
+    id: 'winter',
+    name: 'Зима',
+    label: 'Пора року: Зима',
+    icon: 'mdi-snowflake',
+  },
+  spring: {
+    id: 'spring',
+    name: 'Весна',
+    label: 'Пора року: Весна',
+    icon: 'mdi-flower',
+  },
+  summer: {
+    id: 'summer',
+    name: 'Літо',
+    label: 'Пора року: Літо',
+    icon: 'mdi-white-balance-sunny',
+  },
+  autumn: {
+    id: 'autumn',
+    name: 'Осінь',
+    label: 'Пора року: Осінь',
+    icon: 'mdi-leaf',
+  },
+}
+
+const SEASON_BY_MONTH = [
+  'winter',
+  'winter',
+  'spring',
+  'spring',
+  'spring',
+  'summer',
+  'summer',
+  'summer',
+  'autumn',
+  'autumn',
+  'autumn',
+  'winter',
+]
+
 function getMonthIndex(month) {
   if (typeof month === 'number') return month
   const normalized = String(month || '').toLowerCase()
@@ -79,4 +121,16 @@ export function normalizeFaerunDate(date) {
     month: monthIndex,
     year: date.year ?? DEFAULT_YEAR,
   }
+}
+
+export function getFaerunSeason(dateOrString) {
+  const date = typeof dateOrString === 'string'
+    ? parseFaerunDate(dateOrString)
+    : normalizeFaerunDate(dateOrString)
+
+  if (!date) return null
+
+  const seasonId = SEASON_BY_MONTH[date.month]
+  const season = FAERUN_SEASONS[seasonId]
+  return season ? { ...season } : null
 }
