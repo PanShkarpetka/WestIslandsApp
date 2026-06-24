@@ -707,16 +707,17 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  color: rgba(83, 47, 19, 0.88);
+  color: rgba(61, 31, 9, 0.95);
   filter: drop-shadow(0 1px 0 rgba(255, 236, 178, 0.32));
 }
 
 .highlight-card h3 {
   margin: 10px 0 14px;
-  color: #2a1908;
+  color: #241000 !important;
   font-size: 1.22rem;
   line-height: 1.18;
   overflow-wrap: anywhere;
+  text-shadow: 0 1px 0 rgba(255, 230, 168, 0.28);
 }
 
 .highlight-card dl {
@@ -727,11 +728,13 @@ onMounted(async () => {
 
 .highlight-card dd {
   margin: 5px 0 0;
-  color: #1b1005;
+  color: #160b02;
   font-family: var(--wi-font-body);
   font-size: 1.02rem;
+  font-weight: 700;
   line-height: 1.25;
   overflow-wrap: anywhere;
+  text-shadow: 0 1px 0 rgba(255, 230, 168, 0.22);
 }
 
 .highlight-card :deep(.v-icon),
@@ -741,13 +744,14 @@ onMounted(async () => {
 
 .highlight-card .card-label,
 .highlight-card dt {
-  color: rgba(50, 29, 10, 0.76);
+  color: rgba(44, 22, 5, 0.86);
+  font-weight: 700;
 }
 
 .highlight-card .card-label {
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(69, 41, 15, 0.28);
-  color: rgba(42, 25, 8, 0.74);
+  border-bottom: 1px solid rgba(55, 28, 8, 0.34);
+  color: rgba(36, 17, 4, 0.88);
   font-size: 0.72rem;
 }
 
