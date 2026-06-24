@@ -2,7 +2,7 @@
   <v-container class="buildings-page">
     <WiPageHeader
       title="Мапа острова"
-      subtitle="Актуальна інтерактивна мапа з позначками ведеться в LegendKeeper. Дані будівель-постачальників нижче залишаються збереженими в застосунку."
+      subtitle="Актуальна інтерактивна мапа з позначками ведеться в LegendKeeper."
       icon="mdi-map"
     />
 
