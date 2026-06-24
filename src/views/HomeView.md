@@ -22,6 +22,7 @@ Visible text is Ukrainian and all values come from `dashboardService.fetchDashbo
 - Population deltas come from `cycle-summaries/{cycleId}`.
 - Buildings added come from `islands/{islandId}.buildings.*.builtCycleId`.
 - Crafting highlights use `heroes/*/crafting-logs` with `cycleId`.
+- Best fish displays the linked hero name from `fishing-logs.heroName` or `heroes/{heroId}`; Telegram identity is only a fallback for unlinked logs.
 - Faith spend uses `religion-actions` for the newest finished cycle and resolves hero names from existing `heroes` records.
 
 ## Behavior

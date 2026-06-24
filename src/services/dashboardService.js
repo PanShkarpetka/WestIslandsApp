@@ -108,6 +108,11 @@ export function enrichFaithSpendActions(actions = [], heroes = []) {
   })
 }
 
+function getHeroName(heroId, heroesById) {
+  const hero = heroId ? heroesById.get(heroId) : null
+  return hero?.name || hero?.nickname || ''
+}
+
 export function selectLargestFaithSpend(actions = []) {
   return actions
     .map((action) => ({ ...action, faithSpent: getFaithSpendValue(action) }))
@@ -150,9 +155,10 @@ export function getBuildingsAdded(buildings = {}, definitionsById = new Map(), c
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk-UA'))
 }
 
-export function selectBestFishCatch(logs = [], { startAt = null, endAt = null } = {}) {
+export function selectBestFishCatch(logs = [], { startAt = null, endAt = null, heroes = [] } = {}) {
   const startMs = toMillis(startAt)
   const endMs = toMillis(endAt)
+  const heroesById = new Map(heroes.map((hero) => [hero.id, hero]))
   const candidates = []
 
   for (const log of logs) {
@@ -166,7 +172,9 @@ export function selectBestFishCatch(logs = [], { startAt = null, endAt = null } 
       candidates.push({
         fishName: fish.fishName || '?',
         fishValue: resolveFishValue(fish, log.effectiveRollUsed),
-        username: log.telegramUsername || String(log.telegramUserId || 'unknown'),
+        username: log.heroName || getHeroName(log.heroId, heroesById) || log.telegramUsername || String(log.telegramUserId || 'unknown'),
+        heroId: log.heroId || null,
+        heroName: log.heroName || getHeroName(log.heroId, heroesById) || '',
         timestamp: log.timestamp,
       })
     }
@@ -259,7 +267,7 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
   }
   const currentCycleStart = currentCycle?.createdAt || null
   const bestCrafter = aggregateBestCrafter(craftingLogs) || populationSummary?.bestCrafter || null
-  const bestFish = selectBestFishCatch(fishingLogs, fishingLogsByCycle.length ? {} : { startAt: lastFinishedCycle.createdAt, endAt: currentCycleStart })
+  const bestFish = selectBestFishCatch(fishingLogs, fishingLogsByCycle.length ? { heroes } : { startAt: lastFinishedCycle.createdAt, endAt: currentCycleStart, heroes })
     || populationSummary?.bestFish
     || null
   const faithSpendActions = enrichFaithSpendActions(religionActions, heroes)

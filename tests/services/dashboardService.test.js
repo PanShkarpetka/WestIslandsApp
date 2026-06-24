@@ -5,6 +5,7 @@ import {
   enrichFaithSpendActions,
   getBuildingsAdded,
   getDamagedShips,
+  selectBestFishCatch,
   selectBestMageRequest,
   selectDashboardCycles,
   selectLargestFaithSpend,
@@ -96,6 +97,21 @@ test('enrichFaithSpendActions resolves hero names from existing hero records', (
   );
 
   assert.equal(result[0].heroName, 'Дік');
+});
+
+test('selectBestFishCatch displays linked hero name instead of telegram username', () => {
+  const result = selectBestFishCatch([
+    {
+      heroId: 'hero-1',
+      telegramUsername: 'telegram-player',
+      successFailureResult: 'success',
+      effectiveRollUsed: 12,
+      fishSelected: [{ fishName: 'Golden Tuna', fishValueSilver: 80 }],
+    },
+  ], { heroes: [{ id: 'hero-1', name: 'Каеларіс' }] });
+
+  assert.equal(result.username, 'Каеларіс');
+  assert.equal(result.heroName, 'Каеларіс');
 });
 
 test('aggregateBestCrafter ranks by total component value', () => {
