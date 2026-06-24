@@ -8,7 +8,7 @@ Campaign dashboard and app homepage. Shows the current active cycle for context 
 ## UI
 Uses shared `src/components/ui/` primitives for panels, section headers, and empty/loading/error states. The dashboard is a compact concept-led surface with:
 
-- Campaign header showing the current cycle and the last finished cycle.
+- Campaign header showing the current cycle, the last finished cycle, and the finished cycle duration.
 - Damaged ship repair status in a scan-friendly row layout with HP bars.
 - Last-cycle population, treasury, and buildings-added summary blocks.
 - Four highlight panels for best fish, crafter, mage request, and faith spend; the faith card shows the hero, action type, and points spent without action notes.
@@ -19,6 +19,7 @@ Visible text is Ukrainian and all values come from `dashboardService.fetchDashbo
 - `dashboardService.fetchDashboardData()` loads dashboard aggregates.
 - Damaged ships come from `ships` where `hp < hpMax`.
 - Last-cycle highlights are keyed to the newest finished `cycles/{cycleId}`.
+- Cycle duration comes from `cycles/{cycleId}.duration` and falls back to `startedAt`/`finishedAt` Faerun date math.
 - Population deltas come from `cycle-summaries/{cycleId}`.
 - Buildings added come from `islands/{islandId}.buildings.*.builtCycleId`.
 - Crafting highlights use `heroes/*/crafting-logs` with `cycleId`.

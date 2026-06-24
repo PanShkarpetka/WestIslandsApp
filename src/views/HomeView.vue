@@ -22,6 +22,10 @@
           <span>Останній завершений цикл</span>
           <strong>{{ finishedCycleLabel }}</strong>
         </div>
+        <div class="cycle-cell">
+          <span>Тривалість циклу</span>
+          <strong>{{ finishedCycleDurationLabel }}</strong>
+        </div>
       </div>
     </section>
 
@@ -257,6 +261,7 @@ import WiSectionHeader from '@/components/ui/WiSectionHeader.vue'
 import { fetchDashboardData } from '@/services/dashboardService.js'
 import { formatAmount } from '@/utils/formatters.js'
 import { silverToGold } from '@/utils/fishingUtils.js'
+import { diffInDays, parseFaerunDate } from '@/utils/faerun-date.js'
 
 const loading = ref(true)
 const error = ref('')
@@ -278,6 +283,7 @@ const data = reactive({
 const populationDelta = computed(() => data.lastCycle.population?.populationDelta ?? null)
 const currentCycleLabel = computed(() => cycleLabel(data.currentCycle, 'Немає активного циклу'))
 const finishedCycleLabel = computed(() => cycleLabel(data.lastFinishedCycle, 'Немає завершеного циклу'))
+const finishedCycleDurationLabel = computed(() => formatCycleDuration(data.lastFinishedCycle))
 const populationBefore = computed(() => formatPopulationValue(data.lastCycle.population?.populationBefore))
 const populationAfter = computed(() => formatPopulationValue(data.lastCycle.population?.populationAfter))
 const buildingsAddedText = computed(() => {
@@ -300,6 +306,28 @@ function cycleLabel(cycle, fallback) {
   if (!cycle) return fallback
   if (cycle.startedAt && cycle.finishedAt) return `${cycle.startedAt} - ${cycle.finishedAt}`
   return cycle.startedAt || cycle.id || fallback
+}
+
+function formatCycleDuration(cycle) {
+  const storedDuration = Number(cycle?.duration)
+  if (Number.isFinite(storedDuration) && storedDuration > 0) return `${storedDuration} ${dayWord(storedDuration)}`
+
+  const start = parseFaerunDate(cycle?.startedAt)
+  const finish = parseFaerunDate(cycle?.finishedAt)
+  if (!start || !finish) return 'Немає даних'
+
+  const duration = diffInDays(start, finish)
+  return Number.isFinite(duration) && duration > 0 ? `${duration} ${dayWord(duration)}` : 'Немає даних'
+}
+
+function dayWord(value) {
+  const n = Math.abs(Number(value))
+  const lastTwo = n % 100
+  const last = n % 10
+  if (lastTwo >= 11 && lastTwo <= 14) return 'днів'
+  if (last === 1) return 'день'
+  if (last >= 2 && last <= 4) return 'дні'
+  return 'днів'
 }
 
 function formatPopulationValue(value) {
@@ -427,7 +455,7 @@ onMounted(async () => {
 }
 
 .cycle-strip {
-  flex: 0 1 620px;
+  flex: 0 1 760px;
   justify-content: flex-end;
   border-left: 1px solid rgba(200, 150, 42, 0.34);
 }
