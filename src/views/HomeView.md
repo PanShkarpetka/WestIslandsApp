@@ -11,7 +11,7 @@ Uses shared `src/components/ui/` primitives for panels, section headers, and emp
 - Campaign header showing the current cycle and the last finished cycle.
 - Damaged ship repair status in a scan-friendly row layout with HP bars.
 - Last-cycle population, treasury, and buildings-added summary blocks.
-- Four highlight panels for best fish, crafter, mage request, and faith spend.
+- Four highlight panels for best fish, crafter, mage request, and faith spend; the faith card shows the hero, action type, and points spent without action notes.
 
 Visible text is Ukrainian and all values come from `dashboardService.fetchDashboardData()`.
 
@@ -22,6 +22,7 @@ Visible text is Ukrainian and all values come from `dashboardService.fetchDashbo
 - Population deltas come from `cycle-summaries/{cycleId}`.
 - Buildings added come from `islands/{islandId}.buildings.*.builtCycleId`.
 - Crafting highlights use `heroes/*/crafting-logs` with `cycleId`.
+- Faith spend uses `religion-actions` for the newest finished cycle and resolves hero names from existing `heroes` records.
 
 ## Behavior
 - Public page following the app's existing open-page behavior.
@@ -31,5 +32,5 @@ Visible text is Ukrainian and all values come from `dashboardService.fetchDashbo
 
 ## Constraints
 - No Dashboard actions are exposed here.
-- No additional Firestore reads or dashboard service fields are introduced by the visual polish.
+- Dashboard fields stay derived from existing Firestore documents; no schema fields are introduced by the visual polish.
 - The generated concept image used for this pass is a reference only and is not committed as an app asset.

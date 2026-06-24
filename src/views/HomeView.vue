@@ -229,8 +229,12 @@
               </div>
               <div>
                 <div class="card-label">Найбільше витрачено віри</div>
-                <h3>{{ faithSpendTitle || 'Витрат не записано' }}</h3>
+                <h3>{{ faithSpendHero || 'Витрат не записано' }}</h3>
                 <dl>
+                  <div>
+                    <dt>Дія</dt>
+                    <dd>{{ faithSpendAction || 'Немає даних' }}</dd>
+                  </div>
                   <div>
                     <dt>Витрачено віри</dt>
                     <dd>{{ data.lastCycle.largestFaithSpend ? data.lastCycle.largestFaithSpend.faithSpent : 'Немає даних' }}</dd>
@@ -280,11 +284,16 @@ const buildingsAddedText = computed(() => {
   if (!data.lastCycle.buildingsAdded.length) return ''
   return data.lastCycle.buildingsAdded.map((building) => building.name).join(', ')
 })
-const faithSpendTitle = computed(() => {
+const faithSpendHero = computed(() => {
+  const action = data.lastCycle.largestFaithSpend
+  if (!action) return ''
+  return action.heroName || action.user || action.heroId || ''
+})
+const faithSpendAction = computed(() => {
   const action = data.lastCycle.largestFaithSpend
   if (!action) return ''
   const actionType = action.actionType?.id || action.actionTypeId || action.type || 'Дія віри'
-  return action.notes || action.label || faithActionLabel(actionType)
+  return action.label || faithActionLabel(actionType)
 })
 
 function cycleLabel(cycle, fallback) {

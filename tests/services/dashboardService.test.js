@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregateBestCrafter,
+  enrichFaithSpendActions,
   getBuildingsAdded,
   getDamagedShips,
   selectBestMageRequest,
@@ -86,6 +87,15 @@ test('selectLargestFaithSpend recognizes religion action investedFaith field', (
 
   assert.equal(result.id, 'spread');
   assert.equal(result.faithSpent, 100);
+});
+
+test('enrichFaithSpendActions resolves hero names from existing hero records', () => {
+  const result = enrichFaithSpendActions(
+    [{ id: 'spread', heroId: 'hero-1', investedFaith: 100, user: 'Admin' }],
+    [{ id: 'hero-1', name: 'Дік' }],
+  );
+
+  assert.equal(result[0].heroName, 'Дік');
 });
 
 test('aggregateBestCrafter ranks by total component value', () => {

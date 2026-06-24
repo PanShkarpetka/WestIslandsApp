@@ -87,6 +87,27 @@ function getFaithSpendValue(action = {}) {
   return Math.max(0, ...candidates.map((value) => Number(value ?? 0)).filter(Number.isFinite))
 }
 
+function getRefId(value) {
+  if (!value) return ''
+  if (typeof value === 'string') return value.split('/').pop() || value
+  if (value.id) return value.id
+  if (value.path) return String(value.path).split('/').pop() || ''
+  return ''
+}
+
+export function enrichFaithSpendActions(actions = [], heroes = []) {
+  const heroesById = new Map(heroes.map((hero) => [hero.id, hero]))
+  return actions.map((action) => {
+    const heroId = action.heroId || getRefId(action.hero)
+    const hero = heroId ? heroesById.get(heroId) : null
+    return {
+      ...action,
+      heroId,
+      heroName: action.heroName || hero?.name || hero?.nickname || heroId || action.user || '',
+    }
+  })
+}
+
 export function selectLargestFaithSpend(actions = []) {
   return actions
     .map((action) => ({ ...action, faithSpent: getFaithSpendValue(action) }))
@@ -181,6 +202,16 @@ async function fetchCollectionByCycleSafe(collectionName, cycleId) {
   }
 }
 
+async function fetchCollectionSafe(collectionName) {
+  try {
+    const snap = await getDocs(collection(db, collectionName))
+    return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+  } catch (error) {
+    console.warn(`[dashboard] Failed to load ${collectionName}`, error)
+    return []
+  }
+}
+
 export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) {
   const cyclesSnap = await getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc'), limit(12)))
   const cycles = cyclesSnap.docs.map(normalizeCycle)
@@ -210,13 +241,14 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
     return { currentCycle, lastFinishedCycle, damagedShips: getDamagedShips(ships), lastCycle: emptyLastCycle }
   }
 
-  const [treasuryTx, spellRequests, religionActions, populationSummarySnap, craftingLogs, fishingLogsByCycle] = await Promise.all([
+  const [treasuryTx, spellRequests, religionActions, populationSummarySnap, craftingLogs, fishingLogsByCycle, heroes] = await Promise.all([
     fetchCollectionByCycleSafe('treasury-transactions', lastFinishedCycle.id),
     fetchCollectionByCycleSafe('spell-requests', lastFinishedCycle.id),
     fetchCollectionByCycleSafe('religion-actions', lastFinishedCycle.id),
     getDoc(doc(db, 'cycle-summaries', lastFinishedCycle.id)),
     fetchCollectionByCycleSafe('cycle-crafting-logs', lastFinishedCycle.id),
     fetchCollectionByCycleSafe('fishing-logs', lastFinishedCycle.id),
+    fetchCollectionSafe('heroes'),
   ])
 
   const populationSummary = populationSummarySnap.exists() ? populationSummarySnap.data() : null
@@ -230,6 +262,7 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
   const bestFish = selectBestFishCatch(fishingLogs, fishingLogsByCycle.length ? {} : { startAt: lastFinishedCycle.createdAt, endAt: currentCycleStart })
     || populationSummary?.bestFish
     || null
+  const faithSpendActions = enrichFaithSpendActions(religionActions, heroes)
 
   return {
     currentCycle,
@@ -242,7 +275,7 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
       bestFish,
       bestCrafter,
       bestMageRequest: selectBestMageRequest(spellRequests),
-      largestFaithSpend: selectLargestFaithSpend(religionActions),
+      largestFaithSpend: selectLargestFaithSpend(faithSpendActions),
     },
   }
 }
