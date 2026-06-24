@@ -657,13 +657,15 @@ onMounted(async () => {
 .highlight-panel {
   position: relative;
   border-color: rgba(66, 39, 13, 0.92);
-  background:
-    radial-gradient(circle at 12% 18%, rgba(255, 235, 174, 0.42), transparent 32%),
-    radial-gradient(circle at 88% 82%, rgba(95, 51, 17, 0.18), transparent 34%),
-    linear-gradient(145deg, #d9bd7c 0%, #caa463 48%, #aa7f3f 100%) !important;
+  background-image:
+    linear-gradient(90deg, rgba(245, 209, 129, 0.24), rgba(126, 75, 26, 0.1)),
+    url('/images/ui/parchment-card.png') !important;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 236, 178, 0.3),
-    inset 0 0 34px rgba(59, 31, 10, 0.24),
+    inset 0 0 0 1px rgba(255, 236, 178, 0.18),
+    inset 0 0 28px rgba(34, 17, 5, 0.24),
     0 10px 22px rgba(0, 0, 0, 0.34);
 }
 
@@ -677,31 +679,28 @@ onMounted(async () => {
 
 .highlight-panel::before {
   inset: 8px;
-  border: 1px solid rgba(71, 42, 15, 0.32);
+  border: 1px solid rgba(71, 42, 15, 0.28);
   border-radius: calc(var(--wi-radius-md) - 2px);
 }
 
 .highlight-panel::after {
-  right: -26px;
-  bottom: -28px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
+  inset: 0;
   background:
-    radial-gradient(circle, rgba(51, 30, 11, 0.22), transparent 62%);
+    linear-gradient(180deg, rgba(255, 243, 191, 0.1), transparent 46%),
+    radial-gradient(circle at 92% 88%, rgba(43, 22, 7, 0.18), transparent 42%);
 }
 
 .highlight-panel :deep(.wi-panel__body) {
   position: relative;
   z-index: 1;
-  padding: 22px 24px;
+  padding: 28px 30px;
 }
 
 .highlight-card {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  gap: 16px;
-  min-height: 230px;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 18px;
+  min-height: 218px;
 }
 
 .highlight-icon {
@@ -715,7 +714,7 @@ onMounted(async () => {
 .highlight-card h3 {
   margin: 10px 0 14px;
   color: #2a1908;
-  font-size: 1.24rem;
+  font-size: 1.22rem;
   line-height: 1.18;
   overflow-wrap: anywhere;
 }
@@ -730,7 +729,7 @@ onMounted(async () => {
   margin: 5px 0 0;
   color: #1b1005;
   font-family: var(--wi-font-body);
-  font-size: 1.04rem;
+  font-size: 1.02rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
