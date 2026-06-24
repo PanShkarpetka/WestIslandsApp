@@ -668,7 +668,7 @@ onMounted(async () => {
   border-color: rgba(66, 39, 13, 0.92);
   background-image:
     linear-gradient(90deg, rgba(245, 209, 129, 0.24), rgba(126, 75, 26, 0.1)),
-    url('/images/ui/parchment-card.png') !important;
+    url('/images/ui/parchment-card.webp') !important;
   background-position: center;
   background-repeat: no-repeat;
   background-size: 100% 100%;

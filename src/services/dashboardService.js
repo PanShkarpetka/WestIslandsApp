@@ -113,6 +113,17 @@ function getHeroName(heroId, heroesById) {
   return hero?.name || hero?.nickname || ''
 }
 
+export function enrichBestFishCatch(bestFish = null, heroes = []) {
+  if (!bestFish) return null
+  const heroesById = new Map(heroes.map((hero) => [hero.id, hero]))
+  const heroName = bestFish.heroName || getHeroName(bestFish.heroId, heroesById)
+  return {
+    ...bestFish,
+    username: heroName || bestFish.username,
+    heroName: heroName || bestFish.heroName || '',
+  }
+}
+
 export function selectLargestFaithSpend(actions = []) {
   return actions
     .map((action) => ({ ...action, faithSpent: getFaithSpendValue(action) }))
@@ -268,7 +279,7 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
   const currentCycleStart = currentCycle?.createdAt || null
   const bestCrafter = aggregateBestCrafter(craftingLogs) || populationSummary?.bestCrafter || null
   const bestFish = selectBestFishCatch(fishingLogs, fishingLogsByCycle.length ? { heroes } : { startAt: lastFinishedCycle.createdAt, endAt: currentCycleStart, heroes })
-    || populationSummary?.bestFish
+    || enrichBestFishCatch(populationSummary?.bestFish, heroes)
     || null
   const faithSpendActions = enrichFaithSpendActions(religionActions, heroes)
 

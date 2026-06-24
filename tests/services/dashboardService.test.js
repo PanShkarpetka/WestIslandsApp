@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregateBestCrafter,
+  enrichBestFishCatch,
   enrichFaithSpendActions,
   getBuildingsAdded,
   getDamagedShips,
@@ -109,6 +110,16 @@ test('selectBestFishCatch displays linked hero name instead of telegram username
       fishSelected: [{ fishName: 'Golden Tuna', fishValueSilver: 80 }],
     },
   ], { heroes: [{ id: 'hero-1', name: 'Каеларіс' }] });
+
+  assert.equal(result.username, 'Каеларіс');
+  assert.equal(result.heroName, 'Каеларіс');
+});
+
+test('enrichBestFishCatch resolves summary hero name instead of stored telegram username', () => {
+  const result = enrichBestFishCatch(
+    { fishName: 'Golden Tuna', fishValue: 80, username: 'telegram-player', heroId: 'hero-1' },
+    [{ id: 'hero-1', name: 'Каеларіс' }],
+  );
 
   assert.equal(result.username, 'Каеларіс');
   assert.equal(result.heroName, 'Каеларіс');
