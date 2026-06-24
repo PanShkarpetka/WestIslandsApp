@@ -76,6 +76,7 @@ export function selectBestMageRequest(requestDocuments = []) {
 
 function getFaithSpendValue(action = {}) {
   const candidates = [
+    action.investedFaith,
     action.faithInvested,
     action.invested,
     action.faithSpent,

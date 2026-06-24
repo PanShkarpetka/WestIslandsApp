@@ -78,6 +78,16 @@ test('selectLargestFaithSpend returns largest explicit faith spend', () => {
   assert.equal(result.faithSpent, 25);
 });
 
+test('selectLargestFaithSpend recognizes religion action investedFaith field', () => {
+  const result = selectLargestFaithSpend([
+    { id: 'shield', investedFaith: 50, actionType: { id: 'shield' } },
+    { id: 'spread', investedFaith: 100, actionType: { id: 'influence' } },
+  ]);
+
+  assert.equal(result.id, 'spread');
+  assert.equal(result.faithSpent, 100);
+});
+
 test('aggregateBestCrafter ranks by total component value', () => {
   const result = aggregateBestCrafter([
     { heroId: 'a', heroName: 'Aela', amountCrafted: 10, totalComponentPriceAtTime: 20 },
