@@ -6,7 +6,14 @@ Route: `/`
 Campaign dashboard and app homepage. Shows the current active cycle for context and summarizes the most recently finished cycle.
 
 ## UI
-Uses shared `src/components/ui/` primitives for the page header, metric cards, panels, section headers, and empty/loading states. Visible text is Ukrainian and all values come from `dashboardService.fetchDashboardData()`.
+Uses shared `src/components/ui/` primitives for panels, section headers, and empty/loading/error states. The dashboard is a compact concept-led surface with:
+
+- Campaign header showing the current cycle and the last finished cycle.
+- Damaged ship repair status in a scan-friendly row layout with HP bars.
+- Last-cycle population, treasury, and buildings-added summary blocks.
+- Four highlight panels for best fish, crafter, mage request, and faith spend.
+
+Visible text is Ukrainian and all values come from `dashboardService.fetchDashboardData()`.
 
 ## Data
 - `dashboardService.fetchDashboardData()` loads dashboard aggregates.
@@ -18,5 +25,11 @@ Uses shared `src/components/ui/` primitives for the page header, metric cards, p
 
 ## Behavior
 - Public page following the app's existing open-page behavior.
-- Missing historical data renders empty states instead of blocking the page.
+- Loading and error states render as dashboard panels.
+- Missing historical data renders empty text inside the relevant dashboard section instead of blocking the page.
 - Login is available at `/login`.
+
+## Constraints
+- No Dashboard actions are exposed here.
+- No additional Firestore reads or dashboard service fields are introduced by the visual polish.
+- The generated concept image used for this pass is a reference only and is not committed as an app asset.
