@@ -2,11 +2,8 @@
   <v-container class="buildings-page">
     <WiPageHeader
       title="Мапа острова"
-      subtitle="Актуальна інтерактивна мапа з позначками ведеться в LegendKeeper."
       icon="mdi-map"
-    />
-
-    <WiPanel class="legendkeeper-panel" title="LegendKeeper" icon="mdi-map-marker-path" flush>
+    >
       <template #actions>
         <WiActionButton
           :href="legendKeeperMapUrl"
@@ -19,19 +16,39 @@
           Відкрити мапу
         </WiActionButton>
       </template>
+    </WiPageHeader>
+
+    <WiPanel
+      class="legendkeeper-panel"
+      icon="mdi-map-marker-path"
+      flush
+    >
       <div class="legendkeeper-frame-wrap">
+        <WiEmptyState
+          v-if="!mapLoaded"
+          class="map-loading-state"
+          title="Завантажуємо мапу"
+          text="Якщо вбудована мапа не відкриється, скористайтеся кнопкою відкриття у LegendKeeper."
+          icon="mdi-map-clock"
+        />
         <iframe
           class="legendkeeper-frame"
+          :class="{ 'legendkeeper-frame--loaded': mapLoaded }"
           :src="legendKeeperMapUrl"
           title="Мапа острова West Islands у LegendKeeper"
           loading="lazy"
           referrerpolicy="strict-origin-when-cross-origin"
           allowfullscreen
+          @load="mapLoaded = true"
         />
       </div>
     </WiPanel>
 
-    <WiPanel class="yield-buildings-section" title="Будівлі-постачальники" icon="mdi-sprout">
+    <WiPanel
+      class="yield-buildings-section"
+      title="Будівлі-постачальники"
+      icon="mdi-sprout"
+    >
       <template #actions>
         <WiActionButton
           v-if="isAdmin"
@@ -39,13 +56,30 @@
           variant="tonal"
           tone="gold"
           prepend-icon="mdi-plus"
+          :disabled="yieldBuildingStore.loading"
           @click="showAddYieldDialog = true"
         >
           Додати
         </WiActionButton>
       </template>
 
-      <div v-if="islandYieldBuildings.length" class="yield-buildings-list">
+      <WiEmptyState
+        v-if="yieldBuildingStore.loading || islandStore.loading"
+        title="Завантажуємо будівлі-постачальники"
+        text="Дані острова та довідник постачальників оновлюються."
+        icon="mdi-loading"
+      >
+        <v-progress-circular indeterminate color="primary" size="24" />
+      </WiEmptyState>
+
+      <WiEmptyState
+        v-else-if="yieldError"
+        title="Не вдалося завантажити будівлі"
+        :text="yieldError"
+        icon="mdi-alert-circle"
+      />
+
+      <div v-else-if="islandYieldBuildings.length" class="yield-buildings-list">
         <button
           v-for="yb in islandYieldBuildings"
           :key="yb.key"
@@ -58,10 +92,11 @@
           </div>
           <div class="yield-building-info">
             <div class="yield-building-name">{{ yb.name }}</div>
-            <div v-if="yb.nextHarvest" class="yield-building-next">
-              Наступний врожай: <span class="wi-gold-text">{{ yb.nextHarvest }}</span>
+            <div class="yield-building-meta">
+              <span v-if="yb.nextHarvest">Наступний врожай: <b>{{ yb.nextHarvest }}</b></span>
+              <span v-else>Немає запланованих подій</span>
+              <span>{{ yb.pendingCount }} {{ eventWord(yb.pendingCount) }}</span>
             </div>
-            <div v-else class="yield-building-next wi-muted-text">Немає запланованих подій</div>
           </div>
           <v-icon size="18" class="yield-building-chevron">mdi-chevron-right</v-icon>
         </button>
@@ -70,7 +105,7 @@
       <WiEmptyState
         v-else
         title="Будівлі-постачальники відсутні"
-        text="Додайте постачальника, якщо для острова треба вести заплановані врожаї."
+        text="Додайте постачальника, якщо для острова треба вести заплановані врожаї. Мапа та звичайні будівлі залишаються в LegendKeeper."
         icon="mdi-sprout-outline"
       />
     </WiPanel>
@@ -135,6 +170,7 @@ const isAdmin = computed(() => auth?.isAdmin ?? false)
 
 const currentCycleStartDate = ref(null)
 const currentCycleId = ref(null)
+const mapLoaded = ref(false)
 
 onMounted(async () => {
   islandStore.subscribe()
@@ -179,6 +215,7 @@ const islandYieldBuildings = computed(() => {
     const ybDef = yieldBuildingStore.byId.get(entry.yieldBuildingId)
     const name = ybDef?.name || entry.name || key
     const yields = Array.isArray(entry.yields) ? entry.yields : []
+    const pendingCount = yields.filter(y => !y.processed).length
     const nextPending = yields
       .filter(y => !y.processed && y.date)
       .sort((a, b) => {
@@ -186,10 +223,12 @@ const islandYieldBuildings = computed(() => {
         if (!pa || !pb) return 0
         return (pa.year * 360 + pa.month * 30 + pa.day) - (pb.year * 360 + pb.month * 30 + pb.day)
       })[0]
-    result.push({ key, name, yieldBuildingId: entry.yieldBuildingId, nextHarvest: nextPending?.date || null })
+    result.push({ key, name, yieldBuildingId: entry.yieldBuildingId, nextHarvest: nextPending?.date || null, pendingCount })
   }
   return result.sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'))
 })
+
+const yieldError = computed(() => islandStore.error || yieldBuildingStore.error || '')
 
 const availableYieldBuildingsForSelect = computed(() => {
   const installedIds = new Set(islandYieldBuildings.value.map(yb => yb.yieldBuildingId))
@@ -215,6 +254,16 @@ async function addYieldBuildingToIsland() {
     addingYield.value = false
   }
 }
+
+function eventWord(value) {
+  const n = Math.abs(Number(value) || 0)
+  const lastTwo = n % 100
+  const last = n % 10
+  if (lastTwo >= 11 && lastTwo <= 14) return 'подій'
+  if (last === 1) return 'подія'
+  if (last >= 2 && last <= 4) return 'події'
+  return 'подій'
+}
 </script>
 
 <style scoped>
@@ -228,6 +277,7 @@ async function addYieldBuildingToIsland() {
 }
 
 .legendkeeper-frame-wrap {
+  position: relative;
   min-height: 620px;
   background: #0a0f0c;
 }
@@ -238,6 +288,20 @@ async function addYieldBuildingToIsland() {
   height: min(74vh, 820px);
   min-height: 620px;
   border: 0;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.legendkeeper-frame--loaded {
+  opacity: 1;
+}
+
+.map-loading-state {
+  position: absolute;
+  inset: 16px;
+  z-index: 1;
+  min-height: auto;
+  background: rgba(16, 21, 18, 0.92);
 }
 
 .yield-buildings-list {
@@ -290,10 +354,18 @@ async function addYieldBuildingToIsland() {
   letter-spacing: 0.025em;
 }
 
-.yield-building-next {
+.yield-building-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   margin-top: 3px;
   color: var(--wi-text-muted);
   font-size: 0.8rem;
+}
+
+.yield-building-meta b {
+  color: var(--wi-gold-light);
+  font-weight: 700;
 }
 
 .yield-building-chevron {
@@ -305,6 +377,10 @@ async function addYieldBuildingToIsland() {
   .legendkeeper-frame-wrap,
   .legendkeeper-frame {
     min-height: 520px;
+  }
+
+  .yield-building-card {
+    align-items: flex-start;
   }
 }
 </style>
