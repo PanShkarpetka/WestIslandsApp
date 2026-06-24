@@ -254,6 +254,8 @@
  * @property {string} cycleId
  * @property {string} notes
  * @property {import('firebase/firestore').Timestamp} createdAt
+ * @property {number} [investedFaith] - Faith points spent on shield/spread religion actions.
+ * @property {number} [faithPenalty] - Faith points charged as a penalty, such as religion changes.
  * @property {number} convertedFollowers
  * @property {number} result
  */
