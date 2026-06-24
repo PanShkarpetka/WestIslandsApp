@@ -3,32 +3,28 @@
 Route: `/islands/:islandId/buildings` (child of IslandsPage).
 
 ## Purpose
-Interactive island map with clickable building pins. Each pin represents a building slot; clicking opens `IslandBuildingDialog` for details or admin actions.
+Island map page. The map itself is now embedded from LegendKeeper because that page owns the current island map and pins.
 
-## Building pins
-21 hardcoded pins with pixel-precise `top`/`left` positions on an 800px-wide map image. Each pin has:
-- `id` — building key (e.g., `arcaneStudy`, `harbor`, `lighthouse`)
-- `top`, `left` — absolute px offset on the map
-- `flipX` — mirrors the pin image horizontally (for portCrane, shipyardBig)
+## Map embed
+The page renders an iframe to:
 
-Pin images: `/images/buildings/{id}.png`  
-Map image: `/images/island/{DEFAULT_ISLAND_ID}.jpg`
+`https://www.legendkeeper.com/p/cma2mu1j719h60zl9frefc3wl/o3dmcy3m`
 
-## Built vs unbuilt state
-`island.value.buildings` is a map of `{ [buildingKey]: { built: boolean } }`. Built pins glow gold; unbuilt pins are grayscale/faded. Hovering any pin scales it to 2.1× with a gold border.
+No local island image, hardcoded pin coordinates, or `IslandBuildingDialog` pin interactions are used here anymore.
 
-## Dialog
-`IslandBuildingDialog` receives:
-- `building-key` — the clicked pin id
-- `nickname` — from `userStore`
-- `is-admin` — from `userStore`
+## Local data still shown
+The page keeps the app-managed **Будівлі-постачальники** section below the embedded map:
 
-## Stores
-- `islandStore` — island data (subscribed by parent IslandsPage)
-- `buildingStore` — building metadata (`byId` map for names)
-- `donationGoalStore` — subscribed by parent, available here
+- Reads installed yield buildings from `islands/{islandId}.buildings`.
+- Uses `yieldBuildingStore` metadata for display names.
+- Shows the next pending harvest date when a yield entry has `processed: false`.
+- Admins can add yield buildings through the local dialog.
 
-## Adding a new building
-1. Add pin entry to the `pins` array with correct coordinates and id
-2. Add building image to `/public/images/buildings/{id}.png`
-3. Update `buildingStore` data and Firestore schema if needed
+## Stores and services
+- `islandStore` — island document and `addYieldBuilding()`.
+- `yieldBuildingStore` — supplier-building definitions.
+- `useUserStore` — null-safe `isAdmin` gate.
+- Firestore `cycles` one-time read — current active cycle ID/start date for yield-building defaults.
+
+## Admin behavior
+Admins see the "Додати" action for supplier buildings. Adding a supplier building writes through `islandStore.addYieldBuilding()` and does not modify the LegendKeeper map.

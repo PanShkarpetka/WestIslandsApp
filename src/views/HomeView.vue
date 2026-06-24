@@ -1,132 +1,145 @@
 <template>
   <v-container class="dashboard-page">
-    <section class="dashboard-header">
-      <div>
-        <div class="dashboard-kicker">
-          <v-icon size="16">mdi-compass-rose</v-icon>
-          Панель кампанії
-        </div>
-      </div>
-
-      <div class="cycle-strip">
-        <div class="cycle-pill">
-          <span>Останній цикл</span>
-          <strong>{{ finishedCycleLabel }}</strong>
-        </div>
-      </div>
-    </section>
+    <WiPageHeader
+      title="Панель кампанії"
+      subtitle="Поточний стан острова, підсумки минулого циклу та дії, які потребують уваги."
+      icon="mdi-compass-rose"
+    >
+      <template #actions>
+        <WiMetricCard class="cycle-summary" label="Останній цикл" :value="finishedCycleLabel" />
+      </template>
+    </WiPageHeader>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
       {{ error }}
     </v-alert>
 
-    <div v-if="loading" class="dashboard-loading">
+    <WiEmptyState v-if="loading" title="Завантажуємо стан кампанії" icon="mdi-loading">
       <v-progress-circular indeterminate color="primary" />
-      <span>Завантажуємо стан кампанії...</span>
-    </div>
+    </WiEmptyState>
 
     <template v-else>
       <section class="dashboard-section">
-        <div class="section-heading">
-          <v-icon size="18">mdi-tools</v-icon>
-          <h2>Потребують ремонту</h2>
-        </div>
+        <WiSectionHeader title="Потребують ремонту" icon="mdi-tools" />
 
         <div v-if="data.damagedShips.length" class="ship-grid">
-          <article v-for="ship in data.damagedShips" :key="ship.id" class="dashboard-card ship-card">
-            <div class="card-icon danger">
-              <v-icon>mdi-sail-boat-sink</v-icon>
-            </div>
-            <div class="card-main">
-              <div class="card-label">{{ ship.type || 'Корабель' }}</div>
-              <div class="card-title">{{ ship.name || ship.id }}</div>
-              <div class="hp-track">
-                <div class="hp-fill" :style="{ width: `${ship.hpPercent}%` }" />
+          <WiPanel v-for="ship in data.damagedShips" :key="ship.id" class="ship-card" variant="danger">
+            <div class="ship-card__content">
+              <div class="card-icon danger">
+                <v-icon>mdi-sail-boat-sink</v-icon>
               </div>
-              <div class="card-note">
-                {{ ship.hp }} / {{ ship.hpMax }} міцності | треба відновити {{ ship.missingHp }}
+              <div class="card-main">
+                <div class="card-label">{{ ship.type || 'Корабель' }}</div>
+                <div class="card-title">{{ ship.name || ship.id }}</div>
+                <div class="hp-track">
+                  <div class="hp-fill" :style="{ width: `${ship.hpPercent}%` }" />
+                </div>
+                <div class="card-note">
+                  {{ ship.hp }} / {{ ship.hpMax }} міцності | треба відновити {{ ship.missingHp }}
+                </div>
               </div>
             </div>
-          </article>
+          </WiPanel>
         </div>
 
-        <div v-else class="empty-panel">
-          <v-icon size="20">mdi-shield-check</v-icon>
-          Немає кораблів, що потребують ремонту.
-        </div>
+        <WiEmptyState
+          v-else
+          title="Кораблі в доброму стані"
+          text="Немає кораблів, що потребують ремонту."
+          icon="mdi-shield-check"
+        />
       </section>
 
       <section class="dashboard-section">
-        <div class="section-heading">
-          <v-icon size="18">mdi-calendar-star</v-icon>
-          <h2>Зміни минулого циклу</h2>
-        </div>
+        <WiSectionHeader title="Зміни минулого циклу" icon="mdi-calendar-star" />
 
         <div class="summary-grid">
-          <article class="dashboard-card metric-card">
-            <div class="card-label">Населення</div>
-            <div class="metric-value" :class="deltaClass(populationDelta)">
-              {{ signedNumber(populationDelta) }}
-            </div>
-            <div class="card-note">
-              {{ populationNote }}
-            </div>
-          </article>
+          <WiMetricCard
+            label="Населення"
+            :tone="deltaTone(populationDelta)"
+            :value="signedNumber(populationDelta)"
+            :note="populationNote"
+          />
 
-          <article class="dashboard-card metric-card">
-            <div class="card-label">Скарбниця</div>
-            <div class="metric-value" :class="deltaClass(data.lastCycle.treasury.net)">
-              {{ signedAmount(data.lastCycle.treasury.net) }}
-            </div>
-            <div class="card-note">
-              +{{ formatAmount(data.lastCycle.treasury.income) }} дохід | -{{ formatAmount(data.lastCycle.treasury.expenses) }} витрати
-            </div>
-          </article>
+          <WiMetricCard
+            label="Скарбниця"
+            :tone="deltaTone(data.lastCycle.treasury.net)"
+            :value="signedAmount(data.lastCycle.treasury.net)"
+          >
+            +{{ formatAmount(data.lastCycle.treasury.income) }} дохід | -{{ formatAmount(data.lastCycle.treasury.expenses) }} витрати
+          </WiMetricCard>
 
-          <article class="dashboard-card metric-card">
-            <div class="card-label">Збудовано</div>
-            <div class="metric-value">{{ data.lastCycle.buildingsAdded.length }}</div>
-            <div class="card-note">
-              {{ buildingsAddedText }}
-            </div>
-          </article>
+          <WiMetricCard
+            label="Збудовано"
+            :value="data.lastCycle.buildingsAdded.length"
+            :note="buildingsAddedText || 'Нових будівель за цикл не записано.'"
+          />
         </div>
       </section>
 
       <section class="dashboard-section">
-        <div class="section-heading">
-          <v-icon size="18">mdi-trophy-award</v-icon>
-          <h2>Найкраще за минулий цикл</h2>
-        </div>
+        <WiSectionHeader title="Найкраще за минулий цикл" icon="mdi-trophy-award" />
 
         <div class="highlight-grid">
-          <HighlightCard
-            icon="mdi-fish"
-            label="Найкращий улов"
-            :title="data.lastCycle.bestFish?.fishName || 'Улов не записано'"
-            :note="data.lastCycle.bestFish ? `${data.lastCycle.bestFish.username} | ${formatGoldFromSilver(data.lastCycle.bestFish.fishValue)} золота` : 'У журналі риболовлі немає успішного улову за цей цикл.'"
-          />
+          <WiPanel>
+            <div class="highlight-card">
+              <div class="card-icon">
+                <v-icon>mdi-fish</v-icon>
+              </div>
+              <div class="card-main">
+                <div class="card-label">Найкращий улов</div>
+                <div class="card-title">{{ data.lastCycle.bestFish?.fishName || 'Улов не записано' }}</div>
+                <div class="card-note">
+                  {{ data.lastCycle.bestFish ? `${data.lastCycle.bestFish.username} | ${formatGoldFromSilver(data.lastCycle.bestFish.fishValue)} золота` : 'У журналі риболовлі немає успішного улову за цей цикл.' }}
+                </div>
+              </div>
+            </div>
+          </WiPanel>
 
-          <HighlightCard
-            icon="mdi-anvil"
-            label="Найкращий майстер"
-            :title="data.lastCycle.bestCrafter?.heroName || 'Крафт не записано'"
-            :note="data.lastCycle.bestCrafter ? `${formatAmount(data.lastCycle.bestCrafter.totalValue)} вартість компонентів | ${data.lastCycle.bestCrafter.totalItems} предметів` : 'За цей цикл немає записів крафту.'"
-          />
+          <WiPanel>
+            <div class="highlight-card">
+              <div class="card-icon">
+                <v-icon>mdi-anvil</v-icon>
+              </div>
+              <div class="card-main">
+                <div class="card-label">Найкращий майстер</div>
+                <div class="card-title">{{ data.lastCycle.bestCrafter?.heroName || 'Крафт не записано' }}</div>
+                <div class="card-note">
+                  {{ data.lastCycle.bestCrafter ? `${formatAmount(data.lastCycle.bestCrafter.totalValue)} вартість компонентів | ${data.lastCycle.bestCrafter.totalItems} предметів` : 'За цей цикл немає записів крафту.' }}
+                </div>
+              </div>
+            </div>
+          </WiPanel>
 
-          <HighlightCard
-            icon="mdi-magic-staff"
-            label="Найкраща заявка магів"
-            :title="data.lastCycle.bestMageRequest?.spellName || ''"
-            :note="data.lastCycle.bestMageRequest ? `${formatAmount(data.lastCycle.bestMageRequest.compensation)} винагорода | ${data.lastCycle.bestMageRequest.fulfilledByHeroName || 'Невідомий герой'}` : 'За останній завершений цикл немає виконаних заявок.'"
-          />
+          <WiPanel>
+            <div class="highlight-card">
+              <div class="card-icon">
+                <v-icon>mdi-magic-staff</v-icon>
+              </div>
+              <div class="card-main">
+                <div class="card-label">Найкраща заявка магів</div>
+                <div v-if="data.lastCycle.bestMageRequest?.spellName" class="card-title">{{ data.lastCycle.bestMageRequest.spellName }}</div>
+                <div class="card-note">
+                  {{ data.lastCycle.bestMageRequest ? `${formatAmount(data.lastCycle.bestMageRequest.compensation)} винагорода | ${data.lastCycle.bestMageRequest.fulfilledByHeroName || 'Невідомий герой'}` : 'За останній завершений цикл немає виконаних заявок.' }}
+                </div>
+              </div>
+            </div>
+          </WiPanel>
 
-          <HighlightCard
-            icon="mdi-candle"
-            label="Найбільша витрата віри"
-            :title="faithSpendTitle"
-            :note="data.lastCycle.largestFaithSpend ? `${data.lastCycle.largestFaithSpend.faithSpent} очок віри витрачено` : 'За цей цикл не записано витрат віри.'"
-          />
+          <WiPanel>
+            <div class="highlight-card">
+              <div class="card-icon">
+                <v-icon>mdi-candle</v-icon>
+              </div>
+              <div class="card-main">
+                <div class="card-label">Найбільша витрата віри</div>
+                <div v-if="faithSpendTitle" class="card-title">{{ faithSpendTitle }}</div>
+                <div class="card-note">
+                  {{ data.lastCycle.largestFaithSpend ? `${data.lastCycle.largestFaithSpend.faithSpent} очок віри витрачено` : 'За цей цикл не записано витрат віри.' }}
+                </div>
+              </div>
+            </div>
+          </WiPanel>
         </div>
       </section>
     </template>
@@ -134,7 +147,12 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiMetricCard from '@/components/ui/WiMetricCard.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
+import WiSectionHeader from '@/components/ui/WiSectionHeader.vue'
 import { fetchDashboardData } from '@/services/dashboardService.js'
 import { formatAmount } from '@/utils/formatters.js'
 import { silverToGold } from '@/utils/fishingUtils.js'
@@ -153,25 +171,6 @@ const data = reactive({
     bestCrafter: null,
     bestMageRequest: null,
     largestFaithSpend: null,
-  },
-})
-
-const HighlightCard = defineComponent({
-  props: {
-    icon: { type: String, required: true },
-    label: { type: String, required: true },
-    title: { type: String, default: '' },
-    note: { type: String, required: true },
-  },
-  setup(props) {
-    return () => h('article', { class: 'dashboard-card highlight-card' }, [
-      h('div', { class: 'card-icon' }, [h('i', { class: `mdi ${props.icon}` })]),
-      h('div', { class: 'card-main' }, [
-        h('div', { class: 'card-label' }, props.label),
-        props.title ? h('div', { class: 'card-title' }, props.title) : null,
-        h('div', { class: 'card-note' }, props.note),
-      ]),
-    ])
   },
 })
 
@@ -227,11 +226,11 @@ function faithActionLabel(actionType) {
   return labels[key] || key || 'Дія віри'
 }
 
-function deltaClass(value) {
+function deltaTone(value) {
   const n = Number(value ?? 0)
-  if (n > 0) return 'positive'
-  if (n < 0) return 'negative'
-  return ''
+  if (n > 0) return 'success'
+  if (n < 0) return 'danger'
+  return 'default'
 }
 
 onMounted(async () => {
@@ -255,97 +254,12 @@ onMounted(async () => {
   padding-bottom: 40px;
 }
 
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  align-items: flex-end;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--wi-border);
-  margin-bottom: 22px;
-}
-
-.dashboard-kicker {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-family: var(--wi-font-heading);
-  font-size: 0.74rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-}
-
-.dashboard-title {
-  margin: 6px 0 0;
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  line-height: 1;
-}
-
-.cycle-strip {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.cycle-pill {
-  min-width: 190px;
-  padding: 10px 12px;
-  border: 1px solid var(--wi-border);
-  border-radius: 6px;
-  background: rgba(44, 30, 15, 0.58);
-}
-
-.cycle-pill span,
-.card-label {
-  display: block;
-  font-family: var(--wi-font-heading);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-}
-
-.cycle-pill strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--wi-gold);
-  font-family: var(--wi-font-body);
-  font-size: 0.9rem;
-}
-
-.dashboard-loading,
-.empty-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 100px;
-  border: 1px dashed var(--wi-border);
-  border-radius: 8px;
-  color: var(--wi-text-muted);
-  background: rgba(44, 30, 15, 0.28);
+.cycle-summary {
+  min-width: 240px;
 }
 
 .dashboard-section {
   margin-bottom: 26px;
-}
-
-.section-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  color: var(--wi-gold);
-}
-
-.section-heading h2 {
-  margin: 0;
-  font-family: var(--wi-font-heading);
-  font-size: 1rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .ship-grid,
@@ -367,19 +281,11 @@ onMounted(async () => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.dashboard-card {
+.ship-card__content,
+.highlight-card {
   display: flex;
   gap: 12px;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--wi-border);
-  border-radius: 8px;
-  background: linear-gradient(145deg, rgba(44, 30, 15, 0.92), rgba(26, 18, 9, 0.9));
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
-}
-
-.metric-card {
-  display: block;
 }
 
 .card-icon {
@@ -406,6 +312,15 @@ onMounted(async () => {
   flex: 1;
 }
 
+.card-label {
+  display: block;
+  color: var(--wi-text-muted);
+  font-family: var(--wi-font-heading);
+  font-size: 0.68rem;
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
 .card-title {
   margin-top: 4px;
   color: var(--wi-text);
@@ -421,22 +336,6 @@ onMounted(async () => {
   font-family: var(--wi-font-body);
   font-size: 0.85rem;
   line-height: 1.35;
-}
-
-.metric-value {
-  margin-top: 8px;
-  color: var(--wi-gold);
-  font-family: var(--wi-font-number);
-  font-size: 2.35rem;
-  line-height: 1;
-}
-
-.metric-value.positive {
-  color: var(--wi-success);
-}
-
-.metric-value.negative {
-  color: var(--wi-danger);
 }
 
 .hp-track {
@@ -455,15 +354,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 960px) {
-  .dashboard-header {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .cycle-strip {
-    justify-content: flex-start;
-  }
-
   .summary-grid,
   .highlight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -474,10 +364,6 @@ onMounted(async () => {
   .summary-grid,
   .highlight-grid {
     grid-template-columns: 1fr;
-  }
-
-  .cycle-pill {
-    min-width: 100%;
   }
 }
 </style>

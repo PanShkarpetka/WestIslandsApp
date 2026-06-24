@@ -5,6 +5,9 @@ Route: `/`
 ## Purpose
 Campaign dashboard and app homepage. Shows the current active cycle for context and summarizes the most recently finished cycle.
 
+## UI
+Uses shared `src/components/ui/` primitives for the page header, metric cards, panels, section headers, and empty/loading states. Visible text is Ukrainian and all values come from `dashboardService.fetchDashboardData()`.
+
 ## Data
 - `dashboardService.fetchDashboardData()` loads dashboard aggregates.
 - Damaged ships come from `ships` where `hp < hpMax`.

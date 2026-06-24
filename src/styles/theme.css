@@ -15,8 +15,11 @@
   --wi-text-muted:    #a8896a;
   --wi-border:        #5a3e20;
   --wi-success:       #5a8a3c;
+  --wi-success-light: #8fbd65;
   --wi-danger:        #8b2a2a;
+  --wi-danger-light:  #c45c5c;
   --wi-sea:           #3a6080;
+  --wi-sea-light:     #74a8c4;
 
   --wi-font-heading:  'Cinzel', serif;
   --wi-font-body:     'IM Fell English', serif;
@@ -24,8 +27,17 @@
   --wi-font-mono:     'Special Elite', cursive;
 
   --wi-shadow:        0 4px 24px rgba(0, 0, 0, 0.6);
+  --wi-shadow-soft:   0 5px 18px rgba(0, 0, 0, 0.28);
+  --wi-shadow-panel:  0 8px 28px rgba(0, 0, 0, 0.38);
   --wi-shadow-gold:   0 0 12px rgba(200, 150, 42, 0.25);
   --wi-radius:        6px;
+  --wi-radius-xs:     4px;
+  --wi-radius-sm:     6px;
+  --wi-radius-md:     8px;
+  --wi-radius-lg:     10px;
+  --wi-panel-bg:      linear-gradient(145deg, rgba(44, 30, 15, 0.94), rgba(26, 18, 9, 0.92));
+  --wi-panel-header-bg: rgba(12, 8, 4, 0.36);
+  --wi-parchment-bg:  linear-gradient(145deg, rgba(61, 42, 20, 0.92), rgba(44, 30, 15, 0.9));
   --wi-border-style:  1px solid var(--wi-border);
 }
 

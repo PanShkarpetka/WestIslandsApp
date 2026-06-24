@@ -1,82 +1,80 @@
 <template>
-  <div class="buildings-page">
-    <div class="map-frame">
-      <div class="island-map-wrap">
-        <div class="island-map">
-          <img class="map-img" :src="islandImg" alt="Острів" />
+  <v-container class="buildings-page">
+    <WiPageHeader
+      title="Мапа острова"
+      subtitle="Актуальна інтерактивна мапа з позначками ведеться в LegendKeeper. Дані будівель-постачальників нижче залишаються збереженими в застосунку."
+      icon="mdi-map"
+    />
 
-          <button
-            v-for="pin in pins"
-            :key="pin.id"
-            class="building-pin"
-            :class="{ built: isBuilt(pin.id) }"
-            :style="{ top: pin.top + 'px', left: pin.left + 'px', transform: pin.flipX ? 'scaleX(-1)' : undefined }"
-            @click="openBuilding(pin.id)"
-          >
-            <img :src="`/images/buildings/${pin.id}.png`" :alt="buildingName(pin.id)" />
-            <span class="pin-glow" />
-            <span v-if="hasUpcomingYields(pin.id)" class="pin-yield-badge" title="Є запланований врожай">
-              <v-icon size="10">mdi-sprout</v-icon>
-            </span>
-          </button>
-        </div>
+    <WiPanel class="legendkeeper-panel" title="LegendKeeper" icon="mdi-map-marker-path" flush>
+      <template #actions>
+        <WiActionButton
+          :href="legendKeeperMapUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          variant="tonal"
+          tone="sea"
+          prepend-icon="mdi-open-in-new"
+        >
+          Відкрити мапу
+        </WiActionButton>
+      </template>
+      <div class="legendkeeper-frame-wrap">
+        <iframe
+          class="legendkeeper-frame"
+          :src="legendKeeperMapUrl"
+          title="Мапа острова West Islands у LegendKeeper"
+          loading="lazy"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        />
       </div>
-    </div>
+    </WiPanel>
 
-    <!-- Yield buildings section -->
-    <div class="yield-buildings-section">
-      <div class="yield-buildings-header">
-        <div class="yield-buildings-title">
-          <v-icon size="16" class="mr-1" color="#c8962a">mdi-sprout</v-icon>
-          Будівлі-постачальники
-        </div>
-        <v-btn
+    <WiPanel class="yield-buildings-section" title="Будівлі-постачальники" icon="mdi-sprout">
+      <template #actions>
+        <WiActionButton
           v-if="isAdmin"
           size="small"
           variant="tonal"
+          tone="gold"
           prepend-icon="mdi-plus"
-          class="add-yield-btn"
           @click="showAddYieldDialog = true"
         >
           Додати
-        </v-btn>
-      </div>
+        </WiActionButton>
+      </template>
 
       <div v-if="islandYieldBuildings.length" class="yield-buildings-list">
-        <div
+        <button
           v-for="yb in islandYieldBuildings"
           :key="yb.key"
+          type="button"
           class="yield-building-card"
           @click="openYieldBuilding(yb.key)"
         >
           <div class="yield-building-icon">
-            <v-icon size="22" color="#c8962a">mdi-sprout</v-icon>
+            <v-icon size="22">mdi-sprout</v-icon>
           </div>
           <div class="yield-building-info">
             <div class="yield-building-name">{{ yb.name }}</div>
             <div v-if="yb.nextHarvest" class="yield-building-next">
-              Наст. врожай: <span class="wi-gold-text">{{ yb.nextHarvest }}</span>
+              Наступний врожай: <span class="wi-gold-text">{{ yb.nextHarvest }}</span>
             </div>
             <div v-else class="yield-building-next wi-muted-text">Немає запланованих подій</div>
           </div>
-          <v-icon size="16" class="yield-building-chevron">mdi-chevron-right</v-icon>
-        </div>
+          <v-icon size="18" class="yield-building-chevron">mdi-chevron-right</v-icon>
+        </button>
       </div>
-      <div v-else class="yield-buildings-empty">
-        Будівлі-постачальники відсутні
-      </div>
-    </div>
-  </div>
 
-  <IslandBuildingDialog
-    v-if="activeKey"
-    v-model="showDialog"
-    :building-key="activeKey"
-    :nickname="auth.nickname"
-    :is-admin="isAdmin"
-    :current-cycle-id="currentCycleId"
-    :current-cycle-start-date="currentCycleStartDate"
-  />
+      <WiEmptyState
+        v-else
+        title="Будівлі-постачальники відсутні"
+        text="Додайте постачальника, якщо для острова треба вести заплановані врожаї."
+        icon="mdi-sprout-outline"
+      />
+    </WiPanel>
+  </v-container>
 
   <YieldBuildingDialog
     v-if="activeYieldKey"
@@ -86,78 +84,50 @@
     :current-cycle-start-date="currentCycleStartDate"
   />
 
-  <!-- Add yield building dialog -->
-  <v-dialog v-model="showAddYieldDialog" max-width="400">
-    <v-card class="add-yield-card">
-      <div class="add-yield-card-header">
-        <span class="wi-heading">Додати будівлю-постачальника</span>
-      </div>
-      <v-card-text>
-        <v-select
-          v-model="selectedYieldBuildingId"
-          :items="availableYieldBuildingsForSelect"
-          item-title="name"
-          item-value="id"
-          label="Оберіть будівлю"
-          density="comfortable"
-          hide-details="auto"
-          class="mb-2"
-          clearable
-        />
-        <v-alert v-if="addYieldError" type="error" density="compact" variant="tonal" class="mt-2">{{ addYieldError }}</v-alert>
-      </v-card-text>
-      <v-divider />
-      <v-card-actions>
+  <v-dialog v-model="showAddYieldDialog" max-width="420">
+    <WiDialogFrame title="Додати будівлю-постачальника" icon="mdi-sprout">
+      <v-select
+        v-model="selectedYieldBuildingId"
+        :items="availableYieldBuildingsForSelect"
+        item-title="name"
+        item-value="id"
+        label="Оберіть будівлю"
+        density="comfortable"
+        hide-details="auto"
+        class="mb-2"
+        clearable
+      />
+      <v-alert v-if="addYieldError" type="error" density="compact" variant="tonal" class="mt-2">{{ addYieldError }}</v-alert>
+
+      <template #actions>
         <v-btn variant="text" @click="showAddYieldDialog = false">Скасувати</v-btn>
         <v-spacer />
-        <v-btn color="primary" :loading="addingYield" @click="addYieldBuildingToIsland">Додати</v-btn>
-      </v-card-actions>
-    </v-card>
+        <WiActionButton :loading="addingYield" prepend-icon="mdi-plus" @click="addYieldBuildingToIsland">
+          Додати
+        </WiActionButton>
+      </template>
+    </WiDialogFrame>
   </v-dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 import { useIslandStore } from '@/store/islandStore'
-import { useBuildingStore } from '@/store/buildingStore'
-import { useDonationGoalStore } from '@/store/donationGoalStore'
 import { useUserStore } from '@/store/userStore.js'
 import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
-import IslandBuildingDialog from '@/components/IslandBuildingDialog.vue'
 import YieldBuildingDialog from '@/components/YieldBuildingDialog.vue'
 import { storeToRefs } from 'pinia'
-import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
 import { parseFaerunDate } from '@/utils/faerun-date.js'
 import { getFirestore, collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
 
-const islandImg = `/images/island/${DEFAULT_ISLAND_ID}.jpg`
-const pins = [
-  { id: 'arcaneStudy',   top: 307, left:  73 },
-  { id: 'armory',        top: 280, left: 480 },
-  { id: 'barracks',      top: 377, left: 508 },
-  { id: 'farm',          top: 412, left: 286 },
-  { id: 'garden',        top: 335, left: 294 },
-  { id: 'harbor',        top: 315, left: 749 },
-  { id: 'houses',        top: 479, left: 503 },
-  { id: 'library',       top: 350, left: 200 },
-  { id: 'lighthouse',    top: 188, left: 729 },
-  { id: 'mill',          top: 457, left: 319 },
-  { id: 'pirs',          top: 655, left: 395 },
-  { id: 'portCrane',     top: 597, left: 114, flipX: true },
-  { id: 'sanctuary',     top: 321, left: 586 },
-  { id: 'sawmill',       top: 217, left: 548 },
-  { id: 'shipyardBig',   top: 624, left: 224, flipX: true },
-  { id: 'shipyardSmall', top: 612, left: 301 },
-  { id: 'stonecutter',   top: 204, left: 336 },
-  { id: 'storehouse',    top: 127, left: 331 },
-  { id: 'tavern',        top: 500, left: 420 },
-  { id: 'townhouse',     top: 377, left: 377 },
-  { id: 'workshop',      top: 153, left: 465 },
-]
+const legendKeeperMapUrl = 'https://www.legendkeeper.com/p/cma2mu1j719h60zl9frefc3wl/o3dmcy3m'
 
 const islandStore = useIslandStore()
-const buildingStore = useBuildingStore()
-const donationStore = useDonationGoalStore()
 const yieldBuildingStore = useYieldBuildingStore()
 const auth = useUserStore()
 const { data: island } = storeToRefs(islandStore)
@@ -168,11 +138,8 @@ const currentCycleId = ref(null)
 
 onMounted(async () => {
   islandStore.subscribe()
-  buildingStore.subscribe()
-  donationStore.subscribeToGoals?.()
   yieldBuildingStore.subscribe()
 
-  // Load current cycle start for built-at date default
   try {
     const db = getFirestore()
     const q = query(collection(db, 'cycles'), orderBy('createdAt', 'desc'), limit(1))
@@ -186,15 +153,12 @@ onMounted(async () => {
     console.warn('[buildings] Could not load current cycle', e)
   }
 })
+
 onUnmounted(() => {
   islandStore.stop()
-  buildingStore.stop()
-  donationStore.stop?.()
   yieldBuildingStore.stop()
 })
 
-const showDialog = ref(false)
-const activeKey = ref(null)
 const showYieldDialog = ref(false)
 const activeYieldKey = ref(null)
 const showAddYieldDialog = ref(false)
@@ -202,20 +166,11 @@ const selectedYieldBuildingId = ref(null)
 const addYieldError = ref('')
 const addingYield = ref(false)
 
-const builtMap = computed(() => ({ ...(island.value?.buildings || {}) }))
-
-function isBuilt(key) { return !!builtMap.value[key]?.built }
-function buildingName(key) { return buildingStore.byId.get(key)?.name || key }
-function openBuilding(key) { activeKey.value = key; showDialog.value = true }
-function openYieldBuilding(key) { activeYieldKey.value = key; showYieldDialog.value = true }
-
-function hasUpcomingYields(buildingKey) {
-  const entry = builtMap.value[buildingKey]
-  if (!entry?.built || !Array.isArray(entry.yields)) return false
-  return entry.yields.some(y => !y.processed)
+function openYieldBuilding(key) {
+  activeYieldKey.value = key
+  showYieldDialog.value = true
 }
 
-// Yield buildings installed on this island
 const islandYieldBuildings = computed(() => {
   const buildings = island.value?.buildings || {}
   const result = []
@@ -236,7 +191,6 @@ const islandYieldBuildings = computed(() => {
   return result.sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'))
 })
 
-// For the "add" dropdown — exclude already-installed ones
 const availableYieldBuildingsForSelect = computed(() => {
   const installedIds = new Set(islandYieldBuildings.value.map(yb => yb.yieldBuildingId))
   return yieldBuildingStore.yieldBuildings.filter(yb => !installedIds.has(yb.id))
@@ -244,7 +198,10 @@ const availableYieldBuildingsForSelect = computed(() => {
 
 async function addYieldBuildingToIsland() {
   addYieldError.value = ''
-  if (!selectedYieldBuildingId.value) { addYieldError.value = 'Оберіть будівлю.'; return }
+  if (!selectedYieldBuildingId.value) {
+    addYieldError.value = 'Оберіть будівлю.'
+    return
+  }
   addingYield.value = true
   try {
     const yb = yieldBuildingStore.byId.get(selectedYieldBuildingId.value)
@@ -262,207 +219,92 @@ async function addYieldBuildingToIsland() {
 
 <style scoped>
 .buildings-page {
-  padding-bottom: 16px;
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
-/* ── Map frame ──────────────────────────────────────────────── */
-.map-frame {
-  border: 2px solid var(--wi-border);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 6px 32px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.3);
-  background: #0a1a10;
+.legendkeeper-panel {
+  margin-bottom: 20px;
 }
 
-.island-map-wrap {
-  overflow: auto;
-  display: flex;
-  justify-content: center;
+.legendkeeper-frame-wrap {
+  min-height: 620px;
+  background: #0a0f0c;
 }
 
-.island-map {
-  position: relative;
-  width: 800px;
-  flex-shrink: 0;
-}
-
-.map-img {
+.legendkeeper-frame {
   display: block;
   width: 100%;
-  height: auto;
-  border-radius: 0;
-  filter: sepia(15%) contrast(105%) brightness(92%);
-}
-
-/* ── Building pins ──────────────────────────────────────────── */
-.building-pin {
-  position: absolute;
-  width: 72px;
-  height: 72px;
-  border-radius: 6px;
-  padding: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  background: rgba(30, 20, 10, 0.55);
-  border: 2px solid rgba(90, 62, 32, 0.5);
-  opacity: 0.55;
-  filter: grayscale(60%) brightness(0.7);
-}
-
-.building-pin img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.building-pin.built {
-  opacity: 1;
-  filter: none;
-  background: rgba(20, 12, 4, 0.4);
-  border: 2px solid rgba(200, 150, 42, 0.6);
-  box-shadow: 0 0 10px rgba(200, 150, 42, 0.3), 0 0 4px rgba(200, 150, 42, 0.2);
-}
-
-.building-pin:hover {
-  transform: scale(2.1);
-  z-index: 10;
-  border-color: var(--wi-gold) !important;
-  box-shadow: 0 0 16px rgba(200, 150, 42, 0.6), 0 4px 12px rgba(0,0,0,0.6) !important;
-  filter: none !important;
-  opacity: 1 !important;
-}
-
-.building-pin.built .pin-glow {
-  position: absolute;
-  inset: -4px;
-  border-radius: 8px;
-  border: 1px solid rgba(200, 150, 42, 0.2);
-  animation: lantern-pulse 3s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes lantern-pulse {
-  0%, 100% { opacity: 0.3; }
-  50%       { opacity: 0.8; }
-}
-
-/* Yield badge on pins */
-.pin-yield-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  background: var(--wi-success);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #1a1209;
-  z-index: 2;
-}
-
-/* ── Yield buildings section ────────────────────────────────── */
-.yield-buildings-section {
-  margin-top: 20px;
-  border: 1px solid var(--wi-border);
-  border-radius: 8px;
-  background: rgba(44, 30, 15, 0.4);
-  overflow: hidden;
-}
-
-.yield-buildings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(90, 62, 32, 0.4);
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.yield-buildings-title {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-heading);
-  font-size: 0.78rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-}
-
-.add-yield-btn {
-  font-family: var(--wi-font-heading) !important;
-  font-size: 0.7rem !important;
-  letter-spacing: 0.05em !important;
-  color: var(--wi-gold) !important;
-  border-color: rgba(200, 150, 42, 0.3) !important;
+  height: min(74vh, 820px);
+  min-height: 620px;
+  border: 0;
 }
 
 .yield-buildings-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  gap: 10px;
 }
 
 .yield-building-card {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(90, 62, 32, 0.25);
+  padding: 12px 14px;
+  border: 1px solid rgba(90, 62, 32, 0.46);
+  border-radius: var(--wi-radius-sm);
+  background: rgba(12, 8, 4, 0.28);
+  color: inherit;
   cursor: pointer;
-  transition: background 0.15s ease;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.yield-building-card:last-child { border-bottom: none; }
-.yield-building-card:hover { background: rgba(200, 150, 42, 0.05); }
+.yield-building-card:hover {
+  border-color: rgba(200, 150, 42, 0.52);
+  background: rgba(200, 150, 42, 0.06);
+}
 
 .yield-building-icon {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  border-radius: 6px;
-  background: rgba(200, 150, 42, 0.08);
-  border: 1px solid rgba(200, 150, 42, 0.2);
+  border: 1px solid rgba(200, 150, 42, 0.24);
+  border-radius: var(--wi-radius-sm);
+  background: rgba(200, 150, 42, 0.09);
+  color: var(--wi-gold);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.yield-building-info { flex: 1; min-width: 0; }
+.yield-building-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .yield-building-name {
+  color: var(--wi-text);
   font-family: var(--wi-font-heading);
   font-size: 0.9rem;
-  color: var(--wi-text);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.025em;
 }
 
 .yield-building-next {
-  font-size: 0.78rem;
-  margin-top: 2px;
-}
-
-.yield-building-chevron { color: var(--wi-border) !important; flex-shrink: 0; }
-
-.yield-buildings-empty {
-  padding: 20px 16px;
-  font-size: 0.85rem;
+  margin-top: 3px;
   color: var(--wi-text-muted);
-  font-style: italic;
-  text-align: center;
+  font-size: 0.8rem;
 }
 
-/* Add yield dialog */
-.add-yield-card {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
-  border: 1px solid var(--wi-gold) !important;
+.yield-building-chevron {
+  color: var(--wi-border) !important;
+  flex-shrink: 0;
 }
 
-.add-yield-card-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--wi-border);
+@media (max-width: 760px) {
+  .legendkeeper-frame-wrap,
+  .legendkeeper-frame {
+    min-height: 520px;
+  }
 }
 </style>
