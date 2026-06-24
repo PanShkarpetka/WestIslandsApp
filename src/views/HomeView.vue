@@ -159,7 +159,7 @@
           <WiPanel class="highlight-panel" variant="parchment">
             <article class="highlight-card">
               <div class="highlight-icon">
-                <v-icon size="30">mdi-fish</v-icon>
+                <v-icon size="42">mdi-fish</v-icon>
               </div>
               <div>
                 <div class="card-label">Найкращий улов риби</div>
@@ -181,7 +181,7 @@
           <WiPanel class="highlight-panel" variant="parchment">
             <article class="highlight-card">
               <div class="highlight-icon">
-                <v-icon size="30">mdi-anvil</v-icon>
+                <v-icon size="42">mdi-anvil</v-icon>
               </div>
               <div>
                 <div class="card-label">Найкращий герой-ремісник</div>
@@ -203,7 +203,7 @@
           <WiPanel class="highlight-panel" variant="parchment">
             <article class="highlight-card">
               <div class="highlight-icon">
-                <v-icon size="30">mdi-magic-staff</v-icon>
+                <v-icon size="42">mdi-magic-staff</v-icon>
               </div>
               <div>
                 <div class="card-label">Найкраще магічне прохання</div>
@@ -225,7 +225,7 @@
           <WiPanel class="highlight-panel" variant="parchment">
             <article class="highlight-card">
               <div class="highlight-icon">
-                <v-icon size="30">mdi-candle</v-icon>
+                <v-icon size="42">mdi-candle</v-icon>
               </div>
               <div>
                 <div class="card-label">Найбільше витрачено віри</div>
@@ -655,38 +655,82 @@ onMounted(async () => {
 }
 
 .highlight-panel {
-  border-color: rgba(200, 150, 42, 0.46);
+  position: relative;
+  border-color: rgba(66, 39, 13, 0.92);
   background:
-    linear-gradient(145deg, rgba(221, 194, 136, 0.96), rgba(174, 132, 67, 0.92)) !important;
+    radial-gradient(circle at 12% 18%, rgba(255, 235, 174, 0.42), transparent 32%),
+    radial-gradient(circle at 88% 82%, rgba(95, 51, 17, 0.18), transparent 34%),
+    linear-gradient(145deg, #d9bd7c 0%, #caa463 48%, #aa7f3f 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 236, 178, 0.3),
+    inset 0 0 34px rgba(59, 31, 10, 0.24),
+    0 10px 22px rgba(0, 0, 0, 0.34);
+}
+
+.highlight-panel::before,
+.highlight-panel::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.highlight-panel::before {
+  inset: 8px;
+  border: 1px solid rgba(71, 42, 15, 0.32);
+  border-radius: calc(var(--wi-radius-md) - 2px);
+}
+
+.highlight-panel::after {
+  right: -26px;
+  bottom: -28px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(51, 30, 11, 0.22), transparent 62%);
+}
+
+.highlight-panel :deep(.wi-panel__body) {
+  position: relative;
+  z-index: 1;
+  padding: 22px 24px;
 }
 
 .highlight-card {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  gap: 12px;
-  min-height: 220px;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 230px;
 }
 
 .highlight-icon {
-  color: var(--wi-copper);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  color: rgba(83, 47, 19, 0.88);
+  filter: drop-shadow(0 1px 0 rgba(255, 236, 178, 0.32));
 }
 
 .highlight-card h3 {
-  margin: 8px 0 12px;
-  font-size: 1.08rem;
+  margin: 10px 0 14px;
+  color: #2a1908;
+  font-size: 1.24rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
 }
 
 .highlight-card dl {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
 }
 
 .highlight-card dd {
-  margin: 4px 0 0;
-  color: var(--wi-bg);
+  margin: 5px 0 0;
+  color: #1b1005;
   font-family: var(--wi-font-body);
-  font-size: 0.98rem;
+  font-size: 1.04rem;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -698,12 +742,14 @@ onMounted(async () => {
 
 .highlight-card .card-label,
 .highlight-card dt {
-  color: rgba(26, 18, 9, 0.74);
+  color: rgba(50, 29, 10, 0.76);
 }
 
-.highlight-card h3,
-.highlight-card dd {
-  color: var(--wi-bg);
+.highlight-card .card-label {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(69, 41, 15, 0.28);
+  color: rgba(42, 25, 8, 0.74);
+  font-size: 0.72rem;
 }
 
 @media (max-width: 1180px) {
