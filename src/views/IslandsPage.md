@@ -9,10 +9,11 @@ Layout shell for island-scoped pages. Renders the plank-tab navigation bar and a
 | Tab label | Route | Component |
 |-----------|-------|-----------|
 | Інфо | `/islands/:islandId` | `IslandInfoPage` |
-| Будівлі | `/islands/:islandId/buildings` | `BuildingsPage` |
+| Мапа | `/islands/:islandId/buildings` | `BuildingsPage` |
 | Населення | `/islands/:islandId/population` | `PopulationPage` |
 | Скарбниця | `/islands/:islandId/treasury` | `TreasuryPage` |
 | Мануфактури | `/islands/:islandId/manufactures` | `ManufacturesPage` |
+| Будівлі | `/islands/:islandId/yield-buildings` | `YieldBuildingsPage` |
 
 See each child page's `.md` for details.
 
