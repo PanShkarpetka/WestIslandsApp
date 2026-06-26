@@ -19,13 +19,18 @@ export const useIslandStore = defineStore('islands', () => {
     function subscribe (id = currentId.value) {
         stop()
         loading.value = true
+        error.value = null
         const refDoc = doc(db, 'islands', id)
         _unsub = onSnapshot(refDoc, snap => {
             const raw = snap.exists() ? snap.data() : {}
 
             const buildings = { ...(raw.buildings || {}) }
             data.value = { id: snap.id, ...raw, buildings }
-        }, e => { error.value = e?.message || String(e) })
+            loading.value = false
+        }, e => {
+            error.value = e?.message || String(e)
+            loading.value = false
+        })
     }
 
     async function loadOnce (id = currentId.value) {

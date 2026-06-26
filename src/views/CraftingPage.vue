@@ -1,38 +1,33 @@
 <template>
   <v-container class="crafting-page pb-8">
-    <v-sheet class="hero-banner pa-5 pa-md-8 mb-5" rounded="xl">
-      <div class="d-flex flex-column flex-md-row justify-space-between ga-4">
-        <div>
-          <h1 class="text-h3 font-weight-bold mb-2">Майстерність крафту</h1>
-          <p class="text-body-1 text-medium-emphasis text-info mb-0">
-            Панель прогресу для категорій, сабкатегорій, спеціалізації та розрахунку ціни компонентів.
-          </p>
-        </div>
+    <WiPageHeader
+      title="Майстерність крафту"
+      subtitle="Прогрес категорій, підкатегорій, спеціалізації та розрахунок ціни компонентів для вибраного персонажа."
+      icon="mdi-anvil"
+    >
+      <template #actions>
+        <WiActionButton tone="sea" variant="tonal" prepend-icon="mdi-refresh" @click="loadData">Оновити</WiActionButton>
+        <WiActionButton
+          v-if="canSubmitCraftRequest"
+          tone="success"
+          variant="tonal"
+          prepend-icon="mdi-file-document-plus"
+          @click="requestDialog = true"
+        >
+          Подати крафт
+        </WiActionButton>
+        <WiActionButton
+          v-if="isAdmin"
+          prepend-icon="mdi-hammer"
+          @click="craftDialog = true"
+        >
+          Додати крафт
+        </WiActionButton>
+      </template>
+    </WiPageHeader>
 
-        <div class="d-flex flex-wrap ga-2 align-start">
-          <v-btn color="info" variant="tonal" prepend-icon="mdi-refresh" @click="loadData">Оновити</v-btn>
-          <v-btn
-            v-if="canSubmitCraftRequest"
-            color="success"
-            prepend-icon="mdi-file-document-plus"
-            @click="requestDialog = true"
-          >
-            Подати крафт
-          </v-btn>
-          <v-btn
-            v-if="isAdmin"
-            color="primary"
-            prepend-icon="mdi-hammer"
-            @click="craftDialog = true"
-          >
-            Додати крафт
-          </v-btn>
-        </div>
-      </div>
-    </v-sheet>
-
-    <v-row dense class="mb-5">
-      <v-col cols="12" md="6" lg="4">
+    <WiDataToolbar>
+      <div class="crafting-control crafting-control--hero">
         <v-select
             v-model="selectedHeroId"
             :items="heroOptions"
@@ -40,10 +35,9 @@
             prepend-inner-icon="mdi-account"
             hide-details
             density="comfortable"
-            class="rounded-lg"
         />
-      </v-col>
-      <v-col cols="12" md="6" lg="4">
+      </div>
+      <div class="crafting-control crafting-control--switch">
         <v-switch
             v-model="showUncraftedItems"
             color="info"
@@ -51,23 +45,20 @@
             hide-details
             label="Показати предмети, які ще не були вироблені персонажем"
         />
-      </v-col>
-      <v-col cols="12" lg="4" class="d-flex align-center justify-lg-end">
+      </div>
+      <template #summary>
         <v-chip color="success" variant="tonal" size="large">
           Сумарна знижка: {{ highestDiscountLabel }}
         </v-chip>
-      </v-col>
-    </v-row>
+      </template>
+    </WiDataToolbar>
 
-    <v-card v-if="canSubmitCraftRequest" rounded="xl" class="panel-card mb-5" elevation="2">
-      <v-card-title class="d-flex flex-column flex-sm-row justify-space-between align-start align-sm-center ga-2">
-        <span>Мої заявки на крафт</span>
+    <WiPanel v-if="canSubmitCraftRequest" title="Мої заявки на крафт" icon="mdi-file-document-plus" class="mb-5">
+      <template #actions>
         <v-chip v-if="pendingPlayerRequestCount" color="warning" variant="tonal" size="small">
           Очікують: {{ pendingPlayerRequestCount }}
         </v-chip>
-      </v-card-title>
-      <v-divider />
-      <v-card-text>
+      </template>
         <v-alert v-if="craftRequestListError" type="error" variant="tonal" class="mb-3">
           {{ craftRequestListError }}
         </v-alert>
@@ -119,33 +110,23 @@
         <v-alert v-else type="info" variant="tonal">
           Після подачі заявки її статус з'явиться тут.
         </v-alert>
-      </v-card-text>
-    </v-card>
+    </WiPanel>
 
     <v-row class="mb-5" dense>
       <v-col cols="12" md="6" lg="3" v-for="card in summaryCards" :key="card.label">
-        <v-card class="metric-card" rounded="lg">
-          <v-card-text>
-            <div class="metric-label">{{ card.label }}</div>
-            <div class="metric-value">{{ card.value }}</div>
-            <div class="metric-subtext">{{ card.subtext }}</div>
-          </v-card-text>
-        </v-card>
+        <WiMetricCard :label="card.label" :value="card.value" :note="card.subtext" />
       </v-col>
     </v-row>
 
     <v-row dense class="mb-5">
       <v-col cols="12" lg="7">
-        <v-card rounded="xl" class="panel-card mb-5" elevation="2">
-          <v-card-title class="d-flex justify-space-between align-center">
-            <span>Прогрес крафту персонажа</span>
+        <WiPanel title="Прогрес крафту персонажа" icon="mdi-chart-line" class="mb-5">
+          <template #actions>
             <v-chip color="success" variant="tonal">
               {{ selectedHero?.name || 'Не вибрано' }}
             </v-chip>
-          </v-card-title>
-          <v-divider />
-          <v-card-text>
-            <div class="text-subtitle-1 mb-1 font-weight-bold">Прогрес категорії</div>
+          </template>
+            <WiSectionHeader title="Прогрес категорії" />
             <v-row>
               <v-col v-for="category in categoryRows" :key="category.key" cols="12" md="6">
                 <CraftingProgressBar
@@ -157,25 +138,22 @@
               </v-col>
             </v-row>
 
-            <div class="text-subtitle-1 mt-4 mb-1 font-weight-bold">Прогрес підкатегорії</div>
+            <WiSectionHeader title="Прогрес підкатегорії" class="mt-4" />
             <v-row>
               <v-col v-for="subcategory in subcategoryRows" :key="subcategory.key" cols="12" md="6">
                 <CraftingProgressBar
                   :label="`${subcategory.category} / ${subcategory.name} • ${subcategory.discountPercent.toFixed(2)}%`"
                   :value="subcategory.current"
                   :max="subcategory.max"
-                  color="deep-purple-accent-2"
+                  color="info"
                 />
               </v-col>
             </v-row>
-          </v-card-text>
-        </v-card>
+        </WiPanel>
       </v-col>
 
       <v-col cols="12" lg="5">
-        <v-card rounded="xl" class="panel-card mb-5" elevation="2">
-          <v-card-title>Найпопулярніші вироби</v-card-title>
-          <v-divider />
+        <WiPanel title="Найпопулярніші вироби" icon="mdi-star-four-points" class="mb-5" flush>
           <v-list density="comfortable" class="bg-transparent">
             <v-list-item
               v-for="row in craftedHighlights"
@@ -189,12 +167,13 @@
             </v-list-item>
             <v-list-item v-if="!craftedHighlights.length" title="Вироби відсутні" subtitle="Надайте майстру список виробів" />
           </v-list>
-        </v-card>
+        </WiPanel>
 
-        <v-card rounded="xl" class="panel-card" elevation="2">
-          <v-card-title>Калькулятор крафту</v-card-title>
-          <v-card-subtitle>Швидкий підрахунок фінальної ціни компонентів з врахуванням майстерності.</v-card-subtitle>
-          <v-card-text>
+        <WiPanel
+          title="Калькулятор крафту"
+          subtitle="Швидкий підрахунок фінальної ціни компонентів з врахуванням майстерності."
+          icon="mdi-calculator"
+        >
             <v-row dense>
               <v-col cols="12" md="6">
                 <v-select
@@ -254,18 +233,17 @@
                 <span class="text-success">{{ formatNumber(calculatorResult?.finalTotalComponentPrice) }}</span>
               </div>
               <div class="text-caption text-medium-emphasis mt-3">
-                Days: {{ (selectedItem?.craftDays ?? 0) * (calculatorResult?.amount) }} • DC: {{ selectedItem?.dc ?? 0 }}
+                Днів: {{ craftDaysTotal }} • СК: {{ selectedItem?.dc ?? 0 }}
               </div>
             </v-sheet>
-          </v-card-text>
-        </v-card>
+        </WiPanel>
       </v-col>
     </v-row>
 
     <v-expansion-panels variant="accordion" class="mb-4">
       <v-expansion-panel>
         <v-expansion-panel-title>
-          Прогрес майстерності крафту предметів ({{ visibleCraftRows.length }} rows)
+          Прогрес майстерності крафту предметів ({{ visibleCraftRows.length }} рядків)
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <v-table density="comfortable">
@@ -289,7 +267,7 @@
                 <td>{{ row.progress.craftedAmount }}</td>
                 <td>
                   <CraftingProgressBar
-                    label="Category"
+                    label="Категорія"
                     :value="row.progress.categoryContribution"
                     :max="100"
                     color="info"
@@ -299,17 +277,17 @@
                 </td>
                 <td>
                   <CraftingProgressBar
-                    label="Subcategory"
+                    label="Підкатегорія"
                     :value="row.progress.subcategoryContribution"
                     :max="100"
-                    color="deep-purple-accent-2"
+                    color="info"
                     :capped="row.progress.subcategoryCapped"
                     capped-hint="Прогрес цього предмета в даній підкатегорії досягнув максимуму"
                   />
                 </td>
                 <td>
                   <CraftingProgressBar
-                    label="Item mastery"
+                    label="Майстерність предмета"
                     :value="row.progress.specializationProgress"
                     :max="100"
                     color="amber"
@@ -365,6 +343,12 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import CraftingProgressBar from '@/components/crafting/CraftingProgressBar.vue';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
+import WiActionButton from '@/components/ui/WiActionButton.vue';
+import WiDataToolbar from '@/components/ui/WiDataToolbar.vue';
+import WiMetricCard from '@/components/ui/WiMetricCard.vue';
+import WiPageHeader from '@/components/ui/WiPageHeader.vue';
+import WiPanel from '@/components/ui/WiPanel.vue';
+import WiSectionHeader from '@/components/ui/WiSectionHeader.vue';
 import {
   cancelCraftingRequest,
   getEmptyCraftingState,
@@ -445,6 +429,7 @@ const highestDiscountLabel = computed(() => `${highestDiscount.value.toFixed(1)}
 const pendingPlayerRequestCount = computed(() =>
   playerCraftRequests.value.filter((request) => request.status === 'pending').length,
 );
+const craftDaysTotal = computed(() => (selectedItem.value?.craftDays ?? 0) * (calculatorResult.value?.amount ?? 0));
 
 const summaryCards = computed(() => {
   const rows = craftRows.value;
@@ -585,82 +570,20 @@ onBeforeUnmount(() => stopPlayerCraftRequests?.());
 </script>
 
 <style scoped>
-.crafting-page { /* inherits page background from theme */ }
-
-/* ── Hero banner ─────────────────────────────────────────────── */
-.hero-banner {
-  background: linear-gradient(135deg, rgba(12, 8, 4, 0.92) 0%, rgba(30, 18, 6, 0.88) 100%);
-  border: 1px solid var(--wi-border);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+.crafting-page {
+  padding-top: 24px;
 }
 
-.hero-banner h1 {
-  font-family: var(--wi-font-heading);
-  color: var(--wi-gold);
-  letter-spacing: 0.04em;
+.crafting-control {
+  min-width: 220px;
 }
 
-.hero-banner p {
-  font-family: var(--wi-font-body);
-  color: var(--wi-text-muted);
+.crafting-control--hero {
+  flex: 0 1 360px;
 }
 
-/* ── Summary metric cards ────────────────────────────────────── */
-.metric-card {
-  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
-  border: 1px solid var(--wi-border) !important;
-}
-
-.metric-label {
-  font-family: var(--wi-font-heading);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-  margin-bottom: 6px;
-}
-
-.metric-value {
-  font-family: var(--wi-font-heading);
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--wi-gold);
-  line-height: 1.1;
-  margin-bottom: 4px;
-}
-
-.metric-subtext {
-  font-family: var(--wi-font-body);
-  font-size: 0.72rem;
-  color: var(--wi-text-muted);
-}
-
-/* ── Panel cards (progress + calculator) ────────────────────── */
-.panel-card {
-  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
-  border: 1px solid var(--wi-border) !important;
-}
-
-.panel-card :deep(.v-card-title) {
-  font-family: var(--wi-font-heading);
-  font-size: 0.88rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--wi-gold);
-  padding-bottom: 12px;
-}
-
-.panel-card :deep(.v-card-subtitle) {
-  font-family: var(--wi-font-body);
-  color: var(--wi-text-muted);
-}
-
-.panel-card :deep(.text-subtitle-1) {
-  font-family: var(--wi-font-heading);
-  font-size: 0.76rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
+.crafting-control--switch {
+  flex: 1 1 360px;
 }
 
 /* ── Calculator result sheet ─────────────────────────────────── */
@@ -728,15 +651,21 @@ onBeforeUnmount(() => stopPlayerCraftRequests?.());
 }
 
 /* ── List (top crafted items) ────────────────────────────────── */
-.panel-card :deep(.v-list-item-title) {
+.crafting-page :deep(.v-list-item-title) {
   font-family: var(--wi-font-body);
   color: var(--wi-text);
 }
 
-.panel-card :deep(.v-list-item-subtitle) {
+.crafting-page :deep(.v-list-item-subtitle) {
   font-family: var(--wi-font-body);
   color: var(--wi-text-muted);
 }
 
-.panel-card :deep(.v-divider) { border-color: var(--wi-border) !important; }
+.crafting-page :deep(.v-divider) { border-color: var(--wi-border) !important; }
+
+@media (max-width: 760px) {
+  .crafting-control {
+    width: 100%;
+  }
+}
 </style>

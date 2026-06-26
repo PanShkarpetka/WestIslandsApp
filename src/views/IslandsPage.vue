@@ -48,10 +48,11 @@ const islandName = 'Камінь'
 
 const tabs = [
   { to: `/islands/${islandName}`,              icon: 'mdi-information-outline', label: 'Інфо' },
-  { to: `/islands/${islandName}/buildings`,    icon: 'mdi-chess-rook',          label: 'Будівлі' },
+  { to: `/islands/${islandName}/buildings`,    icon: 'mdi-map',                 label: 'Мапа' },
   { to: `/islands/${islandName}/population`,   icon: 'mdi-account-group',       label: 'Населення' },
   { to: `/islands/${islandName}/treasury`,     icon: 'mdi-treasure-chest',      label: 'Скарбниця' },
   { to: `/islands/${islandName}/manufactures`, icon: 'mdi-factory',             label: 'Мануфактури' },
+  { to: `/islands/${islandName}/yield-buildings`, icon: 'mdi-sprout',           label: 'Будівлі' },
 ]
 
 const islandStore = useIslandStore()
