@@ -22,7 +22,7 @@ import { db } from './firebase.js'
 import { formatAmount } from '../utils/formatters.js'
 import { normalizeAmount } from '../utils/numbers.js'
 import { BUILDING_LEVEL_BONUSES } from '../config/religion.js'
-import { DEFAULT_ISLAND_ID } from '../config/constants.js'
+import { DEFAULT_ISLAND_ID, PSEUDO_RELIGION_ID } from '../config/constants.js'
 import { generateSpellRequestsForCycle, settlePreviousSpellRequests } from './mageGuildService.js'
 
 function normalizeIncomeDestination(value) {
@@ -462,6 +462,48 @@ export async function distributeBuildingFaithIncome(cycleId, {
   }
 }
 
+/**
+ * Consumes the Deva's monthly faith when a newly-created cycle starts a new
+ * Faerun month. The transaction and cycle marker make retries idempotent.
+ */
+export async function consumeDevaFaithForMonthChange(cycleId, currentStartedAt, previousStartedAt, {
+  doc: docFn = doc,
+  runTransaction: runTransactionFn = runTransaction,
+  db: firestoreDb = db,
+} = {}) {
+  const current = typeof currentStartedAt === 'string' ? parseFaerunDate(currentStartedAt) : currentStartedAt
+  const previous = typeof previousStartedAt === 'string' ? parseFaerunDate(previousStartedAt) : previousStartedAt
+
+  if (!cycleId || !current || !previous) return false
+  if (current.day !== 1 || (current.month === previous.month && current.year === previous.year)) return false
+
+  const devaRef = docFn(firestoreDb, 'religions', PSEUDO_RELIGION_ID, 'customs', 'Deva')
+  let consumed = false
+
+  await runTransactionFn(firestoreDb, async (transaction) => {
+    const snap = await transaction.get(devaRef)
+    const data = snap.data() || {}
+    if (data.lastConsumedCycleId === cycleId) return
+
+    const faithPerDay = Math.max(0, Number(data.devaFaithPerDay ?? 1))
+    const currentFaith = Math.max(0, Number(data.devaFaith ?? 0))
+    const newFaith = currentFaith - faithPerDay * 30
+    const updates = { lastConsumedCycleId: cycleId }
+
+    if (newFaith < 0) {
+      updates.devaFaith = 0
+      updates.deathMarkers = Math.min(3, Number(data.deathMarkers ?? 0) + 1)
+    } else {
+      updates.devaFaith = newFaith
+    }
+
+    transaction.set(devaRef, updates, { merge: true })
+    consumed = true
+  })
+
+  return consumed
+}
+
 export async function applyParkBuildingGrowth(islandId, {
   collection: collectionFn = collection,
   doc: docFn = doc,
@@ -795,6 +837,12 @@ export async function createNewCycleWithEffects({
     }, { merge: true })
   }
 
+  await consumeDevaFaithForMonthChange(
+    cycleDoc.id,
+    normalizedStart,
+    lastCycleDoc?.data().startedAt,
+    sharedDeps,
+  )
   await resetReligionsSvTemp(sharedDeps)
   await addDocFn(collectionFn(firestoreDb, 'religion-actions'), {
     actionType: docFn(firestoreDb, 'religion-action-types', 'cycleStart'),

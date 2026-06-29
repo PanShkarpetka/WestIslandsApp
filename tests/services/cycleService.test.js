@@ -5,6 +5,7 @@ import {
   loadManufacturesByIds,
   distributeManufactureIncome,
   distributeBuildingFaithIncome,
+  consumeDevaFaithForMonthChange,
   createNewCycleWithEffects,
 } from '../../src/services/cycleService.js';
 import { createMockFirestore } from '../helpers/mockFirestore.js';
@@ -454,6 +455,59 @@ test('distributeBuildingFaithIncome skips clergy with passiveOVInactive hero', a
   assert.equal(mock.get('clergy/c1').faith, 0);
 });
 
+// ─── consumeDevaFaithForMonthChange ─────────────────────────────────────────
+
+test('consumeDevaFaithForMonthChange deducts 30 days of faith at a new month', async () => {
+  const mock = createMockFirestore({
+    'religions/psevdo/customs/Deva': { devaFaith: 80, devaFaithPerDay: 2, deathMarkers: 0 },
+  });
+
+  const consumed = await consumeDevaFaithForMonthChange(
+    'cycle-new',
+    { day: 1, month: 2, year: 1490 },
+    { day: 24, month: 1, year: 1490 },
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(consumed, true);
+  assert.equal(mock.get('religions/psevdo/customs/Deva').devaFaith, 20);
+  assert.equal(mock.get('religions/psevdo/customs/Deva').lastConsumedCycleId, 'cycle-new');
+});
+
+test('consumeDevaFaithForMonthChange ignores cycles that do not start a new month', async () => {
+  const mock = createMockFirestore({
+    'religions/psevdo/customs/Deva': { devaFaith: 80, devaFaithPerDay: 2 },
+  });
+
+  const consumed = await consumeDevaFaithForMonthChange(
+    'cycle-new',
+    { day: 8, month: 2, year: 1490 },
+    { day: 1, month: 2, year: 1490 },
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(consumed, false);
+  assert.equal(mock.get('religions/psevdo/customs/Deva').devaFaith, 80);
+});
+
+test('consumeDevaFaithForMonthChange is idempotent for the same cycle', async () => {
+  const mock = createMockFirestore({
+    'religions/psevdo/customs/Deva': { devaFaith: 80, devaFaithPerDay: 1 },
+  });
+  const args = [
+    'cycle-new',
+    { day: 1, month: 2, year: 1490 },
+    { day: 24, month: 1, year: 1490 },
+    { ...mock.firebase, db: mock.db },
+  ];
+
+  await consumeDevaFaithForMonthChange(...args);
+  const consumedAgain = await consumeDevaFaithForMonthChange(...args);
+
+  assert.equal(consumedAgain, false);
+  assert.equal(mock.get('religions/psevdo/customs/Deva').devaFaith, 50);
+});
+
 // ─── createNewCycleWithEffects ───────────────────────────────────────────────
 
 test('createNewCycleWithEffects creates cycle doc with startedAt', async () => {
@@ -514,6 +568,29 @@ test('createNewCycleWithEffects closes open previous cycle', async () => {
   assert.equal(summary.populationBefore, 90);
   assert.equal(summary.populationAfter, 120);
   assert.equal(summary.populationDelta, 30);
+});
+
+test('createNewCycleWithEffects consumes Deva faith when the new cycle changes month', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '24 Alturiak 1490', createdAt: 'old' },
+    'religions/psevdo/customs/Deva': { devaFaith: 70, devaFaithPerDay: 2, deathMarkers: 0 },
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  const result = await createNewCycleWithEffects(
+    { startedDate: { day: 1, month: 2, year: 1490 }, islandId: 'island_rock' },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  const deva = mock.get('religions/psevdo/customs/Deva');
+  assert.equal(deva.devaFaith, 10);
+  assert.equal(deva.lastConsumedCycleId, result.id);
 });
 
 test('createNewCycleWithEffects pays Coin Pig for the closed previous cycle', async () => {
