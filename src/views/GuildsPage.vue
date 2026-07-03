@@ -2,17 +2,19 @@
   <v-container class="guilds-page">
 
     <!-- Header -->
-    <div class="guilds-header">
-      <div class="guilds-title">
-        <v-icon class="mr-2" size="20">mdi-shield-sword</v-icon>
-        Гільдії острова
-      </div>
-      <v-btn v-if="user.isAdmin" class="add-guild-btn" prepend-icon="mdi-plus" @click="openCreateDialog">Додати гільдію</v-btn>
-    </div>
+    <WiPageHeader title="Гільдії острова" icon="mdi-shield-sword">
+      <template #actions>
+        <WiActionButton v-if="isAdmin" prepend-icon="mdi-plus" @click="openCreateDialog">Додати гільдію</WiActionButton>
+      </template>
+    </WiPageHeader>
 
-    <div v-if="store.error" class="guilds-error">
-      <v-icon class="mr-2" size="14">mdi-skull-crossbones</v-icon>{{ store.error }}
-    </div>
+    <WiPanel v-if="store.error" variant="danger">
+      <WiEmptyState title="Не вдалося завантажити гільдії" :text="store.error" icon="mdi-alert-circle" />
+    </WiPanel>
+
+    <WiPanel v-else-if="!visibleGuilds.length">
+      <WiEmptyState title="Доступні гільдії відсутні" icon="mdi-shield-off-outline" />
+    </WiPanel>
 
     <!-- Guild cards -->
     <v-row>
@@ -57,10 +59,10 @@
           <!-- Footer actions -->
           <div class="guild-actions" @click.stop>
             <v-btn class="guild-deposit-btn" size="small" prepend-icon="mdi-tray-arrow-down" @click="openTransaction(guild, 'deposit')">Внести</v-btn>
-            <v-btn v-if="user.isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
+            <v-btn v-if="isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
             <v-btn v-if="canManageGuildGoods(guild)" class="guild-goods-btn" size="small" prepend-icon="mdi-package-variant" variant="tonal" @click="openGoodsDialog(guild)">Товари</v-btn>
             <v-spacer />
-            <v-btn v-if="user.isAdmin" size="small" variant="text" icon="mdi-feather" class="guild-edit-btn" @click="openEditDialog(guild)" />
+            <v-btn v-if="isAdmin" size="small" variant="text" icon="mdi-feather" class="guild-edit-btn" @click="openEditDialog(guild)" />
           </div>
 
           <div v-if="canViewGuildLogs(guild)" class="guild-log-hint">
@@ -110,7 +112,7 @@
           <v-text-field v-model.number="txAmount" label="Сума (золото)" type="number" min="0.01" step="0.01" variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-gold" />
           <v-textarea v-model="txComment" label="Коментар" rows="2" auto-grow variant="outlined" density="compact" hide-details="auto" class="mb-3" prepend-inner-icon="mdi-feather" />
           <v-text-field
-            v-if="txMode === 'withdraw' && !user.isAdmin"
+            v-if="txMode === 'withdraw' && !isAdmin"
             v-model="txPassword"
             label="Пароль гільдії"
             type="password"
@@ -234,7 +236,7 @@
           </v-btn-toggle>
 
           <v-text-field
-            v-if="goodsTxMode === 'withdraw' && !user.isAdmin"
+            v-if="goodsTxMode === 'withdraw' && !isAdmin"
             v-model="goodsTxPassword"
             label="Пароль гільдії"
             type="password"
@@ -309,10 +311,15 @@ import { useGuildStore } from '@/store/guildStore'
 import { useUserStore } from '@/store/userStore'
 import { useGoodsStore } from '@/store/goodsStore'
 import { formatAmount } from '@/utils/formatters'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const store = useGuildStore()
 const user = useUserStore()
 const goodsStore = useGoodsStore()
+const isAdmin = computed(() => user.isAdmin ?? false)
 
 const showGuildDialog = ref(false)
 const showTxDialog = ref(false)
@@ -337,7 +344,7 @@ const logsError = ref('')
 
 const visibleGuilds = computed(() =>
   store.guilds.filter((guild) => {
-    if (user.isAdmin) return true
+    if (isAdmin.value) return true
     if (guild.visibleToAll) return true
     return user.canAccessGuild(guild.id)
   })
@@ -345,13 +352,13 @@ const visibleGuilds = computed(() =>
 
 function canViewGuildLogs(guild) {
   if (!guild) return false
-  if (user.isAdmin) return true
+  if (isAdmin.value) return true
   return user.canAccessGuild(guild.id)
 }
 
 function canManageGuildGoods(guild) {
   if (!guild) return false
-  if (user.isAdmin) return true
+  if (isAdmin.value) return true
   return user.canAccessGuild(guild.id)
 }
 
@@ -421,7 +428,7 @@ async function submitTransaction() {
 }
 
 function hasWithdrawAccess(guild, password) {
-  if (user.isAdmin) return true
+  if (isAdmin.value) return true
   return user.nickname === (guild?.withdrawUsername || '') && password === (guild?.withdrawPassword || '')
 }
 
