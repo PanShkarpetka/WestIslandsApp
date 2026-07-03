@@ -4,6 +4,7 @@ Route: `/admin` - `adminOnly: true` (redirects to `/` if not admin).
 
 ## Purpose
 Admin control panel. The page is organized into Vuetify tabs so large admin workflows stay separated while sharing the same loaded data and dialogs.
+Tabs change only through the tab controls; swipe navigation is disabled so horizontal touch gestures do not switch sections on mobile.
 
 ## Sections
 | Tab | Sub-file |

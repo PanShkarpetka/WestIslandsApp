@@ -13,7 +13,7 @@
         <v-tab value="logs" prepend-icon="mdi-format-list-bulleted">Лог подій</v-tab>
       </v-tabs>
 
-      <v-window v-model="adminTab" class="admin-tab-window">
+      <v-window v-model="adminTab" :touch="false" class="admin-tab-window">
         <v-window-item value="cycles">
       <v-card-title class="text-h6">Керування циклами</v-card-title>
       <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">{{ cycleError }}</v-alert>
@@ -42,14 +42,66 @@
           class="mb-3"
         />
         <v-textarea
-          v-model="cycleForm.notes"
-          label="Нотатки до дії"
+          v-model="cycleForm.adventureTitle"
+          label="Назва пригоди"
           auto-grow
           rows="2"
+          :rules="[value => Boolean(String(value || '').trim()) || 'Вкажіть назву пригоди']"
           density="comfortable"
           hide-details="auto"
           class="mb-3"
         />
+        <template v-if="latestCycle">
+          <v-autocomplete
+            v-model="cycleForm.participantHeroIds"
+            :items="activeHeroOptions"
+            item-title="name"
+            item-value="id"
+            label="Учасники пригоди"
+            multiple
+            chips
+            closable-chips
+            density="comfortable"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-text-field
+            v-model.number="cycleForm.expeditionDurationDays"
+            label="Тривалість експедиції, днів (без 7 днів відпочинку)"
+            type="number"
+            min="1"
+            step="1"
+            density="comfortable"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <div class="text-subtitle-1 mb-2">Екіпаж</div>
+          <v-row v-for="(group, index) in cycleForm.crewGroups" :key="index" dense class="align-center mb-1">
+            <v-col cols="12" md="5">
+              <v-text-field v-model="group.role" label="Роль або група" density="comfortable" hide-details="auto" />
+            </v-col>
+            <v-col cols="5" md="2">
+              <v-text-field v-model.number="group.count" label="Кількість" type="number" min="1" step="1" density="comfortable" hide-details="auto" />
+            </v-col>
+            <v-col cols="5" md="3">
+              <v-text-field v-model.number="group.dailyRate" label="Зм за день кожному" type="number" min="0" step="0.01" density="comfortable" hide-details="auto" />
+            </v-col>
+            <v-col cols="2" md="2">
+              <v-btn icon="mdi-delete-outline" variant="text" color="error" :disabled="cycleForm.crewGroups.length === 1" @click="removeCrewGroup(index)" />
+            </v-col>
+          </v-row>
+          <v-btn variant="text" prepend-icon="mdi-plus" class="mb-3" @click="addCrewGroup">Додати групу</v-btn>
+          <v-alert type="info" variant="tonal" density="comfortable" class="mb-3">
+            {{ expeditionCostSummary }}
+          </v-alert>
+          <v-checkbox
+            v-model="cycleForm.autoDeductCrewPayment"
+            label="Автоматично списати оплату екіпажу порівну з учасників"
+            density="comfortable"
+            hide-details
+            class="mb-3"
+          />
+        </template>
         <v-btn color="primary" prepend-icon="mdi-play-circle-outline" :loading="cycleSaving" @click="createCycle">
           Почати новий цикл
         </v-btn>
@@ -64,6 +116,34 @@
           Підсумок релігій
         </v-btn>
       </v-form>
+
+      <v-card-title class="text-h6">Експедиції</v-card-title>
+      <v-data-table
+        :headers="expeditionHeaders"
+        :items="expeditionRows"
+        :items-per-page="10"
+        density="compact"
+        class="elevation-1 mb-6"
+      >
+        <template #item.participants="{ item }">{{ item.participants || 'Невідомо' }}</template>
+        <template #item.durationDays="{ item }">{{ item.durationDays ?? 'Невідомо' }}</template>
+        <template #item.totalCrewCount="{ item }">{{ item.totalCrewCount ?? 'Невідомо' }}</template>
+        <template #item.totalCost="{ item }">
+          <span>{{ item.totalCost == null ? 'Невідомо' : `${formatAmount(item.totalCost)} зм` }}</span>
+          <v-icon
+            v-if="item.paymentStatus"
+            :icon="expeditionPaymentIcon(item.paymentStatus)"
+            :color="expeditionPaymentColor(item.paymentStatus)"
+            :title="expeditionPaymentTitle(item.paymentStatus)"
+            size="small"
+            class="ml-1"
+          />
+          <v-icon v-else icon="mdi-help-circle-outline" color="grey" title="Статус списання невідомий" size="small" class="ml-1" />
+        </template>
+        <template #item.actions="{ item }">
+          <v-btn size="small" variant="text" color="primary" @click="openExpeditionEditor(item)">Редагувати</v-btn>
+        </template>
+      </v-data-table>
 
       <v-divider class="my-4" />
 
@@ -796,6 +876,47 @@
     </v-card>
   </v-container>
 
+  <v-dialog v-model="expeditionEditDialog" max-width="760">
+    <v-card>
+      <div class="pa-4" style="border-bottom: 1px solid var(--wi-border)">
+        <span class="wi-heading text-h6">Редагувати експедицію</span>
+      </div>
+      <v-card-text class="pt-4">
+        <v-alert v-if="expeditionEditError" type="error" variant="tonal" class="mb-3">{{ expeditionEditError }}</v-alert>
+        <div class="text-subtitle-1 mb-3">{{ expeditionEditForm.adventureTitle }}</div>
+        <v-autocomplete
+          v-model="expeditionEditForm.participantHeroIds"
+          :items="editableExpeditionHeroOptions"
+          item-title="name"
+          item-value="id"
+          label="Учасники пригоди"
+          multiple chips closable-chips
+          density="comfortable"
+          hide-details="auto"
+          class="mb-3"
+        />
+        <v-text-field v-model.number="expeditionEditForm.durationDays" label="Тривалість експедиції, днів" type="number" min="1" step="1" density="comfortable" hide-details="auto" class="mb-3" />
+        <div class="text-subtitle-1 mb-2">Екіпаж</div>
+        <v-row v-for="(group, index) in expeditionEditForm.crewGroups" :key="index" dense class="align-center mb-1">
+          <v-col cols="12" md="5"><v-text-field v-model="group.role" label="Роль або група" density="comfortable" hide-details="auto" /></v-col>
+          <v-col cols="5" md="2"><v-text-field v-model.number="group.count" label="Кількість" type="number" min="1" step="1" density="comfortable" hide-details="auto" /></v-col>
+          <v-col cols="5" md="3"><v-text-field v-model.number="group.dailyRate" label="Зм за день кожному" type="number" min="0" step="0.01" density="comfortable" hide-details="auto" /></v-col>
+          <v-col cols="2" md="2"><v-btn icon="mdi-delete-outline" variant="text" color="error" :disabled="expeditionEditForm.crewGroups.length === 1" @click="removeEditCrewGroup(index)" /></v-col>
+        </v-row>
+        <v-btn variant="text" prepend-icon="mdi-plus" @click="addEditCrewGroup">Додати групу</v-btn>
+        <v-alert type="warning" variant="tonal" density="comfortable" class="mt-3">
+          Збереження змін не створює нових списань або транзакцій. Статус оплати буде позначено сірим.
+        </v-alert>
+      </v-card-text>
+      <v-divider />
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="expeditionEditDialog = false">Скасувати</v-btn>
+        <v-btn color="primary" :loading="expeditionEditSaving" @click="saveExpeditionEdit">Зберегти</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <v-dialog v-model="showReligionSummaryDialog" max-width="620">
     <v-card>
       <div class="pa-4" style="border-bottom: 1px solid var(--wi-border)">
@@ -848,7 +969,7 @@ import { db } from '../services/firebase';
 import FaerunDatePicker from '@/components/FaerunDatePicker.vue';
 import { useIslandStore } from '@/store/islandStore';
 import { usePopulationStore } from '@/store/populationStore';
-import { createNewCycleWithEffects } from '@/services/cycleService';
+import { createNewCycleWithEffects, updateExpeditionDetails } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import {
   approveCraftingRequest,
@@ -862,6 +983,8 @@ import { getFirestoreTimestampMillis } from '@/utils/firestoreTimestamp.js';
 import { adjustHeroGoldBalance, SNAPSHOT_HISTORY_DEFAULT_OPEN } from '@/services/heroBalanceService.js';
 import { adjustHeroGoods } from '@/services/heroGoodsService.js';
 import { subscribeCurrentCycleUsedDays } from '@/services/usedDaysService.js';
+import { formatAmount } from '@/utils/formatters.js';
+import { getLegacyExpeditionDurationDays, isCycleStartAction } from '@/services/dashboardService.js';
 
 const adminTab = ref('cycles');
 const logEntries = ref([]);
@@ -871,6 +994,12 @@ const cycleSuccess = ref('');
 const latestCycle = ref(null);
 const previousCompletedCycle = ref(null);
 const allCycles = ref([]);
+const legacyAdventureTitlesByCycle = ref(new Map());
+const expeditionEditDialog = ref(false);
+const expeditionEditSaving = ref(false);
+const expeditionEditError = ref('');
+const expeditionEditCycleId = ref('');
+const expeditionEditForm = reactive({ adventureTitle: '', participantHeroIds: [], durationDays: 1, crewGroups: [] });
 const editCycleId = ref(null);
 const editCycleForm = reactive({ startedAt: null, finishedAt: null });
 const editCycleSaving = ref(false);
@@ -884,7 +1013,11 @@ const islandStore = useIslandStore();
 const populationStore = usePopulationStore();
 const cycleForm = reactive({
   startedDate: null,
-  notes: '',
+  adventureTitle: '',
+  participantHeroIds: [],
+  expeditionDurationDays: null,
+  crewGroups: [{ role: 'Моряки', count: 1, dailyRate: 2 }],
+  autoDeductCrewPayment: true,
 });
 const cycleDaysInput = ref(null);
 let _daysUpdatingDate = false;
@@ -1303,6 +1436,111 @@ const heroRows = computed(() =>
 );
 
 const heroOptions = computed(() => heroRows.value.map((hero) => ({ title: hero.name, value: hero.id })));
+const activeHeroOptions = computed(() => heroRows.value.filter((hero) => !hero.inactive).map((hero) => ({ id: hero.id, name: hero.name })));
+const expeditionHeaders = [
+  { title: 'Назва пригоди', key: 'adventureTitle' },
+  { title: 'Цикл', key: 'cycleLabel' },
+  { title: 'Днів', key: 'durationDays' },
+  { title: 'Учасники', key: 'participants' },
+  { title: 'Моряків', key: 'totalCrewCount' },
+  { title: 'Вартість', key: 'totalCost' },
+  { title: '', key: 'actions', sortable: false },
+];
+const expeditionRows = computed(() => allCycles.value
+  .filter((cycle) => cycle.finishedAt && (cycle.expedition?.adventureTitle || legacyAdventureTitlesByCycle.value.get(cycle.id)))
+  .map((cycle) => ({
+    id: cycle.id,
+    adventureTitle: cycle.expedition?.adventureTitle || legacyAdventureTitlesByCycle.value.get(cycle.id),
+    cycleLabel: `${cycle.startedAt || '—'} — ${cycle.finishedAt || '—'}`,
+    durationDays: cycle.expedition?.durationDays ?? getLegacyExpeditionDurationDays(cycle),
+    participants: cycle.expedition?.participants?.map((participant) => participant.heroName).join(', ') || '',
+    totalCrewCount: cycle.expedition?.totalCrewCount ?? null,
+    totalCost: cycle.expedition?.totalCost ?? null,
+    autoDeduct: cycle.expedition ? cycle.expedition.autoDeduct !== false : null,
+    paymentStatus: cycle.expedition?.paymentStatus || (cycle.expedition ? (cycle.expedition.autoDeduct !== false ? 'deducted' : 'skipped') : ''),
+    expedition: cycle.expedition || null,
+  })));
+
+const editableExpeditionHeroOptions = computed(() => heroRows.value
+  .filter((hero) => !hero.inactive || expeditionEditForm.participantHeroIds.includes(hero.id))
+  .map((hero) => ({ id: hero.id, name: hero.name })));
+
+function expeditionPaymentIcon(status) {
+  if (status === 'deducted') return 'mdi-check-circle';
+  if (status === 'skipped') return 'mdi-minus-circle-outline';
+  return 'mdi-pencil-circle-outline';
+}
+
+function expeditionPaymentColor(status) {
+  if (status === 'deducted') return 'success';
+  if (status === 'skipped') return 'warning';
+  return 'grey';
+}
+
+function expeditionPaymentTitle(status) {
+  if (status === 'deducted') return 'Списано з учасників';
+  if (status === 'skipped') return 'Без автоматичного списання';
+  return 'Дані відредаговано без повторного списання';
+}
+
+function openExpeditionEditor(item) {
+  const expedition = item.expedition || {};
+  expeditionEditCycleId.value = item.id;
+  expeditionEditError.value = '';
+  expeditionEditForm.adventureTitle = expedition.adventureTitle || item.adventureTitle || '';
+  expeditionEditForm.participantHeroIds = [...(expedition.participantHeroIds || [])];
+  expeditionEditForm.durationDays = Number(expedition.durationDays ?? item.durationDays ?? 1);
+  expeditionEditForm.crewGroups = (expedition.crewGroups?.length
+    ? expedition.crewGroups
+    : [{ role: 'Моряки', count: 1, dailyRate: 2 }]).map((group) => ({ ...group }));
+  expeditionEditDialog.value = true;
+}
+
+function addEditCrewGroup() {
+  expeditionEditForm.crewGroups.push({ role: '', count: 1, dailyRate: 2 });
+}
+
+function removeEditCrewGroup(index) {
+  if (expeditionEditForm.crewGroups.length > 1) expeditionEditForm.crewGroups.splice(index, 1);
+}
+
+async function saveExpeditionEdit() {
+  expeditionEditError.value = '';
+  expeditionEditSaving.value = true;
+  try {
+    await updateExpeditionDetails(expeditionEditCycleId.value, {
+      adventureTitle: expeditionEditForm.adventureTitle,
+      participantHeroIds: expeditionEditForm.participantHeroIds,
+      durationDays: expeditionEditForm.durationDays,
+      crewGroups: expeditionEditForm.crewGroups,
+    });
+    await loadAllCycles();
+    expeditionEditDialog.value = false;
+  } catch (error) {
+    console.error('[admin] Failed to update expedition', error);
+    expeditionEditError.value = 'Не вдалося зберегти експедицію. Перевірте учасників, дні та екіпаж.';
+  } finally {
+    expeditionEditSaving.value = false;
+  }
+}
+
+const expeditionCostSummary = computed(() => {
+  const days = Number(cycleForm.expeditionDurationDays) || 0;
+  const groups = cycleForm.crewGroups || [];
+  const crewCount = groups.reduce((sum, group) => sum + (Number(group.count) || 0), 0);
+  const total = groups.reduce((sum, group) => sum + (Number(group.count) || 0) * (Number(group.dailyRate) || 0) * days, 0);
+  const participants = cycleForm.participantHeroIds.length;
+  const share = participants ? total / participants : 0;
+  return `Екіпаж: ${crewCount}. Загальна оплата: ${formatAmount(total)} зм.${participants ? ` Орієнтовно по ${formatAmount(share)} зм з учасника.` : ''}`;
+});
+
+function addCrewGroup() {
+  cycleForm.crewGroups.push({ role: '', count: 1, dailyRate: 2 });
+}
+
+function removeCrewGroup(index) {
+  if (cycleForm.crewGroups.length > 1) cycleForm.crewGroups.splice(index, 1);
+}
 const usedDaysByHero = ref(new Map());
 const usedDaysHeaders = [
   { title: 'Герой', key: 'heroName' },
@@ -1440,8 +1678,22 @@ async function loadLatestCycle() {
 }
 
 async function loadAllCycles() {
-  const snapshot = await getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc')));
+  const [snapshot, actionSnapshot] = await Promise.all([
+    getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc'))),
+    getDocs(collection(db, 'religion-actions')),
+  ]);
   allCycles.value = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const titleByActionCycle = new Map(actionSnapshot.docs
+    .map((item) => item.data() || {})
+    .filter((action) => isCycleStartAction(action) && String(action.notes || '').trim())
+    .map((action) => [action.cycleId, String(action.notes).trim()]));
+  const legacyTitles = new Map();
+  allCycles.value.forEach((cycle, index) => {
+    const nextNewerCycle = allCycles.value[index - 1];
+    const title = nextNewerCycle ? titleByActionCycle.get(nextNewerCycle.id) : '';
+    if (title) legacyTitles.set(cycle.id, title);
+  });
+  legacyAdventureTitlesByCycle.value = legacyTitles;
 }
 
 const allCyclesForSelect = computed(() =>
@@ -1524,19 +1776,45 @@ async function createCycle() {
     cycleError.value = 'Вкажіть початок циклу.';
     return;
   }
+  if (latestCycle.value) {
+    if (!cycleForm.adventureTitle.trim()) { cycleError.value = 'Вкажіть назву пригоди.'; return; }
+    if (!cycleForm.participantHeroIds.length) { cycleError.value = 'Оберіть учасників пригоди.'; return; }
+    if (!Number.isInteger(Number(cycleForm.expeditionDurationDays)) || Number(cycleForm.expeditionDurationDays) < 1) {
+      cycleError.value = 'Вкажіть тривалість експедиції у повних днях.';
+      return;
+    }
+    const invalidCrew = !cycleForm.crewGroups.length || cycleForm.crewGroups.some((group) =>
+      !String(group.role || '').trim()
+      || !Number.isInteger(Number(group.count))
+      || Number(group.count) < 1
+      || !Number.isFinite(Number(group.dailyRate))
+      || Number(group.dailyRate) < 0);
+    if (invalidCrew) { cycleError.value = 'Перевірте назви, кількість і ставки груп екіпажу.'; return; }
+  }
 
   cycleSaving.value = true;
   try {
     await createNewCycleWithEffects({
       startedDate: cycleForm.startedDate,
-      notes: cycleForm.notes,
+      expedition: latestCycle.value ? {
+        adventureTitle: cycleForm.adventureTitle,
+        participantHeroIds: cycleForm.participantHeroIds,
+        durationDays: cycleForm.expeditionDurationDays,
+        crewGroups: cycleForm.crewGroups,
+        autoDeduct: cycleForm.autoDeductCrewPayment,
+      } : null,
       islandId: islandStore.currentId || DEFAULT_ISLAND_ID,
       population: populationStore.totalPopulation,
       populationItems: populationStore.items || [],
     });
     cycleSuccess.value = 'Новий цикл успішно створено.';
-    cycleForm.notes = '';
+    cycleForm.adventureTitle = '';
+    cycleForm.participantHeroIds = [];
+    cycleForm.expeditionDurationDays = null;
+    cycleForm.crewGroups = [{ role: 'Моряки', count: 1, dailyRate: 2 }];
+    cycleForm.autoDeductCrewPayment = true;
     await loadLatestCycle();
+    await loadAllCycles();
     await loadCurrentCycleCraftingLogs();
     cycleForm.startedDate = suggestNextCycleDate();
     cycleDaysInput.value = null;

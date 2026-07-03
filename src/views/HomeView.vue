@@ -44,6 +44,32 @@
     </WiPanel>
 
     <template v-else>
+      <WiPanel class="expedition-panel" title="Остання експедиція" icon="mdi-map-marker-path">
+        <template #actions>
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-format-list-bulleted"
+            :disabled="!data.expeditions.length"
+            @click="expeditionsDialog = true"
+          >
+            Усі експедиції
+          </v-btn>
+        </template>
+
+        <div v-if="data.lastCycle.expedition" class="expedition-summary">
+          <div class="expedition-summary__icon"><v-icon size="30">mdi-sail-boat</v-icon></div>
+          <div>
+            <span class="card-label">Назва пригоди</span>
+            <h2>{{ data.lastCycle.expedition.adventureTitle }}</h2>
+            <p>Учасники: {{ expeditionParticipantNames }}</p>
+            <p>Тривалість: {{ data.lastCycle.expedition.durationDays ?? 'невідомо' }} днів · Моряків: {{ data.lastCycle.expedition.totalCrewCount ?? 'невідомо' }}</p>
+          </div>
+        </div>
+        <WiEmptyState v-else title="Дані про останню експедицію відсутні" icon="mdi-map-marker-off" />
+      </WiPanel>
+
       <div class="dashboard-primary-grid">
         <WiPanel class="repair-panel" title="Пошкоджені кораблі, що потребують ремонту" icon="mdi-tools">
           <div v-if="data.damagedShips.length" class="ship-table">
@@ -251,6 +277,24 @@
       </section>
     </template>
   </v-container>
+
+  <v-dialog v-model="expeditionsDialog" max-width="1100">
+    <v-card>
+      <div class="pa-4 d-flex align-center" style="border-bottom: 1px solid var(--wi-border)">
+        <span class="wi-heading text-h6">Усі експедиції</span>
+        <v-spacer />
+        <v-btn icon="mdi-close" variant="text" aria-label="Закрити" @click="expeditionsDialog = false" />
+      </div>
+      <v-card-text class="pt-4">
+        <v-data-table :headers="expeditionHeaders" :items="data.expeditions" :items-per-page="10" density="compact">
+          <template #item.dates="{ item }">{{ item.startedAt }} - {{ item.finishedAt }}</template>
+          <template #item.participants="{ item }">{{ expeditionParticipants(item) }}</template>
+          <template #item.totalCrewCount="{ item }">{{ item.totalCrewCount ?? 'Невідомо' }}</template>
+          <template #item.durationDays="{ item }">{{ item.durationDays ?? 'Невідомо' }}</template>
+        </v-data-table>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
@@ -265,10 +309,12 @@ import { diffInDays, parseFaerunDate } from '@/utils/faerun-date.js'
 
 const loading = ref(true)
 const error = ref('')
+const expeditionsDialog = ref(false)
 const data = reactive({
   currentCycle: null,
   lastFinishedCycle: null,
   damagedShips: [],
+  expeditions: [],
   lastCycle: {
     treasury: { income: 0, expenses: 0, net: 0, count: 0 },
     population: null,
@@ -277,15 +323,33 @@ const data = reactive({
     bestCrafter: null,
     bestMageRequest: null,
     largestFaithSpend: null,
+    expedition: null,
   },
 })
 
+const expeditionHeaders = [
+  { title: 'Назва пригоди', key: 'adventureTitle' },
+  { title: 'Дати', key: 'dates' },
+  { title: 'Учасники', key: 'participants' },
+  { title: 'Моряків', key: 'totalCrewCount' },
+  { title: 'Днів', key: 'durationDays' },
+]
+
 const populationDelta = computed(() => data.lastCycle.population?.populationDelta ?? null)
+const expeditionParticipantNames = computed(() => {
+  const participants = data.lastCycle.expedition?.participants || []
+  return participants.length ? participants.map((participant) => participant.heroName).join(', ') : 'невідомо'
+})
 const currentCycleLabel = computed(() => cycleLabel(data.currentCycle, 'Немає активного циклу'))
 const finishedCycleLabel = computed(() => cycleLabel(data.lastFinishedCycle, 'Немає завершеного циклу'))
 const finishedCycleDurationLabel = computed(() => formatCycleDuration(data.lastFinishedCycle))
 const populationBefore = computed(() => formatPopulationValue(data.lastCycle.population?.populationBefore))
 const populationAfter = computed(() => formatPopulationValue(data.lastCycle.population?.populationAfter))
+
+function expeditionParticipants(expedition) {
+  const participants = expedition?.participants || []
+  return participants.length ? participants.map((participant) => participant.heroName).join(', ') : 'Невідомо'
+}
 const buildingsAddedText = computed(() => {
   if (!data.lastCycle.buildingsAdded.length) return ''
   return data.lastCycle.buildingsAdded.map((building) => building.name).join(', ')
@@ -497,6 +561,39 @@ onMounted(async () => {
 
 .dashboard-state {
   margin-top: 18px;
+}
+
+.expedition-panel {
+  margin-bottom: 14px;
+}
+
+.expedition-summary {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.expedition-summary__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: var(--wi-gold);
+}
+
+.expedition-summary h2 {
+  margin: 5px 0 8px;
+  color: var(--wi-text);
+  font-family: var(--wi-font-heading);
+  font-size: 1.1rem;
+}
+
+.expedition-summary p {
+  margin: 2px 0;
+  color: var(--wi-text-muted);
+  line-height: 1.35;
 }
 
 .dashboard-state :deep(.wi-empty-state) {

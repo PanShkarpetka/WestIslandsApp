@@ -7,4 +7,5 @@ Celestial/divine entity section. Shows information about a religion's patron dei
 
 ## Notes
 - Rendered when `viewMode === 'celestial'`
+- Monthly Deva faith consumption runs as part of cycle creation in `cycleService`, not when this view is opened.
 - Check `ReligionModals.vue` for the exact features — name suggests modal-driven interactions

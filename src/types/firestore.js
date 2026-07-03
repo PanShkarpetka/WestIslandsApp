@@ -298,8 +298,24 @@
  * @property {string} startedAt - Faerun date string
  * @property {string|null} finishedAt - Faerun date string, null if cycle is open
  * @property {number} [populationAtStart]
+ * @property {ExpeditionData} [expedition] - Expedition completed during this cycle.
  * @property {WeatherForecastDay[]} [weatherForecast] - Stored 7-day seasonal weather forecast generated from the cycle start.
  * @property {import('firebase/firestore').Timestamp} createdAt
+ */
+
+/**
+ * @typedef {Object} ExpeditionData
+ * @property {string} adventureTitle
+ * @property {number} durationDays - Expedition days, excluding the seven-day rest period.
+ * @property {string[]} participantHeroIds
+ * @property {{heroId: string, heroName: string}[]} participants - Participant name snapshots.
+ * @property {{role: string, count: number, dailyRate: number}[]} crewGroups
+ * @property {number} totalCrewCount
+ * @property {number} totalCost
+ * @property {boolean} autoDeduct
+ * @property {'deducted'|'skipped'|'edited'} paymentStatus - `edited` means expedition data changed without another financial transaction.
+ * @property {{heroId: string, heroName: string, amount: number}[]} participantShares
+ * @property {import('firebase/firestore').Timestamp} [editedAt]
  */
 
 /**
@@ -395,7 +411,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'mage-guild-reward'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'mage-guild-reward'|'crew-payment'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
@@ -410,6 +426,7 @@
  * @property {number} [treasuryTaxAmount]
  * @property {number} [treasuryTaxRate]
  * @property {number} [guildTaxAmount]
+ * @property {string} [adventureTitle]
  * @property {number} [guildTaxRate]
  * @property {import('firebase/firestore').Timestamp} createdAt
  */

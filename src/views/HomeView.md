@@ -9,6 +9,7 @@ Campaign dashboard and app homepage. Shows the current active cycle for context 
 Uses shared `src/components/ui/` primitives for panels, section headers, and empty/loading/error states. The dashboard is a compact concept-led surface with:
 
 - Campaign header showing the current cycle, the last finished cycle, and the finished cycle duration.
+- Latest expedition summary with a dialog containing the existing expedition history.
 - Damaged ship repair status in a scan-friendly row layout with HP bars.
 - Last-cycle population, treasury, and buildings-added summary blocks.
 - Four highlight panels for best fish, crafter, mage request, and faith spend; the faith card shows the hero, action type, and points spent without action notes.
@@ -20,6 +21,8 @@ Visible text is Ukrainian and all values come from `dashboardService.fetchDashbo
 - Damaged ships come from `ships` where `hp < hpMax`.
 - Last-cycle highlights are keyed to the newest finished `cycles/{cycleId}`.
 - Cycle duration comes from `cycles/{cycleId}.duration` and falls back to `startedAt`/`finishedAt` Faerun date math.
+- The latest expedition comes from `cycles/{cycleId}.expedition`; legacy titles fall back to the next cycle's existing `religion-actions.notes`.
+- **Усі експедиції** opens a dialog with the complete expedition history: title, cycle dates, participant snapshots, crew count, and duration.
 - Population deltas come from `cycle-summaries/{cycleId}`.
 - Buildings added come from `islands/{islandId}.buildings.*.builtCycleId`.
 - Crafting highlights use `heroes/*/crafting-logs` with `cycleId`.
@@ -30,6 +33,7 @@ Visible text is Ukrainian and all values come from `dashboardService.fetchDashbo
 - Public page following the app's existing open-page behavior.
 - Loading and error states render as dashboard panels.
 - Missing historical data renders empty text inside the relevant dashboard section instead of blocking the page.
+- The expedition summary shows its title, participant snapshots, duration, and total crew count.
 - Login is available at `/login`.
 
 ## Constraints

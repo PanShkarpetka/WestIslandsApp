@@ -394,6 +394,7 @@ function txTypeLabel(type) {
   if (type === 'admin-balance-adjustment') return 'Корекція балансу'
   if (type === 'admin-goods-adjustment') return 'Корекція товарів'
   if (type === 'mage-guild-reward') return 'Магічна допомога'
+  if (type === 'crew-payment') return 'Оплата екіпажу'
   return 'Списання'
 }
 

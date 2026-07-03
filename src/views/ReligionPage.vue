@@ -317,7 +317,6 @@ import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
 import { PSEUDO_RELIGION_ID } from '@/config/constants.js'
 import { formatAmount } from '@/utils/formatters'
-import { parseFaerunDate } from '@/utils/faerun-date'
 
 const iconCache = new Map()
 
@@ -329,7 +328,6 @@ const hoveredReligion = ref(null)
 const viewMode = ref('diagram')
 const defaultCardBackground = ''
 const latestCycle = ref(null)
-const previousCycle = ref(null)
 const devaCustom = ref({})
 let devaCustomUnsubscribe = null
 
@@ -1266,52 +1264,18 @@ const religionChangeFinePercent = computed(() => Math.round(calculateReligionCha
 async function loadLatestCycle() {
   try {
     const cyclesRef = collection(db, 'cycles')
-    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(2))
+    const latestCycleQuery = query(cyclesRef, orderBy('createdAt', 'desc'), limit(1))
     const snapshot = await getDocs(latestCycleQuery)
 
     if (snapshot.docs.length) {
       const docSnap = snapshot.docs[0]
       latestCycle.value = { id: docSnap.id, ...docSnap.data() }
-      previousCycle.value = snapshot.docs[1] ? { id: snapshot.docs[1].id, ...snapshot.docs[1].data() } : null
-      await handleCycleDevaConsumption()
     } else {
       latestCycle.value = null
-      previousCycle.value = null
     }
   } catch (e) {
     console.error('[religion] Failed to load latest cycle', e)
   }
-}
-
-async function handleCycleDevaConsumption() {
-  if (!latestCycle.value?.startedAt || !previousCycle.value?.startedAt) return
-
-  const current = parseFaerunDate(latestCycle.value.startedAt)
-  const previous = parseFaerunDate(previousCycle.value.startedAt)
-
-  if (!current || !previous) return
-  if (current.day !== 1 || (current.month === previous.month && current.year === previous.year)) return
-
-  const devaRef = doc(db, 'religions', PSEUDO_RELIGION_ID, 'customs', 'Deva')
-
-  await runTransaction(db, async (transaction) => {
-    const snap = await transaction.get(devaRef)
-    const data = snap.data() || {}
-    if (data.lastConsumedCycleId === latestCycle.value.id) return
-
-    const currentFaith = Number(data.devaFaith ?? 0)
-    const newFaith = currentFaith - devaFaithPerMonth.value
-    const updates = { lastConsumedCycleId: latestCycle.value.id }
-
-    if (newFaith < 0) {
-      updates.devaFaith = 0
-      updates.deathMarkers = Math.min(3, Number(data.deathMarkers ?? 0) + 1)
-    } else {
-      updates.devaFaith = newFaith
-    }
-
-    transaction.update(devaRef, updates)
-  })
 }
 
 function closeDialog() {
