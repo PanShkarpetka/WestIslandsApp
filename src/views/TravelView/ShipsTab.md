@@ -14,3 +14,4 @@ Output: travel time, cost, risk level.
 - All logic is client-side calculation
 - Rendered inside `v-window-item value="ships"` in TravelView
 - Weapon hazard reduction uses typed ship weapons: `cannon` counts as 1 reduction unit, `ballista` counts as 0.5. Ships without typed `weaponSlots` fall back to legacy `weaponSlotsUsed`.
+- The calculator uses `WiPanel` and six `WiMetricCard` results; formulas and fields are unchanged.
