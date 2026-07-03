@@ -1,25 +1,19 @@
 <template>
   <v-dialog v-model="dialog" max-width="1000px" scrollable>
-    <v-card rounded="xl" elevation="12">
-      <v-card-title class="d-flex align-center justify-space-between">
-        <span class="text-h6 font-weight-bold">
-          Донати для{{ donationGoal?.title ? ': ' + donationGoal.title : '' }}
-        </span>
-        <v-btn icon variant="text" @click="close" aria-label="Закрити">✕</v-btn>
-      </v-card-title>
+    <WiDialogFrame :title="`Донати${donationGoal?.title ? ': ' + donationGoal.title : ''}`" icon="mdi-account-cash">
+      <template #header-actions>
+        <v-btn icon="mdi-close" variant="text" @click="close" aria-label="Закрити" />
+      </template>
 
-      <v-card-text>
-        <div class="d-flex align-center justify-space-between mb-3 text-body-2 text-medium-emphasis">
+        <div class="donation-summary-stats">
           <div>Донатерів: <span class="font-weight-medium">{{ sortedDonations.length }}</span></div>
           <div>Транзакцій: <span class="font-weight-medium"> {{ donationStore.donations.length }}</span></div>
           <div>Всього зібрано: <span class="font-weight-bold">{{ donationsTotal }}</span></div>
         </div>
 
-        <div v-if="sortedDonations.length === 0" class="py-6 text-center text-medium-emphasis">
-          Поки немає донатів на цю ціль.
-        </div>
+        <WiEmptyState v-if="sortedDonations.length === 0" title="Поки немає донатів на цю ціль" icon="mdi-account-cash-outline" />
 
-        <v-list v-else density="comfortable" class="rounded-lg" border lines="two">
+        <v-list v-else density="comfortable" class="donation-list" border lines="two">
           <v-list-item v-for="donation in sortedDonations" :key="donation.character">
             <template #title>
               <div class="text-body-1 font-weight-semibold text-truncate">
@@ -33,18 +27,20 @@
             </template>
           </v-list-item>
         </v-list>
-      </v-card-text>
-
-      <v-card-actions class="justify-end">
-        <v-btn variant="flat" color="primary" @click="close">Закрити</v-btn>
-      </v-card-actions>
-    </v-card>
+      <template #actions>
+        <v-spacer />
+        <WiActionButton variant="text" tone="muted" @click="close">Закрити</WiActionButton>
+      </template>
+    </WiDialogFrame>
   </v-dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useDonationsStore } from '@/store/donationStore.js'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -83,3 +79,31 @@ const donationsTotal = computed(() =>
   }, 0)
 )
 </script>
+
+<style scoped>
+.donation-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--wi-text-muted);
+  font-size: 0.86rem;
+}
+
+.donation-summary-stats span {
+  color: var(--wi-text);
+}
+
+.donation-list {
+  border-color: var(--wi-border) !important;
+  border-radius: var(--wi-radius-sm) !important;
+  background: rgba(12, 8, 4, 0.28) !important;
+}
+
+@media (max-width: 640px) {
+  .donation-summary-stats {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}
+</style>

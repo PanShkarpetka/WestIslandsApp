@@ -1,19 +1,16 @@
 <template>
   <v-container class="donations-page">
-    <div class="donations-header">
-      <div class="donations-title">
-        <v-icon class="mr-2" size="20">mdi-hand-coin</v-icon>
-        Цілі зборів
-      </div>
-      <v-btn v-if="isLoggedIn" class="add-bounty-btn" prepend-icon="mdi-plus" @click="createNewGoal">
-        Новий збір
-      </v-btn>
-    </div>
+    <WiPageHeader title="Цілі зборів" icon="mdi-hand-coin">
+      <template #actions>
+        <WiActionButton v-if="isLoggedIn" prepend-icon="mdi-plus" @click="createNewGoal">
+          Новий збір
+        </WiActionButton>
+      </template>
+    </WiPageHeader>
 
-    <div v-if="!sortedGoals.length" class="donations-empty">
-      <v-icon class="mr-2" size="16">mdi-anchor</v-icon>
-      Поки що немає цілей…
-    </div>
+    <WiPanel v-if="!sortedGoals.length">
+      <WiEmptyState title="Поки що немає цілей зборів" icon="mdi-hand-coin-outline" />
+    </WiPanel>
 
     <v-row v-else>
       <v-col v-for="goal in sortedGoals" :key="goal.id" cols="12" md="6" lg="4">
@@ -46,12 +43,16 @@ import DonationGoalCard from '@/components/DonationGoalCard.vue'
 import DonationsSummaryDialog from '@/components/DonationsSummaryDialog.vue'
 import DonationGoalCreateDialog from '@/components/DonationGoalCreateDialog.vue'
 import {storeToRefs} from "pinia";
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const userStore = useUserStore()
 const donationGoalStore = useDonationGoalStore()
-const isAdmin = userStore.isAdmin;
-const isLoggedIn = userStore.isLoggedIn;
-const nickname = userStore.nickname;
+const isAdmin = computed(() => userStore.isAdmin ?? false)
+const isLoggedIn = computed(() => userStore.isLoggedIn ?? false)
+const nickname = computed(() => userStore.nickname || '')
 const donorsVisible = ref(false)
 const selectedGoal = ref(null)
 const showCreate = ref(false)
@@ -91,41 +92,8 @@ const openDonors = (goal) => {
 }
 </script>
 <style scoped>
-.donations-page { padding-bottom: 16px; }
-
-.donations-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.donations-title {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-heading);
-  font-size: 1.1rem;
-  letter-spacing: 0.06em;
-  color: var(--wi-gold);
-}
-
-.add-bounty-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-  font-size: 0.8rem !important;
-}
-
-.add-bounty-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
-
-.donations-empty {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-body);
-  font-style: italic;
-  color: var(--wi-text-muted);
-  padding: 24px 0;
+.donations-page {
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 </style>

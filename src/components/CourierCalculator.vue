@@ -1,39 +1,33 @@
 <template>
-  <v-row justify="space-between" align="center" class="my-4">
-    <v-col cols="12">
-      <v-card class="pa-6 courier-card" elevation="0" width="100%">
-        <v-card-title class="courier-title">
-          Чи долетів кур'єр?
+  <div class="courier-layout">
+    <WiPanel title="Чи долетів кур'єр?" icon="mdi-bird">
+      <template #actions>
           <v-chip v-if="success" color="success" variant="flat" size="small" class="success-badge ml-3">✓ ТАК!</v-chip>
-        </v-card-title>
-        <v-card-text>
+      </template>
+        <div class="courier-fields">
           <v-text-field v-model.number="distanceToTravel" type="number" label="Відстань, милі" :rules="[v => v > 0 || 'Вкажіть відстань більше нуля']"
                         outlined dense />
           <v-text-field v-model.number="speed" type="number" label="Швидкість, фути" outlined dense :rules="[v => v > 0 || 'Вкажіть швидкість більше нуля']" />
           <v-text-field v-model.number="conSaveMod" label="Модифікатор Con Save. Наприклад: (1, 2, 3, -1, -2)" step="1" outlined dense />
           <v-text-field v-model.number="dangerChance" type="number" label="Шанс небезпеки, %. За замовчуванням: 1%" outlined dense :rules="[v => v > 0 || 'Вкажіть не від\'ємний шанс']" />
-        </v-card-text>
+        </div>
         <p v-if="error" class="error-msg">{{ error }}</p>
-        <v-card-actions class="justify-end">
-          <v-btn color="secondary" class="theme-btn" @click="() => handleSend(false)">Потестувати</v-btn>
+        <div class="courier-actions">
+          <WiActionButton variant="tonal" tone="sea" @click="() => handleSend(false)">Потестувати</WiActionButton>
           <v-tooltip :disabled="!!isLoggedIn" location="top center">
             <template v-slot:activator="{ props }">
               <div v-bind="props" class="d-inline-block">
-                <v-btn color="primary" class="theme-btn theme-btn--primary" :disabled="!isLoggedIn" @click="() => handleSend(true)">
+                <WiActionButton :disabled="!isLoggedIn" @click="() => handleSend(true)">
                   Відправити
-                </v-btn>
+                </WiActionButton>
               </div>
             </template>
             <span>Авторизуйтеся для відправки кур'єра</span>
           </v-tooltip>
-        </v-card-actions>
-      </v-card>
-    </v-col>
-  </v-row>
-  <v-row justify="space-between" align="center" class="my-4">
-    <v-col cols="12">
-      <div class="log-label mb-2">Хроніка подорожі</div>
-      <v-card class="pa-6 courier-card courier-log" elevation="0" width="100%">
+        </div>
+    </WiPanel>
+
+    <WiPanel title="Хроніка подорожі" icon="mdi-map-marker-distance" class="courier-log">
         <v-textarea
             v-model="cardLogger"
             label="Історія подорожі"
@@ -41,21 +35,22 @@
             readonly
             prepend-icon="mdi-map-marker-distance"
         />
-      </v-card>
-    </v-col>
-  </v-row>
+    </WiPanel>
+  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useCourierLogStore } from '@/store/courierLogStore.js'
 import { didCreatureGetToTarget } from '@/utils/courierDistanceCalculator.js';
 import { useUserStore } from "@/store/userStore.js";
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const userStore = useUserStore()
 const courierLogStore = useCourierLogStore();
 
-const isLoggedIn = userStore.isLoggedIn;
+const isLoggedIn = computed(() => userStore.isLoggedIn ?? false)
 
 const distanceToTravel = ref();
 const speed = ref(30);
@@ -103,27 +98,22 @@ function handleSend(save = false) {
 </script>
 
 <style scoped>
-.courier-card {
-  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
-  border: 1px solid var(--wi-border) !important;
-  border-radius: 16px !important;
+.courier-layout {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
 }
 
-.courier-title {
-  font-family: var(--wi-font-heading);
-  text-transform: uppercase;
-  color: var(--wi-gold);
-  font-size: 0.88rem !important;
-  letter-spacing: 0.06em;
-  padding-bottom: 8px;
+.courier-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
 }
 
-.log-label {
-  font-family: var(--wi-font-heading);
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  color: var(--wi-text-muted);
-  letter-spacing: 0.08em;
+.courier-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .courier-log :deep(.v-textarea textarea) {
@@ -152,15 +142,9 @@ function handleSend(save = false) {
   50%       { opacity: 0.6; }
 }
 
-.theme-btn {
-  font-family: var(--wi-font-heading);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-size: 0.78rem;
-}
-
-.theme-btn--primary {
-  background-color: var(--wi-gold) !important;
-  color: #0e0904 !important;
+@media (max-width: 700px) {
+  .courier-fields { grid-template-columns: 1fr; }
+  .courier-actions { justify-content: stretch; }
+  .courier-actions > * { flex: 1 1 auto; }
 }
 </style>
