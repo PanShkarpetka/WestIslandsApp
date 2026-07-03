@@ -11,6 +11,7 @@ import {
 import { db } from './firebase.js'
 import { DEFAULT_ISLAND_ID } from '../config/constants.js'
 import { resolveFishValue } from '../utils/fishingUtils.js'
+import { diffInDays, parseFaerunDate } from '../utils/faerun-date.js'
 
 function toMillis(value) {
   if (!value) return null
@@ -53,6 +54,62 @@ export function summarizeTreasuryTransactions(transactions = []) {
   const income = transactions.reduce((sum, tx) => Number(tx.amount ?? 0) > 0 ? sum + Number(tx.amount ?? 0) : sum, 0)
   const expenses = transactions.reduce((sum, tx) => Number(tx.amount ?? 0) < 0 ? sum + Math.abs(Number(tx.amount ?? 0)) : sum, 0)
   return { income, expenses, net: income - expenses, count: transactions.length }
+}
+
+export function isCycleStartAction(action = {}) {
+  const actionType = action.actionType
+  return action.actionTypeId === 'cycleStart'
+    || actionType?.id === 'cycleStart'
+    || String(actionType?.path || actionType?._path?.segments?.join('/') || '').endsWith('/cycleStart')
+}
+
+export function getLegacyExpeditionDurationDays(cycle = {}) {
+  const storedDuration = Number(cycle.duration)
+  if (Number.isFinite(storedDuration) && storedDuration >= 0) return Math.max(0, storedDuration - 7)
+  const startedAt = parseFaerunDate(cycle.startedAt)
+  const finishedAt = parseFaerunDate(cycle.finishedAt)
+  if (!startedAt || !finishedAt) return null
+  const cycleDays = diffInDays(startedAt, finishedAt)
+  return Number.isFinite(cycleDays) && cycleDays >= 0 ? Math.max(0, cycleDays - 7) : null
+}
+
+export function resolveLastExpedition(lastFinishedCycle, nextCycleActions = []) {
+  if (!lastFinishedCycle) return null
+  if (lastFinishedCycle.expedition?.adventureTitle) return lastFinishedCycle.expedition
+  const legacyTitle = nextCycleActions
+    .filter(isCycleStartAction)
+    .map((action) => String(action.notes || '').trim())
+    .find(Boolean)
+  return legacyTitle ? {
+    adventureTitle: legacyTitle,
+    durationDays: getLegacyExpeditionDurationDays(lastFinishedCycle),
+    legacy: true,
+  } : null
+}
+
+export function buildExpeditionHistory(cycles = [], cycleStartActions = []) {
+  const ordered = [...cycles].sort((a, b) => (toMillis(b.createdAt) ?? 0) - (toMillis(a.createdAt) ?? 0))
+  const titleByActionCycle = new Map(cycleStartActions
+    .filter(isCycleStartAction)
+    .map((action) => [action.cycleId, String(action.notes || '').trim()]))
+
+  return ordered.flatMap((cycle, index) => {
+    if (!cycle.finishedAt) return []
+    const expedition = cycle.expedition || null
+    const nextNewerCycle = ordered[index - 1]
+    const adventureTitle = expedition?.adventureTitle || (nextNewerCycle ? titleByActionCycle.get(nextNewerCycle.id) : '')
+    if (!adventureTitle) return []
+    return [{
+      id: cycle.id,
+      adventureTitle,
+      startedAt: cycle.startedAt || '',
+      finishedAt: cycle.finishedAt || '',
+      participants: expedition?.participants || [],
+      totalCrewCount: expedition?.totalCrewCount ?? null,
+      durationDays: expedition?.durationDays ?? getLegacyExpeditionDurationDays(cycle),
+      legacy: !expedition,
+    }]
+  })
 }
 
 export function selectBestMageRequest(requestDocuments = []) {
@@ -181,8 +238,16 @@ async function fetchCollectionByCycleSafe(collectionName, cycleId) {
 }
 
 export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) {
-  const cyclesSnap = await getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc'), limit(12)))
+  const [cyclesSnap, cycleStartActionsSnap] = await Promise.all([
+    getDocs(query(collection(db, 'cycles'), orderBy('createdAt', 'desc'))),
+    getDocs(query(
+      collection(db, 'religion-actions'),
+      where('actionType', '==', doc(db, 'religion-action-types', 'cycleStart')),
+    )),
+  ])
   const cycles = cyclesSnap.docs.map(normalizeCycle)
+  const cycleStartActions = cycleStartActionsSnap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+  const expeditions = buildExpeditionHistory(cycles, cycleStartActions)
   const { currentCycle, lastFinishedCycle } = selectDashboardCycles(cycles)
 
   const [shipsSnap, islandSnap, buildingsSnap] = await Promise.all([
@@ -203,10 +268,11 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
     bestCrafter: null,
     bestMageRequest: null,
     largestFaithSpend: null,
+    expedition: null,
   }
 
   if (!lastFinishedCycle) {
-    return { currentCycle, lastFinishedCycle, damagedShips: getDamagedShips(ships), lastCycle: emptyLastCycle }
+    return { currentCycle, lastFinishedCycle, expeditions, damagedShips: getDamagedShips(ships), lastCycle: emptyLastCycle }
   }
 
   const [treasuryTx, spellRequests, religionActions, populationSummarySnap, craftingLogs, fishingLogsByCycle] = await Promise.all([
@@ -233,6 +299,7 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
   return {
     currentCycle,
     lastFinishedCycle,
+    expeditions,
     damagedShips: getDamagedShips(ships),
     lastCycle: {
       treasury: summarizeTreasuryTransactions(treasuryTx),
@@ -242,6 +309,10 @@ export async function fetchDashboardData({ islandId = DEFAULT_ISLAND_ID } = {}) 
       bestCrafter,
       bestMageRequest: selectBestMageRequest(spellRequests),
       largestFaithSpend: selectLargestFaithSpend(religionActions),
+      expedition: expeditions[0] || resolveLastExpedition(
+        lastFinishedCycle,
+        cycleStartActions.filter((action) => action.cycleId === currentCycle?.id),
+      ),
     },
   }
 }

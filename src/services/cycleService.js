@@ -462,6 +462,147 @@ export async function distributeBuildingFaithIncome(cycleId, {
   }
 }
 
+export function buildExpeditionDetails(expedition = {}) {
+  const adventureTitle = String(expedition.adventureTitle || '').trim()
+  const durationDays = Number(expedition.durationDays)
+  const participantHeroIds = normalizeHeroIds(expedition.participantHeroIds)
+  const crewGroups = (Array.isArray(expedition.crewGroups) ? expedition.crewGroups : [])
+    .map((group) => ({
+      role: String(group?.role || '').trim(),
+      count: Number(group?.count),
+      dailyRate: normalizeAmount(Number(group?.dailyRate)),
+    }))
+
+  if (!adventureTitle) throw new Error('EXPEDITION_TITLE_REQUIRED')
+  if (!Number.isInteger(durationDays) || durationDays < 1) throw new Error('INVALID_EXPEDITION_DURATION')
+  if (!participantHeroIds.length) throw new Error('EXPEDITION_PARTICIPANTS_REQUIRED')
+  if (!crewGroups.length || crewGroups.some((group) => !group.role || !Number.isInteger(group.count) || group.count < 1 || !Number.isFinite(group.dailyRate) || group.dailyRate < 0)) {
+    throw new Error('INVALID_CREW_GROUPS')
+  }
+
+  const totalCrewCount = crewGroups.reduce((sum, group) => sum + group.count, 0)
+  const totalCostCents = crewGroups.reduce(
+    (sum, group) => sum + Math.round(group.dailyRate * 100) * group.count * durationDays,
+    0,
+  )
+  const baseShare = Math.floor(totalCostCents / participantHeroIds.length)
+  const remainder = totalCostCents % participantHeroIds.length
+  const participantShares = participantHeroIds.map((heroId, index) => ({
+    heroId,
+    amount: (baseShare + (index < remainder ? 1 : 0)) / 100,
+  }))
+
+  return {
+    adventureTitle,
+    durationDays,
+    participantHeroIds,
+    crewGroups,
+    totalCrewCount,
+    totalCost: totalCostCents / 100,
+    autoDeduct: expedition.autoDeduct !== false,
+    participantShares,
+  }
+}
+
+async function settleExpedition(cycleRef, cycleData, expedition, finishedAt, {
+  collectionFn, docFn, runTransactionFn, serverTimestampFn, firestoreDb,
+}) {
+  const details = buildExpeditionDetails(expedition)
+  await runTransactionFn(firestoreDb, async (transaction) => {
+    const heroRows = []
+    for (const share of details.participantShares) {
+      const heroRef = docFn(firestoreDb, 'heroes', share.heroId)
+      const heroSnap = await transaction.get(heroRef)
+      if (!heroSnap.exists()) throw new Error(`EXPEDITION_HERO_NOT_FOUND:${share.heroId}`)
+      const hero = heroSnap.data() || {}
+      if (hero.inactive) throw new Error(`EXPEDITION_HERO_INACTIVE:${share.heroId}`)
+      heroRows.push({ ref: heroRef, share, hero })
+    }
+
+    const participantNames = heroRows.map(({ share, hero }) => ({
+      heroId: share.heroId,
+      heroName: hero.name || share.heroId,
+    }))
+    const participantShares = heroRows.map(({ share, hero }) => ({
+      ...share,
+      heroName: hero.name || share.heroId,
+    }))
+    const storedExpedition = {
+      ...details,
+      participants: participantNames,
+      participantShares,
+      paymentStatus: details.autoDeduct ? 'deducted' : 'skipped',
+    }
+    transaction.update(cycleRef, { finishedAt, expedition: storedExpedition })
+
+    if (!details.autoDeduct) return
+    for (const { ref, share, hero } of heroRows) {
+      const nextBalance = normalizeAmount(Number(hero.goldBalance ?? 0) - share.amount)
+      transaction.set(ref, { goldBalance: nextBalance, updatedAt: serverTimestampFn() }, { merge: true })
+      transaction.set(docFn(collectionFn(firestoreDb, 'hero-transactions')), {
+        heroId: share.heroId,
+        heroName: hero.name || share.heroId,
+        goldAmount: -share.amount,
+        goods: {},
+        type: 'crew-payment',
+        comment: `Оплата екіпажу за пригоду "${details.adventureTitle}": ${details.durationDays} дн., частка ${formatAmount(share.amount)} зм.`.slice(0, 500),
+        cycleId: cycleRef.id,
+        cycleStartedAt: cycleData.startedAt || '',
+        cycleFinishedAt: finishedAt,
+        adventureTitle: details.adventureTitle,
+        createdAt: serverTimestampFn(),
+      })
+    }
+  })
+  return details
+}
+
+export async function updateExpeditionDetails(cycleId, expedition, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  runTransaction: runTransactionFn = runTransaction,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  db: firestoreDb = db,
+} = {}) {
+  if (!cycleId) throw new Error('EXPEDITION_CYCLE_REQUIRED')
+  const cycleRef = docFn(firestoreDb, 'cycles', cycleId)
+
+  return runTransactionFn(firestoreDb, async (transaction) => {
+    const cycleSnap = await transaction.get(cycleRef)
+    if (!cycleSnap.exists()) throw new Error('EXPEDITION_CYCLE_NOT_FOUND')
+    const cycleData = cycleSnap.data() || {}
+    const existingExpedition = cycleData.expedition || {}
+    const adventureTitle = String(expedition.adventureTitle || existingExpedition.adventureTitle || '').trim()
+    if (!adventureTitle) throw new Error('EXPEDITION_NOT_FOUND')
+
+    const details = buildExpeditionDetails({
+      ...expedition,
+      adventureTitle,
+      autoDeduct: existingExpedition.autoDeduct ?? false,
+    })
+    const participants = []
+    const participantShares = []
+    for (const share of details.participantShares) {
+      const heroSnap = await transaction.get(docFn(firestoreDb, 'heroes', share.heroId))
+      if (!heroSnap.exists()) throw new Error(`EXPEDITION_HERO_NOT_FOUND:${share.heroId}`)
+      const hero = heroSnap.data() || {}
+      participants.push({ heroId: share.heroId, heroName: hero.name || share.heroId })
+      participantShares.push({ ...share, heroName: hero.name || share.heroId })
+    }
+
+    const updatedExpedition = {
+      ...existingExpedition,
+      ...details,
+      participants,
+      participantShares,
+      paymentStatus: 'edited',
+      editedAt: serverTimestampFn(),
+    }
+    transaction.update(cycleRef, { expedition: updatedExpedition })
+    return updatedExpedition
+  })
+}
+
 /**
  * Consumes the Deva's monthly faith when a newly-created cycle starts a new
  * Faerun month. The transaction and cycle marker make retries idempotent.
@@ -748,7 +889,7 @@ export async function fulfillYieldEventManually(islandId, buildingKey, eventId, 
 
 export async function createNewCycleWithEffects({
   startedDate,
-  notes = '',
+  expedition = null,
   islandId = DEFAULT_ISLAND_ID,
   population = 0,
   populationItems = [],
@@ -815,7 +956,14 @@ export async function createNewCycleWithEffects({
     const previousDuration = parsedPreviousStart ? diffInDays(parsedPreviousStart, previousFinishedDate) : null
     const previousUpdate = { finishedAt: formatFaerunDate(previousFinishedDate) }
     if (previousDuration && previousDuration > 0) previousUpdate.duration = previousDuration
-    await updateDocFn(lastCycleDoc.ref, previousUpdate)
+    if (expedition) {
+      await settleExpedition(lastCycleDoc.ref, previousCycle, expedition, previousUpdate.finishedAt, {
+        collectionFn, docFn, runTransactionFn, serverTimestampFn, firestoreDb,
+      })
+      if (previousUpdate.duration) await updateDocFn(lastCycleDoc.ref, { duration: previousUpdate.duration })
+    } else {
+      await updateDocFn(lastCycleDoc.ref, previousUpdate)
+    }
     coinPigCycle = {
       cycleId: lastCycleDoc.id,
       startedAt: previousCycle.startedAt || '',
@@ -847,7 +995,7 @@ export async function createNewCycleWithEffects({
   await addDocFn(collectionFn(firestoreDb, 'religion-actions'), {
     actionType: docFn(firestoreDb, 'religion-action-types', 'cycleStart'),
     cycleId: cycleDoc.id,
-    notes: notes?.trim() || '',
+    notes: '',
     createdAt: serverTimestampFn(),
     convertedFollowers: 0,
     result: 0,

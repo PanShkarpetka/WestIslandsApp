@@ -7,6 +7,8 @@ import {
   distributeBuildingFaithIncome,
   consumeDevaFaithForMonthChange,
   createNewCycleWithEffects,
+  buildExpeditionDetails,
+  updateExpeditionDetails,
 } from '../../src/services/cycleService.js';
 import { createMockFirestore } from '../helpers/mockFirestore.js';
 
@@ -647,14 +649,14 @@ test('createNewCycleWithEffects throws on invalid date', async () => {
   );
 });
 
-test('createNewCycleWithEffects writes religionAction doc', async () => {
+test('createNewCycleWithEffects writes cycle religionAction without adventure title', async () => {
   const mock = createMockFirestore({
     'islands/island_rock': { manufactures: [] },
     'treasury/meta': { balance: 0 },
   });
 
   await createNewCycleWithEffects(
-    { startedDate: '1 Hammer 1490', notes: 'Test cycle' },
+    { startedDate: '1 Hammer 1490' },
     {
       ...mock.firebase,
       db: mock.db,
@@ -665,8 +667,120 @@ test('createNewCycleWithEffects writes religionAction doc', async () => {
 
   const actions = Object.values(mock.list('religion-actions'));
   assert.equal(actions.length, 1);
-  assert.equal(actions[0].notes, 'Test cycle');
+  assert.equal(actions[0].notes, '');
   assert.equal(actions[0].convertedFollowers, 0);
+});
+
+test('buildExpeditionDetails calculates crew groups and distributes remainder cents', () => {
+  const result = buildExpeditionDetails({
+    adventureTitle: 'Штормова затока',
+    durationDays: 5,
+    participantHeroIds: ['h1', 'h2', 'h3'],
+    crewGroups: [
+      { role: 'Моряки', count: 9, dailyRate: 2 },
+      { role: 'Капітан', count: 1, dailyRate: 10 },
+    ],
+  });
+
+  assert.equal(result.totalCrewCount, 10);
+  assert.equal(result.totalCost, 140);
+  assert.deepEqual(result.participantShares.map((item) => item.amount), [46.67, 46.67, 46.66]);
+});
+
+test('createNewCycleWithEffects stores expedition, deducts negative balances, and writes crew logs', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Hammer 1490', populationAtStart: 90, createdAt: 1 },
+    'heroes/h1': { name: 'Ада', goldBalance: 10 },
+    'heroes/h2': { name: 'Бран', goldBalance: 5 },
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await createNewCycleWithEffects({
+    startedDate: '8 Hammer 1490',
+    islandId: 'island_rock',
+    expedition: {
+      adventureTitle: 'Глибини', durationDays: 5, participantHeroIds: ['h1', 'h2'],
+      crewGroups: [{ role: 'Моряки', count: 4, dailyRate: 2 }], autoDeduct: true,
+    },
+  }, {
+    ...mock.firebase, db: mock.db,
+    settlePreviousSpellRequestsFn: async () => {}, generateSpellRequestsForCycleFn: async () => {},
+  });
+
+  assert.equal(mock.get('cycles/prev').expedition.totalCost, 40);
+  assert.equal(mock.get('heroes/h1').goldBalance, -10);
+  assert.equal(mock.get('heroes/h2').goldBalance, -15);
+  const logs = Object.values(mock.list('hero-transactions'));
+  assert.equal(logs.length, 2);
+  assert.ok(logs.every((log) => log.type === 'crew-payment' && log.cycleId === 'prev'));
+});
+
+test('createNewCycleWithEffects stores expedition without financial changes when auto deduction is disabled', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Hammer 1490', createdAt: 1 },
+    'heroes/h1': { name: 'Ада', goldBalance: 10 },
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+  });
+  await createNewCycleWithEffects({
+    startedDate: '8 Hammer 1490', islandId: 'island_rock',
+    expedition: { adventureTitle: 'Тиша', durationDays: 1, participantHeroIds: ['h1'], crewGroups: [{ role: 'Моряки', count: 1, dailyRate: 2 }], autoDeduct: false },
+  }, { ...mock.firebase, db: mock.db, settlePreviousSpellRequestsFn: async () => {}, generateSpellRequestsForCycleFn: async () => {} });
+
+  assert.equal(mock.get('cycles/prev').expedition.autoDeduct, false);
+  assert.equal(mock.get('heroes/h1').goldBalance, 10);
+  assert.equal(Object.keys(mock.list('hero-transactions')).length, 0);
+});
+
+test('updateExpeditionDetails recalculates data, marks it edited, and creates no financial transactions', async () => {
+  const mock = createMockFirestore({
+    'cycles/c1': {
+      startedAt: '1 Hammer 1490', finishedAt: '7 Hammer 1490',
+      expedition: {
+        adventureTitle: 'Глибини', durationDays: 5, participantHeroIds: ['h1'],
+        participants: [{ heroId: 'h1', heroName: 'Ада' }],
+        crewGroups: [{ role: 'Моряки', count: 2, dailyRate: 2 }],
+        totalCrewCount: 2, totalCost: 20, autoDeduct: true, paymentStatus: 'deducted',
+      },
+    },
+    'heroes/h1': { name: 'Ада', goldBalance: -10 },
+    'heroes/h2': { name: 'Бран', goldBalance: 30 },
+  });
+
+  await updateExpeditionDetails('c1', {
+    participantHeroIds: ['h1', 'h2'], durationDays: 3,
+    crewGroups: [{ role: 'Моряки', count: 4, dailyRate: 2 }],
+  }, { ...mock.firebase, db: mock.db });
+
+  const expedition = mock.get('cycles/c1').expedition;
+  assert.equal(expedition.totalCost, 24);
+  assert.equal(expedition.totalCrewCount, 4);
+  assert.equal(expedition.paymentStatus, 'edited');
+  assert.deepEqual(expedition.participantShares.map((row) => row.amount), [12, 12]);
+  assert.equal(mock.get('heroes/h1').goldBalance, -10);
+  assert.equal(mock.get('heroes/h2').goldBalance, 30);
+  assert.equal(Object.keys(mock.list('hero-transactions')).length, 0);
+});
+
+test('updateExpeditionDetails materializes a legacy expedition without financial transactions', async () => {
+  const mock = createMockFirestore({
+    'cycles/legacy': { startedAt: '1 Hammer 1490', finishedAt: '10 Hammer 1490' },
+    'heroes/h1': { name: 'Ада', goldBalance: 50 },
+  });
+
+  await updateExpeditionDetails('legacy', {
+    adventureTitle: 'Стара пригода', participantHeroIds: ['h1'], durationDays: 3,
+    crewGroups: [{ role: 'Моряки', count: 2, dailyRate: 2 }],
+  }, { ...mock.firebase, db: mock.db });
+
+  const expedition = mock.get('cycles/legacy').expedition;
+  assert.equal(expedition.adventureTitle, 'Стара пригода');
+  assert.equal(expedition.totalCost, 12);
+  assert.equal(expedition.autoDeduct, false);
+  assert.equal(expedition.paymentStatus, 'edited');
+  assert.equal(mock.get('heroes/h1').goldBalance, 50);
+  assert.equal(Object.keys(mock.list('hero-transactions')).length, 0);
 });
 
 // ─── distributeManufactureIncome — hero destination ──────────────────────────

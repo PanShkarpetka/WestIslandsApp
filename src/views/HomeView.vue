@@ -28,6 +28,29 @@
     <template v-else>
       <section class="dashboard-section">
         <div class="section-heading">
+          <v-icon size="18">mdi-map-marker-path</v-icon>
+          <h2>Остання експедиція</h2>
+          <v-spacer />
+          <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-format-list-bulleted" :disabled="!data.expeditions.length" @click="expeditionsDialog = true">
+            Усі експедиції
+          </v-btn>
+        </div>
+        <article v-if="data.lastCycle.expedition" class="dashboard-card expedition-card">
+          <div class="card-icon"><v-icon>mdi-sail-boat</v-icon></div>
+          <div class="card-main">
+            <div class="card-label">Назва пригоди</div>
+            <div class="card-title">{{ data.lastCycle.expedition.adventureTitle }}</div>
+            <div class="card-note">
+              Учасники: {{ expeditionParticipantNames }}<br>
+              Тривалість: {{ data.lastCycle.expedition.durationDays ?? 'невідомо' }} днів · Моряків: {{ data.lastCycle.expedition.totalCrewCount ?? 'невідомо' }}
+            </div>
+          </div>
+        </article>
+        <div v-else class="empty-panel">Дані про останню експедицію відсутні.</div>
+      </section>
+
+      <section class="dashboard-section">
+        <div class="section-heading">
           <v-icon size="18">mdi-tools</v-icon>
           <h2>Потребують ремонту</h2>
         </div>
@@ -131,6 +154,24 @@
       </section>
     </template>
   </v-container>
+
+  <v-dialog v-model="expeditionsDialog" max-width="1100">
+    <v-card>
+      <div class="pa-4 d-flex align-center" style="border-bottom: 1px solid var(--wi-border)">
+        <span class="wi-heading text-h6">Усі експедиції</span>
+        <v-spacer />
+        <v-btn icon="mdi-close" variant="text" aria-label="Закрити" @click="expeditionsDialog = false" />
+      </div>
+      <v-card-text class="pt-4">
+        <v-data-table :headers="expeditionHeaders" :items="data.expeditions" :items-per-page="10" density="compact">
+          <template #item.dates="{ item }">{{ item.startedAt }} — {{ item.finishedAt }}</template>
+          <template #item.participants="{ item }">{{ expeditionParticipants(item) }}</template>
+          <template #item.totalCrewCount="{ item }">{{ item.totalCrewCount ?? 'Невідомо' }}</template>
+          <template #item.durationDays="{ item }">{{ item.durationDays ?? 'Невідомо' }}</template>
+        </v-data-table>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
@@ -141,10 +182,12 @@ import { silverToGold } from '@/utils/fishingUtils.js'
 
 const loading = ref(true)
 const error = ref('')
+const expeditionsDialog = ref(false)
 const data = reactive({
   currentCycle: null,
   lastFinishedCycle: null,
   damagedShips: [],
+  expeditions: [],
   lastCycle: {
     treasury: { income: 0, expenses: 0, net: 0, count: 0 },
     population: null,
@@ -153,8 +196,17 @@ const data = reactive({
     bestCrafter: null,
     bestMageRequest: null,
     largestFaithSpend: null,
+    expedition: null,
   },
 })
+
+const expeditionHeaders = [
+  { title: 'Назва пригоди', key: 'adventureTitle' },
+  { title: 'Дати', key: 'dates' },
+  { title: 'Учасники', key: 'participants' },
+  { title: 'Моряків', key: 'totalCrewCount' },
+  { title: 'Днів', key: 'durationDays' },
+]
 
 const HighlightCard = defineComponent({
   props: {
@@ -176,6 +228,15 @@ const HighlightCard = defineComponent({
 })
 
 const populationDelta = computed(() => data.lastCycle.population?.populationDelta ?? null)
+const expeditionParticipantNames = computed(() => {
+  const participants = data.lastCycle.expedition?.participants || []
+  return participants.length ? participants.map((participant) => participant.heroName).join(', ') : 'невідомо'
+})
+
+function expeditionParticipants(expedition) {
+  const participants = expedition?.participants || []
+  return participants.length ? participants.map((participant) => participant.heroName).join(', ') : 'Невідомо'
+}
 const finishedCycleLabel = computed(() => {
   if (!data.lastFinishedCycle) return 'Немає завершеного циклу'
   if (data.lastFinishedCycle.startedAt && data.lastFinishedCycle.finishedAt) {

@@ -8,7 +8,67 @@ import {
   selectDashboardCycles,
   selectLargestFaithSpend,
   summarizeTreasuryTransactions,
+  resolveLastExpedition,
+  isCycleStartAction,
+  getLegacyExpeditionDurationDays,
+  buildExpeditionHistory,
 } from '../../src/services/dashboardService.js';
+
+test('resolveLastExpedition prefers structured data and falls back to legacy next-cycle notes', () => {
+  const structured = { adventureTitle: 'Острів бурі', durationDays: 4 };
+  assert.equal(resolveLastExpedition({ expedition: structured }, [{ notes: 'Стара назва' }]), structured);
+  assert.deepEqual(resolveLastExpedition({ id: 'old' }, [
+    { actionType: { id: 'influence' }, notes: 'Релігійна дія' },
+    { actionType: { id: 'cycleStart' }, notes: 'Стара назва' },
+  ]), {
+    adventureTitle: 'Стара назва',
+    durationDays: null,
+    legacy: true,
+  });
+});
+
+test('legacy expedition duration subtracts seven rest days from inclusive cycle dates', () => {
+  assert.equal(getLegacyExpeditionDurationDays({
+    startedAt: '22 Ches 818 рік після Потопу',
+    finishedAt: '5 Tarsakh 818 рік після Потопу',
+  }), 7);
+  assert.equal(getLegacyExpeditionDurationDays({ duration: 15 }), 8);
+  assert.equal(getLegacyExpeditionDurationDays({ duration: 5 }), 0);
+  assert.equal(getLegacyExpeditionDurationDays({ startedAt: 'bad', finishedAt: 'bad' }), null);
+});
+
+test('buildExpeditionHistory combines structured and legacy expeditions in newest-first order', () => {
+  const cycles = [
+    { id: 'old', startedAt: '1 Hammer 818', finishedAt: '10 Hammer 818', duration: 10, createdAt: 1 },
+    { id: 'finished', startedAt: '11 Hammer 818', finishedAt: '20 Hammer 818', createdAt: 2, expedition: {
+      adventureTitle: 'Нова пригода', durationDays: 3, totalCrewCount: 4,
+      participants: [{ heroId: 'h1', heroName: 'Ада' }],
+    } },
+    { id: 'current', startedAt: '21 Hammer 818', finishedAt: null, createdAt: 3 },
+  ];
+  const actions = [
+    { cycleId: 'finished', actionType: { id: 'cycleStart' }, notes: 'Стара пригода' },
+  ];
+
+  assert.deepEqual(buildExpeditionHistory(cycles, actions), [
+    {
+      id: 'finished', adventureTitle: 'Нова пригода', startedAt: '11 Hammer 818', finishedAt: '20 Hammer 818',
+      participants: [{ heroId: 'h1', heroName: 'Ада' }], totalCrewCount: 4, durationDays: 3, legacy: false,
+    },
+    {
+      id: 'old', adventureTitle: 'Стара пригода', startedAt: '1 Hammer 818', finishedAt: '10 Hammer 818',
+      participants: [], totalCrewCount: null, durationDays: 3, legacy: true,
+    },
+  ]);
+});
+
+test('legacy expedition detection accepts only cycleStart religion actions', () => {
+  assert.equal(isCycleStartAction({ actionType: { id: 'cycleStart' } }), true);
+  assert.equal(isCycleStartAction({ actionTypeId: 'cycleStart' }), true);
+  assert.equal(isCycleStartAction({ actionType: { path: 'religion-action-types/cycleStart' } }), true);
+  assert.equal(isCycleStartAction({ actionType: { id: 'awardAdventure' }, notes: 'Not an expedition title' }), false);
+  assert.equal(resolveLastExpedition({ id: 'old' }, [{ actionType: { id: 'shield' }, notes: 'Щит' }]), null);
+});
 
 test('selectDashboardCycles returns active current cycle and newest finished cycle', () => {
   const cycles = [
