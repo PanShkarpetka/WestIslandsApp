@@ -13,7 +13,7 @@
         <v-tab value="logs" prepend-icon="mdi-format-list-bulleted">Лог подій</v-tab>
       </v-tabs>
 
-      <v-window v-model="adminTab" class="admin-tab-window">
+      <v-window v-model="adminTab" :touch="false" class="admin-tab-window">
         <v-window-item value="cycles">
       <v-card-title class="text-h6">Керування циклами</v-card-title>
       <v-alert v-if="cycleError" type="error" variant="tonal" class="mb-4">{{ cycleError }}</v-alert>
