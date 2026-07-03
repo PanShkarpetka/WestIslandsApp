@@ -1,13 +1,10 @@
 <template>
-  <v-container>
-    <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="6">
-        <h1 class="text-h5">Актуальні пропозиції</h1>
-      </v-col>
-    </v-row>
-    <div v-if="!proposals.length">
-      Наразі немає актуальних пропозицій.
-    </div>
+  <v-container class="politics-page">
+    <WiPageHeader title="Політика острова" icon="mdi-vote" />
+    <WiSectionHeader title="Актуальні пропозиції" icon="mdi-file-document-multiple" />
+    <WiPanel v-if="!proposals.length">
+      <WiEmptyState title="Наразі немає актуальних пропозицій" icon="mdi-file-document-outline" />
+    </WiPanel>
     <v-row v-if="!isAdmin" justify="space-between" align="center" class="my-4">
       <v-col cols="12">
         <div class="space-y-4">
@@ -121,11 +118,7 @@
       </div>
     </div>
     <!-- Interests matrix -->
-    <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="6">
-        <h1 class="text-h5">Інтереси груп</h1>
-      </v-col>
-    </v-row>
+    <WiSectionHeader title="Інтереси груп" icon="mdi-table-large" />
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12" sm="12">
         Всього голосів: <b>{{ VOTE_FMT(TOTAL_VOTES) }}</b>;
@@ -206,6 +199,10 @@ import {
 import { apportionFixed } from '@/utils/votes';
 import { useUserStore } from "@/store/userStore.js";
 import { useInterestGroupStore } from '@/store/interestGroupStore';
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
+import WiSectionHeader from '@/components/ui/WiSectionHeader.vue'
 
 const auth = useUserStore()
 
@@ -410,6 +407,10 @@ async function updatePeople(groupId, proposalId, value) {
 
 
 <style scoped>
+.politics-page {
+  padding-top: 24px;
+  padding-bottom: 40px;
+}
 .space-y-8 > * + * { margin-top: 2rem; }
 .space-y-4 > * + * { margin-top: 1rem; }
 /* ширина як на сторінці зборів */
@@ -421,7 +422,8 @@ async function updatePeople(groupId, proposalId, value) {
 /* картка у стилі «цілей зборів» */
 .proposal-card {
   border-radius: 16px;
-  background: #fff;
+  background: var(--wi-surface);
+  border: 1px solid var(--wi-border);
   min-height: 250px;
 }
 
@@ -452,7 +454,9 @@ async function updatePeople(groupId, proposalId, value) {
   overflow: auto;          /* і вертикальний, і горизонтальний скрол */
   width: 100%;
   -webkit-overflow-scrolling: touch; /* плавний скрол на мобільних */
-  background: #fff;
+  background: var(--wi-surface);
+  border: 1px solid var(--wi-border);
+  border-radius: var(--wi-radius-md);
 }
 
 /* Базова таблиця */
@@ -475,7 +479,8 @@ async function updatePeople(groupId, proposalId, value) {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #fff;
+  color: var(--wi-gold-light);
+  background: var(--wi-surface-hi);
   box-shadow: inset 0 -1px 0 #e5e7eb; /* лінія під хедером */
 }
 
@@ -538,5 +543,22 @@ async function updatePeople(groupId, proposalId, value) {
 
 /* Optional: shrink/hide the image on very small screens */
 @media (max-width: 600px){ .with-bg{ --bgW: 100%; } }
+
+.matrix thead th {
+  box-shadow: inset 0 -1px 0 var(--wi-border);
+}
+
+.matrix .sticky-col {
+  background: var(--wi-surface);
+  box-shadow: 1px 0 0 var(--wi-border);
+}
+
+.matrix thead .sticky-col {
+  background: var(--wi-surface-hi);
+}
+
+.matrix tbody tr {
+  border-top-color: var(--wi-border);
+}
 
 </style>

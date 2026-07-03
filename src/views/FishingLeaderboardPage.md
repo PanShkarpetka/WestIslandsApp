@@ -7,6 +7,8 @@
 
 Displays leaderboard statistics for the Telegram fishing bot. The page reads `fishing-logs` and `heroes` so public fishing stats can show linked hero names instead of Telegram usernames. It updates in real-time via `onSnapshot`.
 
+The period filter now sits in the shared page header, and the existing catch/success summaries use shared metric cards. Rankings and availability data are unchanged.
+
 ## Sections
 
 1. **Header + Time Filter** — Title and a dropdown filter (All Time / This Week / Today). Filtering is client-side using ISO timestamp comparison.

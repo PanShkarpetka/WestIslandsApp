@@ -7,6 +7,8 @@ Route: `/politics` — `requiresAuth: false`.
 ## Purpose
 Political proposals and interest group vote distribution. Non-admins see a read-only card view of current proposals with vote progress. Admins can CRUD proposals, toggle actuality, and edit the interest matrix.
 
+The hidden route uses shared page, section, panel, and empty-state hierarchy. Vote calculations and Firestore behavior are unchanged.
+
 ## Sections
 
 ### Proposals (user view)

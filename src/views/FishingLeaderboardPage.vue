@@ -2,11 +2,8 @@
   <v-container class="fishing-page">
 
     <!-- Header -->
-    <div class="fishing-header">
-      <div class="fishing-title">
-        <v-icon class="mr-2" size="20">mdi-fish</v-icon>
-        Таблиця рибалок
-      </div>
+    <WiPageHeader title="Таблиця рибалок" icon="mdi-fish">
+      <template #actions>
       <v-select
         v-model="timeFilter"
         :items="filterOptions"
@@ -17,27 +14,18 @@
         hide-details
         class="filter-select"
       />
-    </div>
+      </template>
+    </WiPageHeader>
 
     <div v-if="store.error" class="fishing-error">
       <v-icon class="mr-2" size="14">mdi-skull-crossbones</v-icon>{{ store.error }}
     </div>
 
     <!-- Summary stats -->
-    <v-row class="mb-4">
-      <v-col cols="12" sm="6">
-        <div class="stat-card">
-          <div class="stat-value wi-number">{{ totalCatches }}</div>
-          <div class="stat-label wi-muted-text">Всього зловлено</div>
-        </div>
-      </v-col>
-      <v-col cols="12" sm="6">
-        <div class="stat-card">
-          <div class="stat-value wi-number">{{ successRate }}%</div>
-          <div class="stat-label wi-muted-text">Успішність</div>
-        </div>
-      </v-col>
-    </v-row>
+    <div class="fishing-metrics">
+      <WiMetricCard label="Всього зловлено" :value="totalCatches" />
+      <WiMetricCard label="Успішність" :value="`${successRate}%`" tone="success" />
+    </div>
 
     <!-- Rankings table -->
     <div class="section-title">
@@ -263,6 +251,8 @@ import { useUserStore } from '@/store/userStore';
 import { formatAmount } from '@/utils/formatters';
 import { resolveFishValue, silverToGold } from '@/utils/fishingUtils';
 import { aggregateTreasureRankings, getLogTreasures } from '@/utils/fishingTreasures';
+import WiMetricCard from '@/components/ui/WiMetricCard.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
 
 const store = useFishingLeaderboardStore();
 const fishStore = useFishStore();
@@ -539,6 +529,16 @@ function timeAgo(ts) {
 </script>
 
 <style scoped>
+.fishing-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .fishing-metrics { grid-template-columns: 1fr; }
+}
 .fishing-page {
   max-width: 900px;
 }
