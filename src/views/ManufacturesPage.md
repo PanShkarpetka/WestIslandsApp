@@ -5,6 +5,8 @@ Route: `/islands/:islandId/manufactures` (child of IslandsPage).
 ## Purpose
 Lists manufactures and auto-income/expense entries linked to the island, split across two tabs.
 
+The page uses `WiPageHeader`, `WiActionButton`, `WiPanel`, and `WiEmptyState` for consistent hierarchy and states. Existing invoice-style item cards remain the primary list surface.
+
 ## Tabs
 - **Мануфактури** — items with `type === 'manufacture'` or no `type` field (backward compat). Physical production facilities like Ферма Берика, Жир та Олія Моніки.
 - **Авто-доходи** — items with `type === 'auto'`. Automatic periodic income or expense entries not tied to a physical manufacture.
@@ -34,6 +36,8 @@ Single dialog handles both modes (`dialogMode: 'add' | 'edit'`). When adding, `t
 **Edit**: updates the existing document in place; updates local `manufactures.value` array optimistically.
 
 Form fields: name (required), description, type, and one or more payout rows. Each payout row selects either fixed payout fields or Coin Pig participants.
+
+The form uses the shared `WiDialogFrame` and save action button. No payout fields, destinations, or mutations were changed by the visual migration.
 
 ## Stores
 - `useIslandStore` — `data.manufactures`, `data.id`

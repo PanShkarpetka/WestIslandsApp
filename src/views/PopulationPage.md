@@ -8,7 +8,9 @@ Displays population groups as image cards with stats. Includes a pie chart summa
 ## Layout
 Two-column flex layout:
 - **Cards column** (`flex: 1 1 520px`) — `v-row` of group cards, one per population group
-- **Chart column** (`flex: 0 1 320px`) — pie chart with total/income summary
+- **Chart column** (`flex: 0 1 320px`) — `WiPanel` with the pie chart and total/income summary
+
+The page uses `WiPageHeader`, `WiPanel`, and `WiEmptyState` for shared island-page hierarchy and loading/empty states.
 
 ## Population group cards
 Each card shows:
@@ -25,6 +27,8 @@ Opens when admin clicks any card. Shows all groups at once with slider + number 
 - Sum of all groups must not exceed `totalPopulation` (from `islandStore`)
 - Slider ceiling auto-expands to `max(totalPopulation, maxGroupValue, 100)`
 - `overLimit` computed blocks save button
+
+The dialog uses the shared `WiDialogFrame` and `WiActionButton`; population fields and save behavior are unchanged.
 
 ## Stores
 - `usePopulationStore` — `startListening(islandId)` / `stopListening()`, `groupsAugmented`, `totalPopulation`, `populationIncomeTotal`, `setGroupCount(id, count)`

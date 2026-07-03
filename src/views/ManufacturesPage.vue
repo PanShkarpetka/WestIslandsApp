@@ -1,5 +1,12 @@
 <template>
-  <div class="manufactures-page">
+  <v-container class="manufactures-page">
+    <WiPageHeader :title="pageTitle" :icon="pageIcon">
+      <template #actions>
+        <WiActionButton v-if="isAdmin" prepend-icon="mdi-plus" @click="openAddDialog">
+          Додати
+        </WiActionButton>
+      </template>
+    </WiPageHeader>
 
     <!-- Tabs -->
     <v-tabs v-model="activeTab" align-tabs="start" class="mfg-tabs mb-4">
@@ -13,30 +20,21 @@
       </v-tab>
     </v-tabs>
 
-    <!-- Header row -->
-    <div class="mfg-header">
-      <div class="mfg-title">
-        <v-icon class="mr-2" size="20">{{ activeTab === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew' }}</v-icon>
-        {{ activeTab === 'manufactures' ? 'Мануфактури острова' : 'Авто-доходи та витрати' }}
-      </div>
-      <v-btn v-if="isAdmin" class="add-btn" prepend-icon="mdi-plus" @click="openAddDialog">
-        Додати
-      </v-btn>
-    </div>
-
     <!-- States -->
-    <div v-if="loading" class="mfg-state">
-      <v-icon class="mr-2" size="16">mdi-compass</v-icon>
-      Завантаження…
-    </div>
-    <div v-else-if="error" class="mfg-state mfg-error">
-      <v-icon class="mr-2" size="16">mdi-skull-crossbones</v-icon>
-      {{ error }}
-    </div>
-    <div v-else-if="!visibleItems.length" class="mfg-state">
-      <v-icon class="mr-2" size="16">mdi-anchor</v-icon>
-      {{ activeTab === 'manufactures' ? 'Наразі на острові немає мануфактур.' : 'Наразі немає авто-доходів чи витрат.' }}
-    </div>
+    <WiPanel v-if="loading" variant="sea">
+      <WiEmptyState title="Завантажуємо записи" icon="mdi-loading">
+        <v-progress-circular indeterminate color="primary" size="24" />
+      </WiEmptyState>
+    </WiPanel>
+    <WiPanel v-else-if="error" variant="danger">
+      <WiEmptyState title="Не вдалося завантажити записи" :text="error" icon="mdi-alert-circle" />
+    </WiPanel>
+    <WiPanel v-else-if="!visibleItems.length">
+      <WiEmptyState
+        :title="activeTab === 'manufactures' ? 'На острові немає мануфактур' : 'Автоматичні доходи та витрати відсутні'"
+        :icon="activeTab === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew'"
+      />
+    </WiPanel>
 
     <!-- Cards grid -->
     <v-row v-else class="mfg-grid">
@@ -120,12 +118,7 @@
 
     <!-- Add/Edit dialog -->
     <v-dialog v-model="dialogOpen" max-width="560" :fullscreen="$vuetify.display.smAndDown" scrollable>
-      <v-card class="mfg-dialog">
-        <div class="mfg-dialog-header">
-          <v-icon class="mr-2">{{ dialogMode === 'add' ? (activeTab === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew') : 'mdi-feather' }}</v-icon>
-          {{ dialogMode === 'add' ? (activeTab === 'manufactures' ? 'Нова мануфактура' : 'Новий авто-дохід') : 'Редагувати запис' }}
-        </div>
-        <v-card-text class="mfg-dialog-body">
+      <WiDialogFrame :title="dialogTitle" :icon="dialogIcon">
           <v-text-field
             v-model="form.name"
             label="Назва"
@@ -291,9 +284,7 @@
           <div v-if="formError" class="mfg-dialog-error">
             <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>{{ formError }}
           </div>
-        </v-card-text>
-        <v-divider style="border-color: var(--wi-border)" />
-        <v-card-actions class="mfg-dialog-actions">
+        <template #actions>
           <!-- Delete (edit mode only) -->
           <template v-if="dialogMode === 'edit'">
             <v-btn
@@ -315,14 +306,14 @@
             <v-btn variant="text" class="cancel-btn" @click="dialogOpen = false">Скасувати</v-btn>
           </template>
           <v-spacer />
-          <v-btn class="save-btn" :loading="saving" prepend-icon="mdi-feather" @click="saveManufacture">
+          <WiActionButton :loading="saving" prepend-icon="mdi-content-save" @click="saveManufacture">
             Зберегти
-          </v-btn>
-        </v-card-actions>
-      </v-card>
+          </WiActionButton>
+        </template>
+      </WiDialogFrame>
     </v-dialog>
 
-  </div>
+  </v-container>
 </template>
 
 <script setup>
@@ -336,14 +327,18 @@ import { useGoodsStore } from '@/store/goodsStore'
 import { useHeroesStore } from '@/store/heroesStore'
 import { db } from '@/services/firebase'
 import { formatAmount } from '@/utils/formatters'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const islandStore = useIslandStore()
 const { data: island } = storeToRefs(islandStore)
-const userStore = useUserStore()
 const guildStore = useGuildStore()
 const goodsStore = useGoodsStore()
 const heroesStore = useHeroesStore()
-const isAdmin = computed(() => !!userStore.isAdmin)
+const isAdmin = computed(() => useUserStore().isAdmin ?? false)
 
 const activeTab = ref('manufactures')
 const manufactures = ref([])
@@ -356,6 +351,12 @@ const deleting = ref(false)
 const confirmDelete = ref(false)
 const formError = ref('')
 const form = ref({ id: null, name: '', description: '', type: 'manufacture', payouts: [emptyPayout()] })
+const pageTitle = computed(() => activeTab.value === 'manufactures' ? 'Мануфактури острова' : 'Автоматичні доходи та витрати')
+const pageIcon = computed(() => activeTab.value === 'manufactures' ? 'mdi-factory' : 'mdi-autorenew')
+const dialogTitle = computed(() => dialogMode.value === 'add'
+  ? (activeTab.value === 'manufactures' ? 'Нова мануфактура' : 'Новий авто-дохід')
+  : 'Редагувати запис')
+const dialogIcon = computed(() => dialogMode.value === 'add' ? pageIcon.value : 'mdi-feather')
 
 function emptyPayout() {
   return { mechanic: 'fixed', destination: 'treasury', income: 0, incomeGoods: [], participantHeroIds: [] }
@@ -667,7 +668,8 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
 <style scoped>
 /* ── Page header ────────────────────────────────────────────── */
 .manufactures-page {
-  padding-bottom: 16px;
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
 .mfg-tabs {
@@ -692,51 +694,10 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
   background-color: var(--wi-gold) !important;
 }
 
-.mfg-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  margin-top: 16px;
-}
-
-.mfg-title {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-heading);
-  font-size: 1.1rem;
-  letter-spacing: 0.06em;
-  color: var(--wi-gold);
-}
-
-.add-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-  font-size: 0.8rem !important;
-}
-
-.add-btn :deep(.v-btn__overlay) {
-  opacity: 0 !important;
-}
-
-/* States */
-.mfg-state {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-body);
-  font-style: italic;
-  color: var(--wi-text-muted);
-  padding: 24px 0;
-}
-
-.mfg-error { color: var(--wi-danger); }
-
 /* ── Invoice card ───────────────────────────────────────────── */
 .mfg-grid {
   margin: 0 -8px;
+  padding-top: 16px;
 }
 
 .invoice-card {
@@ -864,36 +825,12 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
 }
 
 /* ── Dialog ─────────────────────────────────────────────────── */
-.mfg-dialog {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
-  border: 1px solid var(--wi-gold) !important;
-}
-
-.mfg-dialog-header {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--wi-border);
-  font-family: var(--wi-font-heading);
-  font-size: 1rem;
-  color: var(--wi-gold);
-  letter-spacing: 0.06em;
-}
-
-.mfg-dialog-body {
-  padding: 20px !important;
-}
-
 .mfg-dialog-error {
   display: flex;
   align-items: center;
   color: var(--wi-danger);
   font-size: 0.85rem;
   margin-top: 10px;
-}
-
-.mfg-dialog-actions {
-  padding: 12px 20px !important;
 }
 
 .cancel-btn {
@@ -912,18 +849,6 @@ watch(() => island.value?.manufactures, (ids) => { loadManufactures(ids) }, { de
   color: var(--wi-danger);
   letter-spacing: 0.05em;
   margin-right: 4px;
-}
-
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
-
-.save-btn :deep(.v-btn__overlay) {
-  opacity: 0 !important;
 }
 
 /* ── Payouts form ───────────────────────────────────────────── */
