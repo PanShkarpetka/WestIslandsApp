@@ -131,7 +131,6 @@ const addYieldError = ref('')
 const addingYield = ref(false)
 
 onMounted(async () => {
-  islandStore.subscribe()
   yieldBuildingStore.subscribe()
 
   try {
@@ -149,7 +148,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  islandStore.stop()
   yieldBuildingStore.stop()
 })
 
