@@ -35,4 +35,4 @@ All started in `onMounted`, stopped in `onBeforeUnmount`:
 The Crafting tab subscribes to pending `crafting-requests`, lets admins approve or reject them with checkboxes, and shows the validated crafting log for the active cycle from `cycle-crafting-logs`. Only approved requests are converted into real crafting progress and crafting logs.
 
 ## Styling
-Single `.admin-card` wrapping everything. Deep CSS overrides for Vuetify data tables, expansion panels, and inner cards to match the dark pirate theme.
+`WiPageHeader` provides the shared page hierarchy above the existing `.admin-card` workspace. Deep CSS overrides for Vuetify data tables, expansion panels, and inner cards remain in place to preserve the dense admin workflows.
