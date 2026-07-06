@@ -1011,6 +1011,7 @@ const spreadTargetReligionOptions = computed(() =>
 const spreadTargetReligion = computed(() =>
   religionStore.religions.find((item) => item.id === spreadReligionForm.targetReligionId) || null,
 )
+const spreadReligionTargetShieldActive = computed(() => Boolean(spreadTargetReligion.value?.shieldActive))
 const spreadTargetSVTotal = computed(() => {
   const svBase = Number(spreadTargetReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
   const svTemp = Number(spreadTargetReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)

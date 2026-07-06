@@ -96,7 +96,7 @@
         <v-card-actions class="guild-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="showGuildDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" prepend-icon="mdi-feather" @click="saveGuild">Зберегти</v-btn>
+          <WiActionButton prepend-icon="mdi-feather" @click="saveGuild">Зберегти</WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -128,7 +128,7 @@
         <v-card-actions class="guild-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="showTxDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="txLoading" @click="submitTransaction">Підтвердити</v-btn>
+          <WiActionButton :loading="txLoading" @click="submitTransaction">Підтвердити</WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -296,7 +296,7 @@
         <v-card-actions class="guild-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="showGoodsDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="goodsTxLoading" @click="submitGoodsTransaction">Підтвердити</v-btn>
+          <WiActionButton :loading="goodsTxLoading" @click="submitGoodsTransaction">Підтвердити</WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -756,15 +756,6 @@ onBeforeUnmount(() => { store.unsubscribeGuilds(); goodsStore.unsubscribeGoods()
   font-family: var(--wi-font-heading) !important;
   letter-spacing: 0.06em !important;
 }
-
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
-.save-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
 
 /* ── Ledger ─────────────────────────────────────────────────── */
 .guild-ledger-wrap { overflow-x: auto; }

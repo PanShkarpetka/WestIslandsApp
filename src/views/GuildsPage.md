@@ -15,6 +15,8 @@ Shared page-header, action, panel, and empty-state primitives provide consistent
 ## Dialogs
 Three separate dialogs on the same page:
 
+Primary create and transaction confirmations use the shared `WiActionButton` styling.
+
 ### Create/Edit guild dialog (`showGuildDialog`)
 Fields: name, shortName, leader, visibleToAll (checkbox), withdrawUsername, withdrawPassword, treasure (initial balance).
 
