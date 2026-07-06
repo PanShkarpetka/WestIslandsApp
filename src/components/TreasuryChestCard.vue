@@ -22,19 +22,13 @@
 
     <!-- Dialog -->
     <v-dialog v-model="isOpen" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
-      <v-card class="chest-dialog">
-
-        <div class="chest-dialog-header">
-          <v-icon class="mr-2">mdi-treasure-chest</v-icon>
-          <span>{{ mode === 'deposit' ? 'Внесок у скарбницю' : 'Зняття зі скарбниці' }}</span>
-          <v-spacer />
+      <WiDialogFrame :title="mode === 'deposit' ? 'Внесок у скарбницю' : 'Зняття зі скарбниці'" icon="mdi-treasure-chest">
+        <template #header-actions>
           <span class="chest-dialog-balance">
             <v-icon size="14" class="mr-1">mdi-gold</v-icon>
             {{ formattedBalance }} зм
           </span>
-        </div>
-
-        <v-card-text class="chest-dialog-body">
+        </template>
 
           <!-- Mode toggle (admin only) -->
           <div v-if="isAdmin" class="mode-toggle-wrap">
@@ -106,24 +100,20 @@
           <div v-if="error" class="chest-dialog-error">
             <v-icon size="14" class="mr-1">mdi-skull-crossbones</v-icon>{{ error }}
           </div>
-        </v-card-text>
-
-        <v-divider style="border-color: var(--wi-border)" />
-        <v-card-actions class="chest-dialog-actions">
-          <v-btn variant="text" class="cancel-btn" @click="isOpen = false">Скасувати</v-btn>
+        <template #actions>
+          <v-btn variant="text" @click="isOpen = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn
+          <WiActionButton
             :loading="loading"
             :disabled="!isLoggedIn"
-            class="confirm-btn"
             size="large"
             :prepend-icon="mode === 'deposit' ? 'mdi-tray-arrow-down' : 'mdi-tray-arrow-up'"
             @click="submit"
           >
             Підтвердити
-          </v-btn>
-        </v-card-actions>
-      </v-card>
+          </WiActionButton>
+        </template>
+      </WiDialogFrame>
     </v-dialog>
   </div>
 </template>
@@ -134,6 +124,8 @@ import { useTreasuryStore } from '@/store/treasuryStore'
 import { useUserStore } from '@/store/userStore'
 import { useGuildStore } from '@/store/guildStore'
 import { formatAmount } from '@/utils/formatters'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
 
 const treasury = useTreasuryStore()
 const guildStore = useGuildStore()
@@ -147,7 +139,7 @@ const loading = ref(false)
 const error = ref('')
 const splitWithAdventurerGuild = ref(false)
 
-const isAdmin = computed(() => !!user.isAdmin)
+const isAdmin = computed(() => user.isAdmin ?? false)
 const isLoggedIn = computed(() => user.nickname !== '')
 const balance = computed(() => treasury.balance)
 const formattedBalance = computed(() => formatAmount(balance.value))
@@ -270,23 +262,6 @@ onBeforeUnmount(() => treasury.unsubscribeBalance())
   color: var(--wi-gold);
 }
 
-/* ── Dialog ─────────────────────────────────────────────────── */
-.chest-dialog {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
-  border: 1px solid var(--wi-gold) !important;
-}
-
-.chest-dialog-header {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--wi-border);
-  font-family: var(--wi-font-heading);
-  font-size: 1.1rem;
-  color: var(--wi-gold);
-  letter-spacing: 0.06em;
-}
-
 .chest-dialog-balance {
   font-family: var(--wi-font-number);
   font-size: 0.9rem;
@@ -294,10 +269,6 @@ onBeforeUnmount(() => treasury.unsubscribeBalance())
   opacity: 0.8;
   display: flex;
   align-items: center;
-}
-
-.chest-dialog-body {
-  padding: 20px !important;
 }
 
 /* Mode toggle */
@@ -375,21 +346,4 @@ onBeforeUnmount(() => treasury.unsubscribeBalance())
   margin-top: 8px;
 }
 
-/* Actions */
-.chest-dialog-actions {
-  padding: 12px 20px !important;
-}
-
-.cancel-btn {
-  color: var(--wi-text-muted) !important;
-  font-family: var(--wi-font-heading) !important;
-}
-
-.confirm-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
 </style>

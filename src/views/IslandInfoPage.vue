@@ -1,12 +1,7 @@
 <template>
   <div class="island-info">
 
-    <div class="log-card">
-      <div class="log-card-header">
-        <v-icon class="mr-2" size="18">mdi-scroll-text</v-icon>
-        Параметри острова
-      </div>
-
+    <WiPanel title="Параметри острова" icon="mdi-scroll-text" flush>
       <div class="log-fields">
         <div class="log-row">
           <span class="log-label">Назва</span>
@@ -38,23 +33,24 @@
           <v-text-field v-else v-model.number="form.repairDiscount" type="number" min="0" max="100" variant="underlined" density="compact" hide-details class="log-input" suffix="%" />
         </div>
       </div>
-    </div>
+    </WiPanel>
 
     <div v-if="isAdmin" class="save-row">
-      <v-btn class="save-btn" :loading="saving" @click="save">
-        <v-icon start>mdi-feather</v-icon>
+      <WiActionButton :loading="saving" prepend-icon="mdi-feather" @click="save">
         Записати зміни
-      </v-btn>
+      </WiActionButton>
     </div>
 
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useIslandStore } from '@/store/islandStore.js'
 import { useUserStore } from '@/store/userStore.js'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const auth = useUserStore()
 const isAdmin = computed(() => auth?.isAdmin ?? false)
@@ -63,9 +59,6 @@ const { data: island } = storeToRefs(islandStore)
 
 const saving = ref(false)
 const form = reactive({ name: '', population: 0, sailors: 0, characters: 0, buildingDiscount: 0, repairDiscount: 0 })
-
-onMounted(() => islandStore.subscribe())
-onUnmounted(() => islandStore.stop())
 
 watch(island, (v) => {
   if (!v) return
@@ -99,31 +92,6 @@ async function save() {
 }
 
 /* ── Captain's log card ─────────────────────────────────────── */
-.log-card {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%);
-  border: 1px solid var(--wi-border);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-
-.log-card-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  background: #1a1108;
-  border-bottom: 1px solid var(--wi-border);
-  font-family: var(--wi-font-heading);
-  font-size: 0.8rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-}
-
-.log-card-header .v-icon {
-  color: var(--wi-gold) !important;
-}
-
 /* ── Log rows ───────────────────────────────────────────────── */
 .log-fields {
   padding: 8px 0;
@@ -185,11 +153,4 @@ async function save() {
   margin-top: 16px;
 }
 
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.08em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
 </style>

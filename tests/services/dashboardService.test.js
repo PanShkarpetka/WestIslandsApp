@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   aggregateBestCrafter,
+  enrichBestFishCatch,
+  enrichFaithSpendActions,
   getBuildingsAdded,
   getDamagedShips,
+  selectBestFishCatch,
   selectBestMageRequest,
   selectDashboardCycles,
   selectLargestFaithSpend,
@@ -136,6 +139,50 @@ test('selectLargestFaithSpend returns largest explicit faith spend', () => {
 
   assert.equal(result.id, 'b');
   assert.equal(result.faithSpent, 25);
+});
+
+test('selectLargestFaithSpend recognizes religion action investedFaith field', () => {
+  const result = selectLargestFaithSpend([
+    { id: 'shield', investedFaith: 50, actionType: { id: 'shield' } },
+    { id: 'spread', investedFaith: 100, actionType: { id: 'influence' } },
+  ]);
+
+  assert.equal(result.id, 'spread');
+  assert.equal(result.faithSpent, 100);
+});
+
+test('enrichFaithSpendActions resolves hero names from existing hero records', () => {
+  const result = enrichFaithSpendActions(
+    [{ id: 'spread', heroId: 'hero-1', investedFaith: 100, user: 'Admin' }],
+    [{ id: 'hero-1', name: 'Дік' }],
+  );
+
+  assert.equal(result[0].heroName, 'Дік');
+});
+
+test('selectBestFishCatch displays linked hero name instead of telegram username', () => {
+  const result = selectBestFishCatch([
+    {
+      heroId: 'hero-1',
+      telegramUsername: 'telegram-player',
+      successFailureResult: 'success',
+      effectiveRollUsed: 12,
+      fishSelected: [{ fishName: 'Golden Tuna', fishValueSilver: 80 }],
+    },
+  ], { heroes: [{ id: 'hero-1', name: 'Каеларіс' }] });
+
+  assert.equal(result.username, 'Каеларіс');
+  assert.equal(result.heroName, 'Каеларіс');
+});
+
+test('enrichBestFishCatch resolves summary hero name instead of stored telegram username', () => {
+  const result = enrichBestFishCatch(
+    { fishName: 'Golden Tuna', fishValue: 80, username: 'telegram-player', heroId: 'hero-1' },
+    [{ id: 'hero-1', name: 'Каеларіс' }],
+  );
+
+  assert.equal(result.username, 'Каеларіс');
+  assert.equal(result.heroName, 'Каеларіс');
 });
 
 test('aggregateBestCrafter ranks by total component value', () => {

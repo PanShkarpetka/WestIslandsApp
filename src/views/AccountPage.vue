@@ -1,20 +1,16 @@
 <template>
-  <v-container class="account-page py-6">
-    <div class="account-header mb-6">
-      <v-icon class="mr-2" size="26" color="primary">mdi-account</v-icon>
-      <h1 class="wi-heading">{{ userStore.nickname }}</h1>
-      <span class="account-subtitle">Особистий рахунок</span>
-    </div>
+  <v-container class="account-page">
+    <WiPageHeader :title="userStore.nickname || 'Особистий рахунок'" icon="mdi-account" subtitle="Особистий рахунок" />
 
-    <div v-if="loading" class="account-state">
-      <v-icon class="mr-2">mdi-compass</v-icon>
-      Завантаження...
-    </div>
+    <WiPanel v-if="loading" variant="sea">
+      <WiEmptyState title="Завантажуємо особистий рахунок" icon="mdi-loading">
+        <v-progress-circular indeterminate color="primary" size="24" />
+      </WiEmptyState>
+    </WiPanel>
 
-    <div v-else-if="loadError" class="account-state account-error">
-      <v-icon class="mr-2">mdi-skull-crossbones</v-icon>
-      {{ loadError }}
-    </div>
+    <WiPanel v-else-if="loadError" variant="danger">
+      <WiEmptyState title="Не вдалося завантажити рахунок" :text="loadError" icon="mdi-alert-circle" />
+    </WiPanel>
 
     <template v-else>
       <v-card class="account-card mb-4" elevation="0">
@@ -126,15 +122,14 @@
               >
                 Відпустити
               </v-btn>
-              <v-btn
-                class="save-btn"
+              <WiActionButton
                 prepend-icon="mdi-cash-plus"
                 :disabled="!selectedFishIds.length || Boolean(fishActionLoading)"
                 :loading="fishActionLoading === 'sell'"
                 @click="sellSelectedFish"
               >
                 Продати
-              </v-btn>
+              </WiActionButton>
             </div>
           </template>
         </v-card-text>
@@ -265,9 +260,9 @@
         <v-card-actions class="pa-4">
           <v-btn variant="text" class="cancel-btn" @click="goldDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="withdrawing" prepend-icon="mdi-check" @click="withdrawGold">
+          <WiActionButton :loading="withdrawing" prepend-icon="mdi-check" @click="withdrawGold">
             Підтвердити
-          </v-btn>
+          </WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -300,9 +295,9 @@
         <v-card-actions class="pa-4">
           <v-btn variant="text" class="cancel-btn" @click="goodsDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="withdrawing" prepend-icon="mdi-check" @click="withdrawGoods">
+          <WiActionButton :loading="withdrawing" prepend-icon="mdi-check" @click="withdrawGoods">
             Підтвердити
-          </v-btn>
+          </WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -331,6 +326,10 @@ import {
   removeCaughtTreasure,
 } from '@/services/caughtTreasureService.js'
 import { subscribeCurrentCycleUsedDays } from '@/services/usedDaysService.js'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const userStore = useUserStore()
 const goodsStore = useGoodsStore()
@@ -715,31 +714,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .account-page {
   max-width: 720px;
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
-
-.account-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.account-subtitle {
-  font-family: var(--wi-font-body);
-  font-style: italic;
-  color: var(--wi-text-muted);
-  font-size: 0.9rem;
-}
-
-.account-state {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-body);
-  font-style: italic;
-  color: var(--wi-text-muted);
-  padding: 24px 0;
-}
-
-.account-error { color: var(--wi-danger); }
 
 .account-card {
   background: linear-gradient(160deg, #2c1e0f 0%, #241809 100%);
@@ -786,8 +763,7 @@ onBeforeUnmount(() => {
   font-size: 0.86rem;
 }
 
-.withdraw-btn,
-.save-btn {
+.withdraw-btn {
   font-family: var(--wi-font-heading) !important;
   letter-spacing: 0.07em !important;
   background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
@@ -799,8 +775,7 @@ onBeforeUnmount(() => {
   font-size: 0.8rem !important;
 }
 
-.withdraw-btn :deep(.v-btn__overlay),
-.save-btn :deep(.v-btn__overlay) {
+.withdraw-btn :deep(.v-btn__overlay) {
   opacity: 0 !important;
 }
 

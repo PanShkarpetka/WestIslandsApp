@@ -15,7 +15,7 @@ Displays and edits core island parameters. Non-admins see read-only values; admi
 | repairDiscount | number (%) | Discount applied to ship repair costs |
 
 ## Stores & data
-- `useIslandStore` — `subscribe()` / `stop()`, `updateIsland(payload)`
+- `useIslandStore` — island data supplied by the parent `IslandsPage` subscription; `updateIsland(payload)` saves admin edits
 - `useUserStore` — `isAdmin` gate
 
 ## Admin behavior
@@ -24,4 +24,4 @@ Displays and edits core island parameters. Non-admins see read-only values; admi
 - Saving state shown via `loading` prop on the save button
 
 ## UI pattern
-"Captain's log" card: dark gradient background, alternating row tint, label-value rows. Discount values styled gold with `wi-number` font.
+`WiPanel` frames the compact label-value rows and `WiActionButton` provides the admin save action. Discount values remain styled gold with `wi-number` font.

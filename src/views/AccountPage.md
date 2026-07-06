@@ -4,6 +4,9 @@ Route: `/account` (`requiresAuth: false`, but the page requires `userStore.heroI
 
 Shows the logged-in hero account: gold balance, goods inventory, caught fish inventory, fishing treasure inventory, and hero transaction history.
 
+Shared page-header, panel, and empty-state primitives handle page identity and top-level loading/error states. Account data and actions are unchanged.
+Primary sell and withdrawal confirmations use the shared `WiActionButton` styling.
+
 ## Sections
 - Gold balance: displays `heroes/{heroId}.goldBalance` and allows the player to withdraw gold. The withdrawal writes a `hero-transactions` record.
 - Goods: displays positive quantities from `heroes/{heroId}.goods` with names from `goods/{goodId}` and allows withdrawal with a transaction log.

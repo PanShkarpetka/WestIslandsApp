@@ -185,7 +185,8 @@ Each page view has a companion `.md` file alongside its `.vue` file in `src/view
 ### Island pages (nested under `/islands/:islandId`)
 - [IslandsPage.md](src/views/IslandsPage.md) — nav shell, plank-tab bar
 - [IslandInfoPage.md](src/views/IslandInfoPage.md) — island parameters, admin edit
-- [BuildingsPage.md](src/views/BuildingsPage.md) — interactive map, building pins
+- [BuildingsPage.md](src/views/BuildingsPage.md) — LegendKeeper map embed
+- [YieldBuildingsPage.md](src/views/YieldBuildingsPage.md) — supplier buildings and harvest scheduling
 - [PopulationPage.md](src/views/PopulationPage.md) — group cards, pie chart, admin edit dialog
 - [TreasuryPage.md](src/views/TreasuryPage.md) — chest card + transaction history
 - [ManufacturesPage.md](src/views/ManufacturesPage.md) — manufacture cards, admin CRUD

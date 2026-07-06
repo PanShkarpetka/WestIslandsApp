@@ -6,8 +6,8 @@ Route: `/crafting` — `requiresAuth: false`.
 Crafting mastery tracker. Shows per-hero progress across categories, subcategories, and item specializations. Includes a price calculator and a full item progress table.
 
 ## Layout sections (top to bottom)
-1. **Hero banner** — title + Refresh + "Подати крафт" (hero login) + "Додати крафт" (admin) buttons
-2. **Filters row** — hero selector, "show uncrafted" toggle, highest discount chip
+1. **Page header** — title + "Оновити" + "Подати крафт" (hero login) + "Додати крафт" (admin) buttons
+2. **Data toolbar** — hero selector, "show uncrafted" toggle, highest discount chip
 3. **My crafting requests** (hero login only) — player-submitted request status table with cancel actions for pending requests
 4. **Summary metric cards** — total crafted, best discount, capped categories/subcategories/specializations
 5. **Progress panel** (left 7/12) — category progress bars + subcategory progress bars
@@ -17,6 +17,9 @@ Crafting mastery tracker. Shows per-hero progress across categories, subcategori
 
 ## Data loading
 `loadData()` fetches via `loadHeroesForCrafting()` and `loadCraftItems()` from `craftingService`. No real-time listener — manual refresh only.
+
+## UI
+Uses shared `src/components/ui/` primitives for the page header, data toolbar, panels, and metric cards. The redesign keeps all previous data surfaces and does not introduce new fields.
 
 ## Discount system
 Three tiers of discount, capped at 25% total:
@@ -33,7 +36,7 @@ Inputs: item slug + quantity. Output: component price, each discount tier, disco
 `CraftActionForm` receives `heroes`, `items`, and `defaultHeroId`. After save, calls `onCraftSaved()` which closes dialog and reloads data.
 
 ## Player craft requests
-Hero logins (`userStore.heroId`) see a "Подати крафт" action in the hero banner. It opens `CraftActionForm` in `mode="request"` with the hero selector locked to the logged-in hero. Saving requires item quantity and "Зайняло днів" values greater than zero, then creates `crafting-requests/{requestId}` with `status: "pending"`.
+Hero logins (`userStore.heroId`) see a "Подати крафт" action in the page header. It opens `CraftActionForm` in `mode="request"` with the hero selector locked to the logged-in hero. Saving requires item quantity and "Зайняло днів" values greater than zero, then creates `crafting-requests/{requestId}` with `status: "pending"`.
 
 Hero logins also subscribe to their own `crafting-requests` via `subscribeHeroCraftingRequests(userStore.heroId)`. The "Мої заявки на крафт" panel shows each submitted request with status (`pending`, `approved`, `rejected`, or `cancelled`). Pending rows can be cancelled by the player through `cancelCraftingRequest()`, which transactionally refuses already reviewed requests.
 

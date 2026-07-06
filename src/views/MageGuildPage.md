@@ -5,6 +5,8 @@ Route: `/mage-guild` — `requiresAuth: false`.
 ## Purpose
 Shows magical service requests generated per cycle. Active cycle requests are shown as spell cards. Admins can mark requests as fulfilled. Previous cycle history shown as collapsible expansion panels (admin only).
 
+The page uses the shared page header for cycle counts and shared empty states for missing requests. Fulfillment and payout behavior are unchanged.
+
 ## Data model
 Requests are stored per-document, one document per cycle. Each document has a `requests` array of spell requests. The `store.latestRequestDocument` is the active cycle; `store.productionDocuments.slice(1)` is history.
 
@@ -52,6 +54,8 @@ This means popular spells get cheaper over time and neglected ones get more expe
 
 ### Fulfillment write
 Firestore transaction: reads the `spell-requests` document, hero document, `treasury/meta`, selected `guilds/{guildId}`, and `islands/{islandId}`. It updates the matching request in the `requests` array in-place and applies the payout atomically.
+
+The fulfillment confirmation uses the shared `WiActionButton` styling.
 
 Payout formula:
 - `grossReward` = request `compensation`

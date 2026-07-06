@@ -2,11 +2,8 @@
   <v-container class="mage-page">
 
     <!-- Header -->
-    <div class="mage-header">
-      <div class="mage-title">
-        <v-icon class="mr-2" size="20">mdi-auto-fix</v-icon>
-        Запити на магічні послуги
-      </div>
+    <WiPageHeader title="Запити на магічні послуги" icon="mdi-auto-fix">
+      <template #actions>
       <div class="mage-cycle-chips">
         <span class="mage-chip chip-open">
           <v-icon size="12" class="mr-1">mdi-clock-outline</v-icon>
@@ -17,7 +14,8 @@
           Виконано: {{ store.fulfilledCount }}
         </span>
       </div>
-    </div>
+      </template>
+    </WiPageHeader>
 
     <!-- Alerts -->
     <div v-if="store.error" class="mage-alert mage-alert-error">
@@ -34,14 +32,12 @@
     <v-skeleton-loader v-if="store.loading || store.syncLoading" type="article, article, article" />
 
     <template v-else>
-      <div v-if="!activeRequestDocument" class="mage-empty">
-        <v-icon class="mr-2" size="16">mdi-compass</v-icon>
-        Для поточного циклу ще немає заявок.
-      </div>
-      <div v-else-if="!activeRequestDocument.requests?.length" class="mage-empty">
-        <v-icon class="mr-2" size="16">mdi-compass</v-icon>
-        Для цього циклу валідних заявок не згенеровано.
-      </div>
+      <WiPanel v-if="!activeRequestDocument">
+        <WiEmptyState title="Для поточного циклу ще немає заявок" icon="mdi-auto-fix-off" />
+      </WiPanel>
+      <WiPanel v-else-if="!activeRequestDocument.requests?.length">
+        <WiEmptyState title="Для цього циклу валідних заявок не згенеровано" icon="mdi-auto-fix-off" />
+      </WiPanel>
 
       <v-row v-else>
         <v-col
@@ -197,7 +193,7 @@
         <v-card-actions class="mage-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="closeFulfillmentDialog">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="store.actionLoading" :disabled="isPayoutInvalid" prepend-icon="mdi-check" @click="confirmFulfillment">Зберегти</v-btn>
+          <WiActionButton :loading="store.actionLoading" :disabled="isPayoutInvalid" prepend-icon="mdi-check" @click="confirmFulfillment">Зберегти</WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -217,6 +213,10 @@ import { formatAmount } from '@/utils/formatters'
 import { normalizeSpellLevel, normalizeSpellTier } from '@/utils/mageGuildRequests'
 import { DEFAULT_ISLAND_ID } from '@/config/constants'
 import { db } from '@/services/firebase'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const SPELL_LEVEL_COLORS = {
   0: '#607d8b', 1: '#5a8a3c', 2: '#3a6080', 3: '#6a3a8a',
@@ -705,12 +705,4 @@ onBeforeUnmount(() => { store.stopListening(); populationStore.stopListening(); 
   letter-spacing: 0.06em !important;
 }
 
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
-.save-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
 </style>

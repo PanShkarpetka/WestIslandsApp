@@ -5,6 +5,8 @@ Route: `/guilds` — `requiresAuth: false`.
 ## Purpose
 Guild management page. Shows guild cards with coin balance and goods inventory. Users can deposit funds; leaders and admins can withdraw funds and manage goods. Admins can create/edit guilds and view full logs.
 
+Shared page-header, action, panel, and empty-state primitives provide consistent hierarchy. Guild permissions and mutations are unchanged.
+
 ## Visibility rules
 - Admin: sees all guilds
 - Leader: sees guilds where `user.canAccessGuild(guild.id)` is true, plus `visibleToAll` guilds
@@ -12,6 +14,8 @@ Guild management page. Shows guild cards with coin balance and goods inventory. 
 
 ## Dialogs
 Three separate dialogs on the same page:
+
+Primary create and transaction confirmations use the shared `WiActionButton` styling.
 
 ### Create/Edit guild dialog (`showGuildDialog`)
 Fields: name, shortName, leader, visibleToAll (checkbox), withdrawUsername, withdrawPassword, treasure (initial balance).

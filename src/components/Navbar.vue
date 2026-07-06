@@ -14,16 +14,16 @@
     <v-spacer />
 
     <!-- Desktop nav -->
-    <template v-if="!isMobile">
+    <template v-if="!smAndDown">
       <v-btn v-for="item in navItems" :key="item.to" icon :to="item.to" variant="text" class="nav-icon-btn" :title="item.label">
         <v-icon>{{ item.icon }}</v-icon>
         <v-tooltip activator="parent" location="bottom">{{ item.label }}</v-tooltip>
       </v-btn>
-      <v-btn v-if="userStore.isHeroUser" icon to="/account" variant="text" class="nav-icon-btn" title="Мій рахунок">
+      <v-btn v-if="isHeroUser" icon to="/account" variant="text" class="nav-icon-btn" title="Мій рахунок">
         <v-icon>mdi-account</v-icon>
         <v-tooltip activator="parent" location="bottom">Мій рахунок</v-tooltip>
       </v-btn>
-      <v-btn v-if="userStore.isAdmin" icon to="/admin" variant="text" class="nav-icon-btn" title="Адмін">
+      <v-btn v-if="isAdmin" icon to="/admin" variant="text" class="nav-icon-btn" title="Адмін">
         <v-icon>mdi-shield-account</v-icon>
         <v-badge
           v-if="pendingCraftRequestCount"
@@ -43,11 +43,11 @@
           </v-btn>
         </template>
         <v-list class="nav-menu-list">
-          <v-list-item @click="userStore.isLoggedIn ? logout() : login()">
+          <v-list-item @click="isLoggedIn ? logout() : login()">
             <template #prepend>
-              <v-icon>{{ userStore.isLoggedIn ? 'mdi-logout-variant' : 'mdi-login-variant' }}</v-icon>
+              <v-icon>{{ isLoggedIn ? 'mdi-logout-variant' : 'mdi-login-variant' }}</v-icon>
             </template>
-            <v-list-item-title>{{ userStore.isLoggedIn ? 'Покинути корабель' : 'На борт' }}</v-list-item-title>
+            <v-list-item-title>{{ isLoggedIn ? 'Покинути корабель' : 'На борт' }}</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
@@ -79,7 +79,7 @@
       </v-list-item>
 
       <v-list-item
-        v-if="userStore.isHeroUser"
+        v-if="isHeroUser"
         to="/account"
         @click="drawer = false"
         rounded="lg"
@@ -90,7 +90,7 @@
       </v-list-item>
 
       <v-list-item
-        v-if="userStore.isAdmin"
+        v-if="isAdmin"
         to="/admin"
         @click="drawer = false"
         rounded="lg"
@@ -104,11 +104,11 @@
     <template #append>
       <v-divider class="drawer-divider" />
       <v-list nav class="drawer-list">
-        <v-list-item @click="userStore.isLoggedIn ? logout() : login()" rounded="lg" class="drawer-item">
+        <v-list-item @click="isLoggedIn ? logout() : login()" rounded="lg" class="drawer-item">
           <template #prepend>
-            <v-icon>{{ userStore.isLoggedIn ? 'mdi-logout-variant' : 'mdi-login-variant' }}</v-icon>
+            <v-icon>{{ isLoggedIn ? 'mdi-logout-variant' : 'mdi-login-variant' }}</v-icon>
           </template>
-          <v-list-item-title>{{ userStore.isLoggedIn ? 'Покинути корабель' : 'На борт' }}</v-list-item-title>
+          <v-list-item-title>{{ isLoggedIn ? 'Покинути корабель' : 'На борт' }}</v-list-item-title>
         </v-list-item>
       </v-list>
     </template>
@@ -119,11 +119,13 @@
 import { useUserStore } from '../store/userStore';
 import { useRouter } from 'vue-router';
 import { ref, computed, onBeforeUnmount, watch } from 'vue';
+import { useDisplay } from 'vuetify'
 import { DEFAULT_ISLAND_ID } from '../config/constants.js';
 import { subscribePendingCraftingRequestCount } from '../services/craftingService';
 
 const userStore = useUserStore();
 const router = useRouter();
+const { smAndDown } = useDisplay()
 const drawer = ref(false);
 const pendingCraftRequestCount = ref(0);
 let stopPendingCraftRequestCount = null;
@@ -156,10 +158,12 @@ function login() {
   router.push('/login');
 }
 
-const isMobile = computed(() => window.innerWidth < 600);
+const isAdmin = computed(() => userStore.isAdmin ?? false)
+const isHeroUser = computed(() => userStore.isHeroUser ?? false)
+const isLoggedIn = computed(() => userStore.isLoggedIn ?? false)
 
 watch(
-  () => userStore.isAdmin,
+  isAdmin,
   (isAdmin) => {
     stopPendingCraftRequestCount?.();
     stopPendingCraftRequestCount = null;

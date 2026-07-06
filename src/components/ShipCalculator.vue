@@ -1,9 +1,5 @@
 <template>
-  <v-row class="my-4">
-    <v-col cols="12">
-      <v-card class="pa-6 ship-card" elevation="0">
-        <v-card-title class="voyage-title">Калькулятор подорожі кораблем</v-card-title>
-        <v-card-text>
+  <WiPanel title="Калькулятор подорожі кораблем" icon="mdi-sail-boat" class="ship-calculator">
           <v-row>
             <v-col cols="12" md="6">
               <v-select
@@ -47,32 +43,14 @@
 
           <div class="wave-divider"></div>
 
-          <v-row>
-            <v-col cols="12" md="4">
-              <div class="result-label">Швидкість за годину (поточна зміна)</div>
-              <div class="result-value">{{ formattedSpeedPerHour }}</div>
-            </v-col>
-            <v-col cols="12" md="4">
-              <div class="result-label">Час в один бік</div>
-              <div class="result-value">{{ formattedOneWayTime }}</div>
-            </v-col>
-            <v-col cols="12" md="4">
-              <div class="result-label">Час туди й назад</div>
-              <div class="result-value">{{ formattedRoundTripTime }}</div>
-            </v-col>
-            <v-col cols="12" md="4">
-              <div class="result-label">Вартість (в один бік)</div>
-              <div class="result-value">{{ formattedCostOneWay }}</div>
-            </v-col>
-            <v-col cols="12" md="4">
-              <div class="result-label">Вартість (туди й назад)</div>
-              <div class="result-value">{{ formattedCostRoundTrip }}</div>
-            </v-col>
-            <v-col cols="12" md="4">
-              <div class="result-label">Годин плавання на добу</div>
-              <div class="result-value">{{ formattedSailingHoursPerDay }}</div>
-            </v-col>
-          </v-row>
+          <div class="result-grid">
+            <WiMetricCard label="Швидкість за годину" :value="formattedSpeedPerHour" />
+            <WiMetricCard label="Час в один бік" :value="formattedOneWayTime" />
+            <WiMetricCard label="Час туди й назад" :value="formattedRoundTripTime" />
+            <WiMetricCard label="Вартість в один бік" :value="formattedCostOneWay" />
+            <WiMetricCard label="Вартість туди й назад" :value="formattedCostRoundTrip" />
+            <WiMetricCard label="Годин плавання на добу" :value="formattedSailingHoursPerDay" />
+          </div>
 
           <v-expand-transition>
             <div v-if="advancedEnabled">
@@ -96,7 +74,7 @@
                   />
                 </v-col>
                 <v-col cols="12">
-                  <v-card class="pa-4 danger-card" variant="outlined">
+                  <div class="pa-4 danger-card">
                     <div class="danger-title">Ризик подорожі (Шанс небезпеки)</div>
                     <div v-if="dangerArea" class="text-body-1 mt-1">
                       Зона небезпеки: {{ dangerArea.area }} (мін. ШБ {{ formatPercent(dangerArea.min) }})
@@ -117,20 +95,19 @@
                       </v-list-item>
                     </v-list>
                     <div class="danger-final mt-3">Фінальний шанс небезпеки: {{ formattedFinalChance }}</div>
-                  </v-card>
+                  </div>
                 </v-col>
               </v-row>
             </div>
           </v-expand-transition>
-        </v-card-text>
-      </v-card>
-    </v-col>
-  </v-row>
+  </WiPanel>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue';
 import { useShipStore } from '@/store/shipStore';
+import WiMetricCard from '@/components/ui/WiMetricCard.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 const shipStore = useShipStore();
 
@@ -275,35 +252,14 @@ const formattedFinalChance = computed(() => (finalChance.value === null ? '—' 
 </script>
 
 <style scoped>
-.ship-card {
-  background: linear-gradient(135deg, rgba(14, 9, 4, 0.9), rgba(26, 17, 8, 0.85)) !important;
-  border: 1px solid var(--wi-border) !important;
-  border-radius: 16px !important;
+.ship-calculator {
+  margin-top: 16px;
 }
 
-.voyage-title {
-  font-family: var(--wi-font-heading);
-  text-transform: uppercase;
-  color: var(--wi-gold);
-  font-size: 0.88rem !important;
-  letter-spacing: 0.06em;
-  padding-bottom: 8px;
-}
-
-.result-label {
-  font-family: var(--wi-font-heading);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-  letter-spacing: 0.08em;
-  margin-bottom: 4px;
-}
-
-.result-value {
-  font-family: var(--wi-font-heading);
-  color: var(--wi-gold);
-  font-size: 1.4rem;
-  font-weight: 600;
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .wave-divider {
@@ -315,9 +271,17 @@ const formattedFinalChance = computed(() => (finalChance.value === null ? '—' 
 }
 
 .danger-card {
-  background: rgba(40, 8, 8, 0.7) !important;
-  border: 1px solid rgba(180, 60, 60, 0.3) !important;
-  border-radius: 8px !important;
+  background: rgba(40, 8, 8, 0.7);
+  border: 1px solid rgba(180, 60, 60, 0.3);
+  border-radius: var(--wi-radius-sm);
+}
+
+@media (max-width: 900px) {
+  .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .result-grid { grid-template-columns: 1fr; }
 }
 
 .danger-title {

@@ -1,10 +1,8 @@
 <template>
-  <v-container class="admin-page pb-8">
+  <v-container class="admin-page">
+    <WiPageHeader title="Адмін-панель" icon="mdi-shield-account" />
+
     <v-card class="admin-card pa-6" elevation="0">
-      <v-card-title class="admin-title text-h5">Адмін панель</v-card-title>
-
-      <v-divider class="my-4" />
-
       <v-tabs v-model="adminTab" class="admin-tabs mb-4" color="primary" show-arrows>
         <v-tab value="cycles" prepend-icon="mdi-calendar-sync">Цикли</v-tab>
         <v-tab value="heroes" prepend-icon="mdi-account-group">Герої</v-tab>
@@ -985,6 +983,7 @@ import { adjustHeroGoods } from '@/services/heroGoodsService.js';
 import { subscribeCurrentCycleUsedDays } from '@/services/usedDaysService.js';
 import { formatAmount } from '@/utils/formatters.js';
 import { getLegacyExpeditionDurationDays, isCycleStartAction } from '@/services/dashboardService.js';
+import WiPageHeader from '@/components/ui/WiPageHeader.vue';
 
 const adminTab = ref('cycles');
 const logEntries = ref([]);
@@ -2508,15 +2507,12 @@ function buildSnapshotGroupKey(timestamp, source) {
   border: 1px solid var(--wi-border) !important;
 }
 
-/* ── Titles ──────────────────────────────────────────────────── */
-.admin-title {
-  font-family: var(--wi-font-heading) !important;
-  font-size: 1.3rem !important;
-  color: var(--wi-gold) !important;
-  letter-spacing: 0.04em;
-  padding-bottom: 4px;
+.admin-page {
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
+/* ── Titles ──────────────────────────────────────────────────── */
 .admin-card :deep(.v-card-title.text-h6) {
   font-family: var(--wi-font-heading) !important;
   font-size: 0.72rem !important;

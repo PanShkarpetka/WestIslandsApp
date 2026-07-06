@@ -1,22 +1,11 @@
 <template>
-  <v-container class="treasury-container py-6">
+  <v-container class="treasury-container">
+    <WiPageHeader title="Скарбниця острова" icon="mdi-treasure-chest" />
 
-    <div class="treasury-header">
-      <div class="treasury-header-title">
-        <v-icon class="mr-2" color="primary">mdi-treasure-chest</v-icon>
-        <h1 class="wi-heading">Скарбниця острова</h1>
-      </div>
-      <div class="treasury-totals">
-        <span class="total-item income">
-          <v-icon size="15">mdi-arrow-up-bold</v-icon>
-          +{{ formatAmount(totalIncome) }} зм
-        </span>
-        <span class="total-divider">/</span>
-        <span class="total-item expense">
-          <v-icon size="15">mdi-arrow-down-bold</v-icon>
-          −{{ formatAmount(totalOutcome) }} зм
-        </span>
-      </div>
+    <div class="treasury-metrics">
+      <WiMetricCard label="Дохід за цикл" :value="`${formatAmount(totalIncome)} зм`" tone="success" />
+      <WiMetricCard label="Витрати за цикл" :value="`${formatAmount(totalOutcome)} зм`" tone="danger" />
+      <WiMetricCard label="Чистий підсумок" :value="netTotalLabel" :tone="netTotal >= 0 ? 'success' : 'danger'" />
     </div>
 
     <TreasuryChestCard />
@@ -38,6 +27,8 @@ import { useIslandStore } from '@/store/islandStore'
 import { usePopulationStore } from '@/store/populationStore'
 import { db } from '@/services/firebase'
 import { formatAmount } from '@/utils/formatters'
+import WiMetricCard from '@/components/ui/WiMetricCard.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
 
 const islandStore = useIslandStore()
 const populationStore = usePopulationStore()
@@ -55,6 +46,8 @@ const totalOutcome = computed(() => {
   const combined = manufactureOutcome.value + (populationIncome.value < 0 ? Math.abs(populationIncome.value) : 0)
   return roundAmount(combined)
 })
+const netTotal = computed(() => roundAmount(totalIncome.value - totalOutcome.value))
+const netTotalLabel = computed(() => `${netTotal.value >= 0 ? '+' : '−'}${formatAmount(Math.abs(netTotal.value))} зм`)
 
 function roundAmount(value) {
   const parsed = Number(value)
@@ -96,39 +89,21 @@ onBeforeUnmount(() => populationStore.stopListening())
 </script>
 
 <style scoped>
-.treasury-container { padding-top: 24px; }
+.treasury-container {
+  padding-top: 24px;
+  padding-bottom: 40px;
+}
 
-.treasury-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+.treasury-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--wi-border);
 }
 
-.treasury-header-title {
-  display: flex;
-  align-items: center;
+@media (max-width: 760px) {
+  .treasury-metrics {
+    grid-template-columns: 1fr;
+  }
 }
-
-.treasury-totals {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--wi-font-body);
-  font-size: 0.9rem;
-}
-
-.total-item {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.income { color: var(--wi-success); }
-.expense { color: var(--wi-danger); }
-.total-divider { color: var(--wi-border); }
 </style>

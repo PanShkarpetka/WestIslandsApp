@@ -1,16 +1,9 @@
 <template>
   <v-dialog v-model="dialog" max-width="800px" :fullscreen="$vuetify.display.smAndDown" scrollable>
-    <v-card class="ship-dialog-card">
-
-      <!-- Header -->
-      <div class="ship-dialog-header">
-        <v-icon class="header-icon">mdi-sail-boat</v-icon>
-        <span class="header-title">{{ editedShip.name || 'Новий корабель' }}</span>
-        <v-spacer />
-        <v-btn icon variant="text" @click="dialog = false" class="close-btn">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </div>
+    <WiDialogFrame :title="editedShip.name || 'Новий корабель'" icon="mdi-sail-boat" class="ship-dialog-frame">
+      <template #header-actions>
+        <v-btn icon="mdi-close" variant="text" @click="dialog = false" aria-label="Закрити" />
+      </template>
 
       <!-- Admin: copy from existing -->
       <div v-if="isAdmin && !editedShip.id" class="copy-section">
@@ -249,18 +242,15 @@
         </v-tabs-window>
       </v-card-text>
 
-      <!-- Footer -->
-      <v-divider class="tab-divider" />
-      <v-card-actions class="dialog-actions">
+      <template #actions>
         <v-spacer />
-        <v-btn variant="text" class="cancel-btn" @click="dialog = false">Закрити</v-btn>
-        <v-btn v-if="isAdmin" class="save-btn" @click="saveChanges">
-          <v-icon start>mdi-content-save</v-icon>
+        <v-btn variant="text" @click="dialog = false">Закрити</v-btn>
+        <WiActionButton v-if="isAdmin" prepend-icon="mdi-content-save" @click="saveChanges">
           Зберегти
-        </v-btn>
-      </v-card-actions>
+        </WiActionButton>
+      </template>
 
-    </v-card>
+    </WiDialogFrame>
   </v-dialog>
 </template>
 
@@ -270,6 +260,8 @@ import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { useUserStore } from '@/store/userStore'
 import { useLogStore } from '@/store/logStore'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
 
 const props = defineProps({
   dialog: Boolean,
@@ -391,41 +383,9 @@ async function saveChanges() {
 
 <style scoped>
 /* ── Card ───────────────────────────────────────────────────── */
-.ship-dialog-card {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
-  border: 1px solid var(--wi-gold) !important;
+.ship-dialog-frame {
   display: flex;
   flex-direction: column;
-}
-
-/* ── Header ─────────────────────────────────────────────────── */
-.ship-dialog-header {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid var(--wi-border);
-  gap: 10px;
-}
-
-.header-icon {
-  color: var(--wi-gold) !important;
-  font-size: 22px !important;
-}
-
-.header-title {
-  font-family: var(--wi-font-heading);
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--wi-gold);
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 10px rgba(200,150,42,0.3);
-}
-
-.close-btn {
-  color: var(--wi-text-muted) !important;
-}
-.close-btn:hover {
-  color: var(--wi-gold) !important;
 }
 
 /* ── Copy section ───────────────────────────────────────────── */
@@ -485,21 +445,4 @@ async function saveChanges() {
 }
 
 /* ── Footer ─────────────────────────────────────────────────── */
-.dialog-actions {
-  padding: 12px 20px !important;
-}
-
-.cancel-btn {
-  color: var(--wi-text-muted) !important;
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.05em !important;
-}
-
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
 </style>

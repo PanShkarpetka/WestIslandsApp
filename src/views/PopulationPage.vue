@@ -1,14 +1,15 @@
 <template>
-  <div class="population-page">
+  <v-container class="population-page">
+    <WiPageHeader title="Населення острова" icon="mdi-account-group" />
 
-    <div v-if="store.loading" class="pop-state">
-      <v-icon class="mr-2" size="16">mdi-compass</v-icon>
-      Завантаження…
-    </div>
-    <div v-else-if="store.items.length === 0" class="pop-state">
-      <v-icon class="mr-2" size="16">mdi-anchor</v-icon>
-      Немає даних.
-    </div>
+    <WiPanel v-if="store.loading" variant="sea">
+      <WiEmptyState title="Завантажуємо населення" icon="mdi-loading">
+        <v-progress-circular indeterminate color="primary" size="24" />
+      </WiEmptyState>
+    </WiPanel>
+    <WiPanel v-else-if="store.items.length === 0">
+      <WiEmptyState title="Дані про населення відсутні" icon="mdi-account-group-outline" />
+    </WiPanel>
 
     <div v-else class="pop-layout">
 
@@ -68,11 +69,7 @@
 
       <!-- Chart column -->
       <div class="pop-chart-wrap">
-        <div class="pop-chart-card">
-          <div class="pop-chart-header">
-            <v-icon class="mr-2" size="16">mdi-account-group</v-icon>
-            Групи населення
-          </div>
+        <WiPanel class="pop-chart-card" title="Групи населення" icon="mdi-chart-donut">
           <div class="pop-chart-totals">
             <span class="pop-total-item">
               <v-icon size="13" class="mr-1">mdi-account-multiple</v-icon>
@@ -101,19 +98,15 @@
           <div class="pop-chart-canvas">
             <Pie :data="chartData" :options="chartOptions" />
           </div>
-        </div>
+        </WiPanel>
       </div>
 
     </div>
 
     <!-- Edit dialog -->
     <v-dialog v-model="showEditor" max-width="580" :fullscreen="$vuetify.display.smAndDown" scrollable>
-      <v-card class="pop-dialog">
-        <div class="pop-dialog-header">
-          <v-icon class="mr-2">mdi-account-group</v-icon>
-          Розподіл населення
-        </div>
-        <v-card-text class="pop-dialog-body" v-if="editedGroups.length">
+      <WiDialogFrame title="Розподіл населення" icon="mdi-account-group">
+        <div v-if="editedGroups.length">
 
           <p class="pop-dialog-note">Змініть кількість для кожної групи. Сума не має перевищувати загальне населення острова.</p>
 
@@ -168,19 +161,18 @@
             {{ error }}
           </div>
 
-        </v-card-text>
-        <v-divider style="border-color: var(--wi-border)" />
-        <v-card-actions class="pop-dialog-actions">
-          <v-btn variant="text" class="cancel-btn" @click="closeEditor" :disabled="saving">Скасувати</v-btn>
+        </div>
+        <template #actions>
+          <v-btn variant="text" @click="closeEditor" :disabled="saving">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="saving" :disabled="saving || overLimit" prepend-icon="mdi-feather" @click="saveGroup">
+          <WiActionButton :loading="saving" :disabled="saving || overLimit" prepend-icon="mdi-content-save" @click="saveGroup">
             Зберегти
-          </v-btn>
-        </v-card-actions>
-      </v-card>
+          </WiActionButton>
+        </template>
+      </WiDialogFrame>
     </v-dialog>
 
-  </div>
+  </v-container>
 </template>
 
 <script setup>
@@ -191,6 +183,11 @@ import { useUserStore } from '@/store/userStore'
 import { Pie } from 'vue-chartjs'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Title } from 'chart.js'
 import { formatAmount } from '@/utils/formatters'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
+import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import WiPanel from '@/components/ui/WiPanel.vue'
 
 ChartJS.register(ArcElement, Tooltip, Legend, Title)
 
@@ -311,16 +308,8 @@ async function saveGroup() {
 <style scoped>
 /* ── Page ───────────────────────────────────────────────────── */
 .population-page {
-  padding-bottom: 16px;
-}
-
-.pop-state {
-  display: flex;
-  align-items: center;
-  font-family: var(--wi-font-body);
-  font-style: italic;
-  color: var(--wi-text-muted);
-  padding: 24px 0;
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
 .pop-layout {
@@ -490,27 +479,7 @@ async function saveGroup() {
 }
 
 .pop-chart-card {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%);
-  border: 1px solid var(--wi-border);
-  border-radius: 8px;
   overflow: hidden;
-}
-
-.pop-chart-header {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  background: #1a1108;
-  border-bottom: 1px solid var(--wi-border);
-  font-family: var(--wi-font-heading);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--wi-text-muted);
-}
-
-.pop-chart-header .v-icon {
-  color: var(--wi-gold) !important;
 }
 
 .pop-chart-totals {
@@ -541,27 +510,6 @@ async function saveGroup() {
 .pop-chart-canvas {
   height: 280px;
   padding: 12px;
-}
-
-/* ── Edit dialog ────────────────────────────────────────────── */
-.pop-dialog {
-  background: linear-gradient(160deg, #2c1e0f 0%, #1f1508 100%) !important;
-  border: 1px solid var(--wi-gold) !important;
-}
-
-.pop-dialog-header {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--wi-border);
-  font-family: var(--wi-font-heading);
-  font-size: 1rem;
-  color: var(--wi-gold);
-  letter-spacing: 0.06em;
-}
-
-.pop-dialog-body {
-  padding: 20px !important;
 }
 
 .pop-dialog-note {
@@ -655,27 +603,6 @@ async function saveGroup() {
   color: var(--wi-danger);
   font-size: 0.85rem;
   margin-top: 8px;
-}
-
-.pop-dialog-actions {
-  padding: 12px 20px !important;
-}
-
-.cancel-btn {
-  color: var(--wi-text-muted) !important;
-  font-family: var(--wi-font-heading) !important;
-}
-
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
-
-.save-btn :deep(.v-btn__overlay) {
-  opacity: 0 !important;
 }
 
 /* ── Bureaucrat card ────────────────────────────────────────── */

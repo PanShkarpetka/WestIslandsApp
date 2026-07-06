@@ -1,12 +1,6 @@
 <template>
-  <v-container class="pb-8">
-    <div class="hero-banner my-4">
-      <v-icon class="hero-watermark" size="320">mdi-ship-wheel</v-icon>
-      <div class="hero-content">
-        <h1 class="hero-title">Калькулятори подорожей</h1>
-        <p class="hero-subtitle">Розрахуй маршрут, вартість та небезпеки морського шляху</p>
-      </div>
-    </div>
+  <v-container class="travel-page">
+    <WiPageHeader title="Калькулятори подорожей" icon="mdi-ship-wheel" />
 
     <v-tabs v-model="activeTab" align-tabs="start" class="travel-tabs mb-4">
       <v-tab value="ships">
@@ -34,56 +28,15 @@
 import { ref } from 'vue';
 import CourierCalculator from '@/components/CourierCalculator.vue';
 import ShipCalculator from '@/components/ShipCalculator.vue';
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
 
 const activeTab = ref('ships');
 </script>
 
 <style scoped>
-.hero-banner {
-  position: relative;
-  overflow: hidden;
-  padding: 40px 32px 36px;
-  background: linear-gradient(135deg, rgba(14, 9, 4, 0.95), rgba(26, 17, 8, 0.9));
-  border: 1px solid var(--wi-border);
-  border-radius: 16px;
-}
-
-.hero-watermark {
-  position: absolute;
-  right: -32px;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0.07;
-  color: var(--wi-gold);
-  animation: spin-slow 60s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes spin-slow {
-  from { transform: translateY(-50%) rotate(0deg); }
-  to   { transform: translateY(-50%) rotate(360deg); }
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-title {
-  font-family: var(--wi-font-heading);
-  color: var(--wi-gold);
-  font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  margin: 0 0 8px;
-}
-
-.hero-subtitle {
-  font-family: var(--wi-font-body);
-  color: var(--wi-text-muted);
-  font-style: italic;
-  font-size: 0.95rem;
-  margin: 0;
+.travel-page {
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
 .travel-tabs :deep(.v-tab) {

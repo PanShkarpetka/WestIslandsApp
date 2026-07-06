@@ -1,13 +1,6 @@
 <template>
-  <v-container>
-    <v-row justify="space-between" align="center" class="my-4">
-      <v-col cols="12" sm="6">
-        <h1 class="wi-heading" style="display:flex;align-items:center;gap:8px;font-size:1.4rem">
-          <v-icon color="primary" size="22">mdi-candle</v-icon>
-          Релігії острова
-        </h1>
-      </v-col>
-    </v-row>
+  <v-container class="religion-page">
+    <WiPageHeader title="Релігії острова" icon="mdi-candle" />
 
     <v-row justify="space-between" align="center" class="my-4">
       <v-col cols="12">
@@ -17,9 +10,24 @@
             aria-hidden="true"
           ></div>
           <v-card-text class="px-0 position-relative">
-            <div v-if="loading" class="text-gray-500">Завантаження…</div>
-            <div v-else-if="error" class="error">{{ error }}</div>
-            <div v-else-if="records.length === 0" class="text-gray-500">Немає даних.</div>
+            <WiEmptyState
+              v-if="loading"
+              title="Завантажуємо дані релігій"
+              icon="mdi-loading"
+            >
+              <v-progress-circular indeterminate color="primary" size="24" />
+            </WiEmptyState>
+            <WiEmptyState
+              v-else-if="error"
+              title="Не вдалося завантажити дані"
+              :text="error"
+              icon="mdi-alert-circle"
+            />
+            <WiEmptyState
+              v-else-if="records.length === 0"
+              title="Дані про релігії відсутні"
+              icon="mdi-candle-off"
+            />
 
             <section v-else class="distribution-section section-overlay" :style="sectionBackgroundStyle">
               <header class="distribution-header">
@@ -317,6 +325,8 @@ import ReligionModals from '@/components/ReligionModals.vue'
 import { db } from '@/services/firebase'
 import { PSEUDO_RELIGION_ID } from '@/config/constants.js'
 import { formatAmount } from '@/utils/formatters'
+import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiPageHeader from '@/components/ui/WiPageHeader.vue'
 
 const iconCache = new Map()
 
@@ -1001,6 +1011,7 @@ const spreadTargetReligionOptions = computed(() =>
 const spreadTargetReligion = computed(() =>
   religionStore.religions.find((item) => item.id === spreadReligionForm.targetReligionId) || null,
 )
+const spreadReligionTargetShieldActive = computed(() => Boolean(spreadTargetReligion.value?.shieldActive))
 const spreadTargetSVTotal = computed(() => {
   const svBase = Number(spreadTargetReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
   const svTemp = Number(spreadTargetReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)
@@ -2029,10 +2040,9 @@ const celestialBonusOptions = computed(() => {
 </script>
 <style scoped>
 /* ── Page header ────────────────────────────────────────────── */
-.religion-page-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
+.religion-page {
+  padding-top: 24px;
+  padding-bottom: 40px;
 }
 
 .error {
