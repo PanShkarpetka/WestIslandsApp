@@ -3,11 +3,11 @@
 ## Purpose
 CRUD for heroes and their linked clergy records. Also shows hero balance snapshot history.
 
-## Hero table
-`v-data-table` with columns: name, religion, downtime status, active/inactive status, edit action.  
-Rows from `heroRows` computed — heroes joined with clergy (religion name, clergyId).
+## Hero workspace
+One searchable `v-data-table` combines profile/status, Telegram binding, account balance, and current-cycle used days. Rows come from `heroWorkspaceRows`, which reads each hero's breakdown directly from `usedDaysByHero`. The status filter defaults to active heroes, and profile/balance editing are adjacent row actions. Day categories use full labels so the breakdown remains understandable on touch devices.
 
 ## Add hero form
+Collapsed until requested to keep the routine hero-management workflow focused.
 Fields: name, religion (select), dndbeyondCharacterId, Telegram ID or username.  
 On save: Firestore transaction that atomically creates both the `heroes` document and a `clergy` document linking hero to religion. New heroes receive the default player password `password`, empty `telegramId` when not filled, and `goldBalance: 0`. `telegramId` can store either a numeric Telegram user ID or a username such as `PanShkarpetka` / `@PanShkarpetka`. Initial clergy state: `faith: 0, faithMax: 0`.
 
@@ -15,8 +15,8 @@ On save: Firestore transaction that atomically creates both the `heroes` documen
 Fields same as add form + `downtimeAvailable` switch + `inactive` switch + player password.  
 On save: transaction that updates `heroes` doc and updates (or creates if missing) the linked `clergy` doc's religion reference. Empty password input is reset to the default `password`.
 
-## Account balances table
-Shows every hero's account `goldBalance` and Telegram ID/username link. Clicking **Змінити** opens a dialog to set a new `goldBalance`.
+## Account balance action
+The unified workspace shows each hero's `goldBalance` and Telegram ID/username. The cash-edit row action opens a dialog to set a new `goldBalance`.
 
 On save: transaction updates `heroes/{heroId}.goldBalance` and writes `hero-transactions` with type `admin-balance-adjustment` and `goldAmount = newBalance - previousBalance`. This does not change imported D&D Beyond `balance` snapshots.
 

@@ -193,9 +193,16 @@
       <v-alert v-if="heroError" type="error" variant="tonal" class="mb-4">{{ heroError }}</v-alert>
       <v-alert v-if="heroSuccess" type="success" variant="tonal" class="mb-4">{{ heroSuccess }}</v-alert>
 
-      <v-card variant="outlined" class="pa-4 mb-4">
-        <div class="text-subtitle-1 mb-3">Додати нового героя</div>
-        <v-row>
+      <v-expansion-panels class="mb-4">
+        <v-expansion-panel>
+          <v-expansion-panel-title>
+            <div class="d-flex align-center ga-2">
+              <v-icon icon="mdi-account-plus-outline" color="primary" />
+              <span>Додати нового героя</span>
+            </div>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+        <v-row class="pt-2">
           <v-col cols="12" md="4">
             <v-text-field v-model="newHeroForm.name" label="Ім'я героя" hide-details="auto" density="comfortable" />
           </v-col>
@@ -230,13 +237,27 @@
             </v-btn>
           </v-col>
         </v-row>
-      </v-card>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
 
-      <v-data-table
-        :headers="heroHeaders"
-        :items="heroRows"
+      <v-card variant="outlined" class="hero-workspace mb-4">
+        <div class="hero-workspace__toolbar">
+          <div>
+            <div class="text-subtitle-1">Керування героями</div>
+          </div>
+          <div class="hero-workspace__filters">
+            <v-text-field v-model="heroSearch" label="Пошук героя" prepend-inner-icon="mdi-magnify" density="compact" hide-details clearable />
+            <v-select v-model="heroStatusFilter" :items="heroStatusOptions" label="Статус" density="compact" hide-details />
+          </div>
+        </div>
+        <v-alert v-if="balanceError" type="error" variant="tonal" class="mx-4 mb-3">{{ balanceError }}</v-alert>
+        <v-data-table
+        :headers="heroWorkspaceHeaders"
+        :items="heroWorkspaceRows"
+        :search="heroSearch"
         :items-per-page="10"
-        class="elevation-1 mb-2"
+        class="hero-workspace__table"
         density="compact"
       >
         <template #item.name="{ item }">
@@ -245,56 +266,33 @@
         <template #item.religionName="{ item }">
           {{ item.religionName || '—' }}
         </template>
-        <template #item.downtimeAvailable="{ item }">
-          <v-chip size="small" :color="item.downtimeAvailable ? 'warning' : 'success'" variant="tonal">
-            {{ item.downtimeAvailable ? 'Дія не виконана' : 'Дія виконана' }}
-          </v-chip>
-        </template>
-        <template #item.inactive="{ item }">
+        <template #item.status="{ item }">
           <v-chip size="small" :color="item.inactive ? 'error' : 'success'" variant="tonal">
             {{ item.inactive ? 'Неактивний' : 'Активний' }}
           </v-chip>
+          <div class="text-caption mt-1" :class="item.downtimeAvailable ? 'text-warning' : 'wi-muted-text'">
+            {{ item.downtimeAvailable ? 'Дія очікує' : 'Дію виконано' }}
+          </div>
         </template>
-        <template #item.actions="{ item }">
-          <v-btn size="small" variant="text" color="primary" @click="openHeroEditor(item)">Редагувати</v-btn>
+        <template #item.telegramId="{ item }">
+          <span :class="item.telegramId ? '' : 'text-error'">{{ item.telegramId || 'Не привʼязано' }}</span>
         </template>
-      </v-data-table>
-
-      <v-card variant="outlined" class="pa-4 mb-4">
-        <div class="text-subtitle-1 mb-3">Баланси акаунтів</div>
-        <v-alert v-if="balanceError" type="error" variant="tonal" class="mb-3">{{ balanceError }}</v-alert>
-        <v-data-table
-          :headers="accountBalanceHeaders"
-          :items="heroRows"
-          :items-per-page="10"
-          density="compact"
-          class="elevation-1"
-        >
-          <template #item.telegramId="{ item }">
-            <span :class="item.telegramId ? '' : 'text-error'">{{ item.telegramId || 'Не привʼязано' }}</span>
-          </template>
           <template #item.goldBalance="{ item }">
             <span class="font-weight-medium">{{ Number(item.goldBalance || 0).toFixed(2) }} зм</span>
-          </template>
-          <template #item.actions="{ item }">
-            <v-btn size="small" variant="text" color="primary" @click="openBalanceEditor(item)">Змінити</v-btn>
-          </template>
+        </template>
+        <template #item.usedDays="{ item }">
+          <div class="hero-days">
+            <strong>Разом: {{ item.totalDays }}</strong>
+            <span>Крафт: {{ item.craftingDays }} · Магія: {{ item.mageGuildDays }} · Релігія: {{ item.religionDays }}</span>
+          </div>
+        </template>
+        <template #item.actions="{ item }">
+          <div class="d-flex justify-end ga-1">
+            <v-btn icon="mdi-pencil-outline" size="small" variant="text" color="primary" title="Редагувати профіль" @click="openHeroEditor(item)" />
+            <v-btn icon="mdi-cash-edit" size="small" variant="text" color="primary" title="Змінити баланс" @click="openBalanceEditor(item)" />
+          </div>
+        </template>
       </v-data-table>
-      </v-card>
-
-      <v-card variant="outlined" class="pa-4 mb-4">
-        <div class="text-subtitle-1 mb-3">Використані дні поточного циклу</div>
-        <v-data-table
-          :headers="usedDaysHeaders"
-          :items="usedDaysRows"
-          :items-per-page="10"
-          density="compact"
-          class="elevation-1"
-        >
-          <template #item.totalDays="{ item }">
-            <span class="font-weight-medium">{{ item.totalDays }}</span>
-          </template>
-        </v-data-table>
       </v-card>
 
       <div class="d-flex align-center ga-2 mb-3">
@@ -1371,18 +1369,20 @@ const headers = [
   { title: 'Дія', key: 'action' },
 ];
 
-const heroHeaders = [
+const heroSearch = ref('');
+const heroStatusFilter = ref('active');
+const heroStatusOptions = [
+  { title: 'Активні', value: 'active' },
+  { title: 'Усі', value: 'all' },
+  { title: 'Неактивні', value: 'inactive' },
+];
+const heroWorkspaceHeaders = [
   { title: 'Герой', key: 'name' },
   { title: 'Релігія', key: 'religionName' },
-  { title: 'Статус дії', key: 'downtimeAvailable' },
-  { title: 'Стан героя', key: 'inactive' },
-  { title: '', key: 'actions', sortable: false },
-];
-
-const accountBalanceHeaders = [
-  { title: 'Герой', key: 'name' },
+  { title: 'Статус', key: 'status', sortable: false },
   { title: 'Telegram ID', key: 'telegramId' },
-  { title: 'Баланс акаунта', key: 'goldBalance' },
+  { title: 'Баланс', key: 'goldBalance' },
+  { title: 'Дні циклу', key: 'usedDays', sortable: false },
   { title: '', key: 'actions', sortable: false },
 ];
 
@@ -1541,24 +1541,21 @@ function removeCrewGroup(index) {
   if (cycleForm.crewGroups.length > 1) cycleForm.crewGroups.splice(index, 1);
 }
 const usedDaysByHero = ref(new Map());
-const usedDaysHeaders = [
-  { title: 'Герой', key: 'heroName' },
-  { title: 'Крафт', key: 'craftingDays' },
-  { title: 'Магічна допомога', key: 'mageGuildDays' },
-  { title: 'Релігія', key: 'religionDays' },
-  { title: 'Разом', key: 'totalDays' },
-];
-const usedDaysRows = computed(() => heroRows.value.map((hero) => {
-  const breakdown = usedDaysByHero.value.get(hero.id) || {};
-  return {
-    heroId: hero.id,
-    heroName: hero.name,
-    craftingDays: Number(breakdown.craftingDays || 0),
-    mageGuildDays: Number(breakdown.mageGuildDays || 0),
-    religionDays: Number(breakdown.religionDays || 0),
-    totalDays: Number(breakdown.totalDays || 0),
-  };
-}));
+const heroWorkspaceRows = computed(() => {
+  return heroRows.value
+    .filter((hero) => heroStatusFilter.value === 'all'
+      || (heroStatusFilter.value === 'inactive' ? hero.inactive : !hero.inactive))
+    .map((hero) => {
+      const breakdown = usedDaysByHero.value.get(hero.id) || {};
+      return {
+        ...hero,
+        craftingDays: Number(breakdown.craftingDays || 0),
+        mageGuildDays: Number(breakdown.mageGuildDays || 0),
+        religionDays: Number(breakdown.religionDays || 0),
+        totalDays: Number(breakdown.totalDays || 0),
+      };
+    });
+});
 
 const applyImportDisabled = computed(() => {
   const preview = snapshotImportState.preview;
@@ -2569,6 +2566,45 @@ function buildSnapshotGroupKey(timestamp, source) {
   font-family: var(--wi-font-body);
   color: var(--wi-text-muted);
   border-top: 1px solid var(--wi-border);
+}
+
+.hero-workspace { overflow: hidden; }
+
+.hero-workspace__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
+  border-bottom: 1px solid var(--wi-border);
+}
+
+.hero-workspace__filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px;
+  gap: 12px;
+  width: min(100%, 460px);
+}
+
+.hero-workspace__table :deep(.v-data-table__td:last-child) { white-space: nowrap; }
+
+.hero-days {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+}
+
+.hero-days strong { color: var(--wi-gold-light); }
+
+.hero-days span {
+  color: var(--wi-text-muted);
+  font-size: 0.72rem;
+}
+
+@media (max-width: 700px) {
+  .admin-card { padding: 16px !important; }
+  .hero-workspace__toolbar { align-items: stretch; flex-direction: column; }
+  .hero-workspace__filters { grid-template-columns: 1fr; width: 100%; }
 }
 
 /* ── Snapshot history table ──────────────────────────────────── */

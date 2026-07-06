@@ -27,7 +27,7 @@ All started in `onMounted`, stopped in `onBeforeUnmount`:
 
 ## Computed Cross-Section Data
 - `heroRows` - heroes joined with clergy (religion, clergyId), sorted alphabetically
-- `usedDaysRows` - current-cycle crafting, mage help, religion, and total used days per hero
+- `heroWorkspaceRows` - the unified hero list, combining identity/status, account balance, and current-cycle used days from `usedDaysByHero` so admins search and paginate one table instead of three
 - `religionOptions` - for hero form selects
 - `clergyByHeroId` / `religionById` - lookup maps
 
