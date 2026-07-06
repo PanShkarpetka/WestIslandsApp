@@ -21,7 +21,7 @@ Default view: `diagram`.
 - `useIslandStore` — current island context
 
 ## UI shell
-Single card with a `v-btn-toggle` in the header. The toggle label text is hidden on small screens (`.toggle-label` has responsive display). Active button highlighted with `color="primary"`.
+`WiPageHeader` provides the shared page hierarchy. The existing religion card and `v-btn-toggle` remain unchanged; loading, error, and empty states use `WiEmptyState`. Toggle label text is hidden on small screens (`.toggle-label` has responsive display).
 
 ## Components imported
 - `ReligionDistributionDiagram`
