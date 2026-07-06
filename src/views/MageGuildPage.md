@@ -55,6 +55,8 @@ This means popular spells get cheaper over time and neglected ones get more expe
 ### Fulfillment write
 Firestore transaction: reads the `spell-requests` document, hero document, `treasury/meta`, selected `guilds/{guildId}`, and `islands/{islandId}`. It updates the matching request in the `requests` array in-place and applies the payout atomically.
 
+The fulfillment confirmation uses the shared `WiActionButton` styling.
+
 Payout formula:
 - `grossReward` = request `compensation`
 - `treasuryTax` = `grossReward * islands/{islandId}.taxRate`

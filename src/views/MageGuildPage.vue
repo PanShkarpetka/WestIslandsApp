@@ -193,7 +193,7 @@
         <v-card-actions class="mage-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="closeFulfillmentDialog">Скасувати</v-btn>
           <v-spacer />
-          <v-btn class="save-btn" :loading="store.actionLoading" :disabled="isPayoutInvalid" prepend-icon="mdi-check" @click="confirmFulfillment">Зберегти</v-btn>
+          <WiActionButton :loading="store.actionLoading" :disabled="isPayoutInvalid" prepend-icon="mdi-check" @click="confirmFulfillment">Зберегти</WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -214,6 +214,7 @@ import { normalizeSpellLevel, normalizeSpellTier } from '@/utils/mageGuildReques
 import { DEFAULT_ISLAND_ID } from '@/config/constants'
 import { db } from '@/services/firebase'
 import WiEmptyState from '@/components/ui/WiEmptyState.vue'
+import WiActionButton from '@/components/ui/WiActionButton.vue'
 import WiPageHeader from '@/components/ui/WiPageHeader.vue'
 import WiPanel from '@/components/ui/WiPanel.vue'
 
@@ -704,12 +705,4 @@ onBeforeUnmount(() => { store.stopListening(); populationStore.stopListening(); 
   letter-spacing: 0.06em !important;
 }
 
-.save-btn {
-  font-family: var(--wi-font-heading) !important;
-  letter-spacing: 0.07em !important;
-  background: linear-gradient(180deg, #d4a233 0%, #a07020 100%) !important;
-  color: #1a1209 !important;
-  border: 1px solid var(--wi-gold-light) !important;
-}
-.save-btn :deep(.v-btn__overlay) { opacity: 0 !important; }
 </style>
