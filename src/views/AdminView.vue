@@ -561,7 +561,6 @@
               v-model.number="balanceEditForm.goldBalance"
               label="Новий баланс (зм)"
               type="number"
-              min="0"
               step="0.01"
               class="mb-2"
             />

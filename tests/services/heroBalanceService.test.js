@@ -41,13 +41,19 @@ test('adjustHeroGoldBalance updates goldBalance and writes delta transaction', a
   assert.equal(logs[0].actorName, 'Admin')
 })
 
-test('adjustHeroGoldBalance rejects negative balances', async () => {
-  const { deps } = makeDeps({
+test('adjustHeroGoldBalance allows admins to set a negative balance', async () => {
+  const { mock, deps } = makeDeps({
     'heroes/h1': { name: 'Aela', goldBalance: 10 },
   })
 
-  await assert.rejects(
-    () => adjustHeroGoldBalance({ heroId: 'h1', newBalance: -1 }, deps),
-    /невід/,
+  const result = await adjustHeroGoldBalance(
+    { heroId: 'h1', newBalance: -1.25, comment: 'Debt correction' },
+    deps,
   )
+
+  assert.equal(result.newBalance, -1.25)
+  assert.equal(result.delta, -11.25)
+  assert.equal(mock.get('heroes/h1').goldBalance, -1.25)
+  const logs = Object.values(mock.list('hero-transactions'))
+  assert.equal(logs[0].goldAmount, -11.25)
 })

@@ -16,7 +16,7 @@ Fields same as add form + `downtimeAvailable` switch + `inactive` switch + playe
 On save: transaction that updates `heroes` doc and updates (or creates if missing) the linked `clergy` doc's religion reference. Empty password input is reset to the default `password`.
 
 ## Account balance action
-The unified workspace shows each hero's `goldBalance` and Telegram ID/username. The cash-edit row action opens a dialog to set a new `goldBalance`.
+The unified workspace shows each hero's `goldBalance` and Telegram ID/username. The cash-edit row action opens a dialog to set a new `goldBalance`, including a negative balance when the hero owes funds.
 
 On save: transaction updates `heroes/{heroId}.goldBalance` and writes `hero-transactions` with type `admin-balance-adjustment` and `goldAmount = newBalance - previousBalance`. This does not change imported D&D Beyond `balance` snapshots.
 

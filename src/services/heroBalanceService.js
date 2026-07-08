@@ -22,8 +22,8 @@ export async function adjustHeroGoldBalance(
   const db = firestoreDb ?? getFirestore()
   const targetBalance = normalizeAmount(newBalance)
   if (!heroId) throw new Error('Не вдалося визначити героя.')
-  if (!Number.isFinite(targetBalance) || targetBalance < 0) {
-    throw new Error('Баланс має бути невідʼємним числом.')
+  if (!Number.isFinite(targetBalance)) {
+    throw new Error('Баланс має бути числом.')
   }
 
   return runTransactionFn(db, async (transaction) => {

@@ -395,7 +395,7 @@
  * @property {HeroCraftingData} crafting
  * @property {string} password - player login password; defaults to "password" until manually changed
  * @property {string} telegramId - Telegram user ID or username used to link fishing bot catches; empty until manually filled
- * @property {number} [goldBalance] - personal gold balance, never negative
+ * @property {number} [goldBalance] - personal gold balance; may be negative when the hero owes funds
  * @property {Record<string, number>} [goods] - personal goods inventory, keyed by goodId
  */
 
