@@ -68,7 +68,7 @@ function openNewShipDialog() {
     name: '', type: '', speedUnit: 0, capacity: 0,
     hp: 0, hpMax: 0, ac: 0, hullDiceUsed: 0,
     crewCurrent: 0, passengerCurrent: 0, tonnageCurrent: 0,
-    weaponSlotsUsed: 0, weaponSlots: [], hullUpgrade: '',
+    weaponSlotsUsed: 0, weaponSlots: [], hullUpgrades: [],
     ammunition: {
       cannonballs: 0, chain: 0, grapeshot: 0, smokeBombs: 0,
       bolt: 0, flamingBolt: 0, catapultStone: 0,

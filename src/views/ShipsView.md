@@ -11,14 +11,14 @@ The page uses the shared page header, action button, panel, and empty-state prim
 - `ShipCard` — displays a single ship's stats, emits `edit` event
 - `ShipEditor` (imported as `ShipDetailsDialog`) — form dialog for create/edit
 
-`ShipDetailsDialog` uses `WiDialogFrame` and `WiActionButton`; all status, characteristics, weapons, ammunition, copy, and save fields remain unchanged.
+`ShipDetailsDialog` uses `WiDialogFrame` and `WiActionButton`. Hull upgrades are selected independently in an icon-led multi-select and stored in `hullUpgrades`; legacy `hullUpgrade` strings remain readable. Ship cards show hull-upgrade icons at the top-left and weapon icons at the top-right.
 
 ## Sorting
 - **Admin**: all ships sorted by visibility first (visible before hidden), then by `maxHP` descending
 - **Non-admin**: only ships with `visibility: true`, sorted by `maxHP` descending
 
 ## New ship defaults
-When commissionning a new ship, a full zero-state object is constructed including ammunition types: `cannonballs`, `chain`, `grapeshot`, `smokeBombs`, `bolt`, `flamingBolt`, `catapultStone`, `salamanderFuel`, `dragonHeadFuel`.
+When commissioning a new ship, a full zero-state object is constructed with an empty `hullUpgrades` array and ammunition types: `cannonballs`, `chain`, `grapeshot`, `smokeBombs`, `bolt`, `flamingBolt`, `catapultStone`, `salamanderFuel`, `dragonHeadFuel`.
 
 ## Stores
 - `useShipStore` — `subscribeToShips()`, `ships`, `saveShip(updatedShip)`

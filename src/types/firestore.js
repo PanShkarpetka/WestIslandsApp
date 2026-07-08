@@ -106,6 +106,8 @@
  * @property {number} [tonnageCurrent]
  * @property {number} [weaponSlotsUsed]
  * @property {unknown[]} [weaponSlots]
+ * @property {string[]} [hullUpgrades] - Active hull upgrades. Multiple upgrades may be selected.
+ * @property {string} [hullUpgrade] - Legacy single hull upgrade, read as a fallback.
  * @property {Record<string, number>} [ammunition]
  * @property {string} [size]
  * @property {string} [description]

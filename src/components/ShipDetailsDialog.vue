@@ -136,16 +136,26 @@
               </v-col>
               <v-col cols="12" sm="6">
                 <v-select
-                  v-model="editedShip.hullUpgrade"
+                  v-model="editedShip.hullUpgrades"
                   :items="hullUpgradeOptions"
                   item-title="title"
                   item-value="value"
                   label="Покращення корпусу"
                   prepend-inner-icon="mdi-shield-plus"
                   :readonly="!isAdmin"
+                  multiple
+                  chips
+                  :closable-chips="isAdmin"
                   variant="outlined"
                   density="compact"
-                />
+                >
+                  <template #item="{ props: itemProps, item }">
+                    <v-list-item v-bind="itemProps" :prepend-icon="item.raw.icon" />
+                  </template>
+                  <template #chip="{ props: chipProps, item }">
+                    <v-chip v-bind="chipProps" :prepend-icon="item.raw.icon" />
+                  </template>
+                </v-select>
               </v-col>
             </v-row>
           </v-tabs-window-item>
@@ -288,10 +298,10 @@ const weaponOptions = [
   { title: 'Таран ауруха', value: 'auroch ram' },
 ]
 const hullUpgradeOptions = [
-  { title: 'Шиповані плити', value: 'spiked plates' },
-  { title: 'Магічна сітка', value: 'magic mesh' },
-  { title: 'Захист від чар', value: 'spell shielding' },
-  { title: 'Таран', value: 'naval ram' },
+  { title: 'Шиповані плити', value: 'spiked plates', icon: 'mdi-shield-sword' },
+  { title: 'Магічна сітка', value: 'magic mesh', icon: 'mdi-spider-web' },
+  { title: 'Захист від чар', value: 'spell shielding', icon: 'mdi-shield-star' },
+  { title: 'Таран', value: 'naval ram', icon: 'mdi-spear' },
 ]
 const ammunitionTypes = [
   { key: 'cannonballs', label: 'Ядра' },
@@ -322,10 +332,14 @@ watch(() => props.ships, () => {
 const copyOptions = computed(() => props.ships.filter(s => s.id))
 
 function normalizeShip(ship) {
+  const hullUpgrades = Array.isArray(ship.hullUpgrades)
+    ? ship.hullUpgrades
+    : (ship.hullUpgrade ? [ship.hullUpgrade] : [])
+
   return {
     ...ship,
     weaponSlots: ship.weaponSlots || [],
-    hullUpgrade: ship.hullUpgrade || '',
+    hullUpgrades,
     ammunition: {
       cannonballs: 0, chain: 0, grapeshot: 0, smokeBombs: 0,
       bolt: 0, flamingBolt: 0, catapultStone: 0,

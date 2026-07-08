@@ -14,19 +14,35 @@
         </div>
       </div>
 
-      <!-- Weapon icons — top-right corner of image -->
-      <div v-if="weaponIcons.length" class="weapon-badge-row">
+      <!-- Hull upgrades — top-left corner of image -->
+      <div v-if="hullUpgradeIcons.length" class="equipment-badge-row equipment-badge-row--left">
         <v-tooltip
-          v-for="w in weaponIcons"
-          :key="w.type"
+          v-for="(item, index) in hullUpgradeIcons"
+          :key="`${item.type}-${index}`"
           location="bottom"
         >
           <template #activator="{ props }">
-            <span class="weapon-badge" v-bind="props">
-              <v-icon size="15">{{ w.icon }}</v-icon>
+            <span class="equipment-badge" v-bind="props">
+              <v-icon size="15">{{ item.icon }}</v-icon>
             </span>
           </template>
-          {{ w.label }}
+          {{ item.label }}
+        </v-tooltip>
+      </div>
+
+      <!-- Weapons — top-right corner of image -->
+      <div v-if="weaponIcons.length" class="equipment-badge-row equipment-badge-row--right">
+        <v-tooltip
+          v-for="(item, index) in weaponIcons"
+          :key="`${item.type}-${index}`"
+          location="bottom"
+        >
+          <template #activator="{ props }">
+            <span class="equipment-badge" v-bind="props">
+              <v-icon size="15">{{ item.icon }}</v-icon>
+            </span>
+          </template>
+          {{ item.label }}
         </v-tooltip>
       </div>
 
@@ -123,11 +139,28 @@ const WEAPON_MAP = {
   'auroch ram':       { icon: 'mdi-axe-battle',         label: 'Таран ауруха' },
 };
 
+const HULL_UPGRADE_MAP = {
+  'spiked plates':   { icon: 'mdi-shield-sword', label: 'Шиповані плити' },
+  'magic mesh':      { icon: 'mdi-spider-web',   label: 'Магічна сітка' },
+  'spell shielding': { icon: 'mdi-shield-star',  label: 'Захист від чар' },
+  'naval ram':       { icon: 'mdi-spear',        label: 'Таран' },
+};
+
 const weaponIcons = computed(() =>
   (props.ship.weaponSlots || [])
     .filter(w => w.type && WEAPON_MAP[w.type])
     .map(w => ({ type: w.type, ...WEAPON_MAP[w.type] }))
 );
+
+const hullUpgradeIcons = computed(() => {
+  const hullUpgrades = Array.isArray(props.ship.hullUpgrades)
+    ? props.ship.hullUpgrades
+    : (props.ship.hullUpgrade ? [props.ship.hullUpgrade] : []);
+
+  return hullUpgrades
+    .filter(type => HULL_UPGRADE_MAP[type])
+    .map(type => ({ type, ...HULL_UPGRADE_MAP[type] }));
+});
 
 const hpColor = computed(() => {
   if (hpPercent.value > 60) return 'hp-high';
@@ -175,18 +208,25 @@ const hpColor = computed(() => {
   transform: scale(1.04);
 }
 
-/* ── Weapon badges ──────────────────────────────────────────── */
-.weapon-badge-row {
+/* ── Equipment badges ───────────────────────────────────────── */
+.equipment-badge-row {
   position: absolute;
   top: 8px;
-  right: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   z-index: 1;
 }
 
-.weapon-badge {
+.equipment-badge-row--left {
+  left: 8px;
+}
+
+.equipment-badge-row--right {
+  right: 8px;
+}
+
+.equipment-badge {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -199,7 +239,7 @@ const hpColor = computed(() => {
   backdrop-filter: blur(2px);
 }
 
-.weapon-badge .v-icon {
+.equipment-badge .v-icon {
   color: var(--wi-gold) !important;
 }
 
