@@ -604,8 +604,8 @@ export async function updateExpeditionDetails(cycleId, expedition, {
 }
 
 /**
- * Consumes the Deva's monthly faith when a newly-created cycle starts a new
- * Faerun month. The transaction and cycle marker make retries idempotent.
+ * Consumes the Deva's monthly faith when a newly-created cycle crosses into a
+ * new Faerun month. The transaction and cycle marker make retries idempotent.
  */
 export async function consumeDevaFaithForMonthChange(cycleId, currentStartedAt, previousStartedAt, {
   doc: docFn = doc,
@@ -616,7 +616,7 @@ export async function consumeDevaFaithForMonthChange(cycleId, currentStartedAt, 
   const previous = typeof previousStartedAt === 'string' ? parseFaerunDate(previousStartedAt) : previousStartedAt
 
   if (!cycleId || !current || !previous) return false
-  if (current.day !== 1 || (current.month === previous.month && current.year === previous.year)) return false
+  if (current.month === previous.month && current.year === previous.year) return false
 
   const devaRef = docFn(firestoreDb, 'religions', PSEUDO_RELIGION_ID, 'customs', 'Deva')
   let consumed = false

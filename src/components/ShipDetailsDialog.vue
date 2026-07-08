@@ -291,6 +291,7 @@ const hullUpgradeOptions = [
   { title: 'Шиповані плити', value: 'spiked plates' },
   { title: 'Магічна сітка', value: 'magic mesh' },
   { title: 'Захист від чар', value: 'spell shielding' },
+  { title: 'Таран', value: 'naval ram' },
 ]
 const ammunitionTypes = [
   { key: 'cannonballs', label: 'Ядра' },
