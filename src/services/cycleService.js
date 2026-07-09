@@ -807,9 +807,9 @@ export async function processBuildingYields(cycleId, newCycleStart, islandId, {
       if (event.processed) return false
       const parsedEventDate = parseFaerunDate(event.date)
       if (!parsedEventDate) return false
-      // diffInDays(A, B) > 1 means B is strictly after A, i.e. eventDate < newCycleStart
+      // diffInDays(A, B) > 0 means the event date is on or before the new cycle start.
       const diff = diffInDays(parsedEventDate, newCycleStart)
-      return diff !== null && diff > 1
+      return diff !== null && diff > 0
     })
 
     if (!pendingEvents.length) continue

@@ -7,6 +7,7 @@ import {
   distributeBuildingFaithIncome,
   consumeDevaFaithForMonthChange,
   createNewCycleWithEffects,
+  processBuildingYields,
   buildExpeditionDetails,
   updateExpeditionDetails,
 } from '../../src/services/cycleService.js';
@@ -801,6 +802,75 @@ test('updateExpeditionDetails materializes a legacy expedition without financial
 });
 
 // ─── distributeManufactureIncome — hero destination ──────────────────────────
+
+test('processBuildingYields fulfills yield events due on the new cycle start date', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': {
+      buildings: {
+        yield_garden: {
+          name: 'Garden',
+          yields: [
+            {
+              id: 'garden-12-kythorn',
+              destination: 'hero:hero-1',
+              date: '12 Kythorn 1490',
+              goods: { vegetables: 12 },
+              processed: false,
+            },
+          ],
+        },
+      },
+    },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 0, goods: {} },
+  });
+
+  await processBuildingYields(
+    'cycle-12-kythorn',
+    { day: 12, month: 5, year: 1490 },
+    'island_rock',
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goods.vegetables, 12);
+  const txs = Object.values(mock.list('hero-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].type, 'building-yield');
+  assert.deepEqual(txs[0].goods, { vegetables: 12 });
+  assert.equal(mock.get('islands/island_rock')['buildings.yield_garden.yields'][0].processed, true);
+});
+
+test('processBuildingYields keeps future yield events pending', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': {
+      buildings: {
+        yield_garden: {
+          name: 'Garden',
+          yields: [
+            {
+              id: 'garden-13-kythorn',
+              destination: 'hero:hero-1',
+              date: '13 Kythorn 1490',
+              goods: { vegetables: 12 },
+              processed: false,
+            },
+          ],
+        },
+      },
+    },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 0, goods: {} },
+  });
+
+  await processBuildingYields(
+    'cycle-12-kythorn',
+    { day: 12, month: 5, year: 1490 },
+    'island_rock',
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.deepEqual(mock.get('heroes/hero-1').goods, {});
+  assert.equal(Object.keys(mock.list('hero-transactions')).length, 0);
+  assert.equal(mock.get('islands/island_rock')['buildings.yield_garden.yields'], undefined);
+});
 
 test('distributeManufactureIncome credits hero goldBalance from manufacture income', async () => {
   const mock = createMockFirestore({
