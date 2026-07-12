@@ -12,7 +12,7 @@ Displays island treasury overview: cycle income, expenses, derived net total, ch
 
 ## Income/Outcome calculation
 The page aggregates income from two sources:
-1. **Manufactures** — loaded via direct Firestore query on `island.manufactures` IDs (chunked in batches of 10 due to Firestore `in` limit). Only manufactures with `incomeDestination === 'treasury'` are counted.
+1. **Manufactures** — loaded through `loadManufacturesByIds(island.manufactures)`, so both legacy `income` / `incomeDestination` fields and modern `payouts[]` rows are normalized consistently with cycle rollover. Only fixed payouts to `treasury` are counted; guild, hero, and Coin Pig payouts are excluded from the treasury summary.
 2. **Population** — from `populationStore.populationIncomeTotal`. Positive = income, negative = outcome.
 
 `totalIncome`, `totalOutcome`, and their derived net value are displayed in metric cards. No additional Firestore fields are read.

@@ -61,6 +61,17 @@ function rollCoinPigTotal(durationDays, rng) {
   return total
 }
 
+function splitAmountEvenly(amount, parts) {
+  const count = Math.max(0, Math.floor(Number(parts) || 0))
+  if (count <= 0) return []
+
+  const cents = Math.round(normalizeAmount(amount) * 100)
+  const base = Math.trunc(cents / count)
+  const remainder = cents - base * count
+
+  return Array.from({ length: count }, (_, index) => normalizeAmount((base + (index < remainder ? 1 : 0)) / 100))
+}
+
 function expandCoinPigEntry(entry, coinPigCycle, rng) {
   if (entry.mechanic !== 'coinPig') return [entry]
 
@@ -71,8 +82,7 @@ function expandCoinPigEntry(entry, coinPigCycle, rng) {
   const total = rollCoinPigTotal(durationDays, rng)
   if (total <= 0) return []
 
-  const share = normalizeAmount(total / participantHeroIds.length)
-  if (share <= 0) return []
+  const shares = splitAmountEvenly(total, participantHeroIds.length)
 
   return participantHeroIds.map((heroId, index) => ({
     ...entry,
@@ -81,7 +91,7 @@ function expandCoinPigEntry(entry, coinPigCycle, rng) {
     coinPigParticipantCount: participantHeroIds.length,
     coinPigDurationDays: durationDays,
     coinPigTotal: total,
-    income: share,
+    income: shares[index] || 0,
     incomeDestination: `hero:${heroId}`,
     incomeGoods: {},
     cycleId: coinPigCycle?.cycleId || entry.cycleId || null,
@@ -156,7 +166,7 @@ export async function loadManufacturesByIds(ids, {
           name,
           description,
           income: normalizeAmount(payout.income || 0),
-          incomeDestination: normalizeIncomeDestination(payout.destination),
+          incomeDestination: normalizeIncomeDestination(payout.destination ?? payout.incomeDestination),
           incomeGoods: payout.incomeGoods && typeof payout.incomeGoods === 'object' ? payout.incomeGoods : {},
         })
       })

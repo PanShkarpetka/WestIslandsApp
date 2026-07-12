@@ -20,12 +20,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { collection, documentId, getDocs, query, where } from 'firebase/firestore'
 import TreasuryTransactions from "@/components/TreasuryTransactions.vue"
 import TreasuryChestCard from "@/components/TreasuryChestCard.vue"
 import { useIslandStore } from '@/store/islandStore'
 import { usePopulationStore } from '@/store/populationStore'
-import { db } from '@/services/firebase'
+import { loadManufacturesByIds } from '@/services/cycleService.js'
 import { formatAmount } from '@/utils/formatters'
 import WiMetricCard from '@/components/ui/WiMetricCard.vue'
 import WiPageHeader from '@/components/ui/WiPageHeader.vue'
@@ -61,19 +60,14 @@ async function loadManufactureTotals(ids) {
     manufactureOutcome.value = 0
     return
   }
-  const chunks = []
-  for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10))
-
-  let incomeSum = 0, outcomeSum = 0
-  for (const chunk of chunks) {
-    const snap = await getDocs(query(collection(db, 'manufactures'), where(documentId(), 'in', chunk)))
-    snap.docs.forEach(d => {
-      const data = d.data() || {}
-      if ((data.incomeDestination || 'treasury') !== 'treasury') return
-      const income = roundAmount(Number(data.income || 0))
-      if (income > 0) incomeSum += income
-      else if (income < 0) outcomeSum += Math.abs(income)
-    })
+  let incomeSum = 0
+  let outcomeSum = 0
+  const payouts = await loadManufacturesByIds(ids)
+  for (const payout of payouts) {
+    if (payout.mechanic === 'coinPig' || payout.incomeDestination !== 'treasury') continue
+    const income = roundAmount(Number(payout.income || 0))
+    if (income > 0) incomeSum += income
+    else if (income < 0) outcomeSum += Math.abs(income)
   }
   manufactureIncome.value = roundAmount(incomeSum)
   manufactureOutcome.value = roundAmount(outcomeSum)

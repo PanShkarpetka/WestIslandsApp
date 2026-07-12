@@ -91,6 +91,26 @@ test('loadManufacturesByIds expands multi-payout manufactures into separate entr
   assert.equal(result[1].incomeGoods['barrel'], 2);
 });
 
+test('loadManufacturesByIds accepts incomeDestination in payout rows', async () => {
+  const mock = createMockFirestore({
+    'manufactures/m1': {
+      name: 'Mixed legacy payouts',
+      payouts: [
+        { incomeDestination: 'guild:guild-a', income: 25 },
+        { incomeDestination: 'hero:hero-1', income: 5, incomeGoods: { barrel: 1 } },
+      ],
+    },
+  });
+
+  const result = await loadManufacturesByIds(['m1'], { ...mock.firebase, db: mock.db });
+
+  assert.equal(result.length, 2);
+  assert.equal(result[0].incomeDestination, 'guild:guild-a');
+  assert.equal(result[0].income, 25);
+  assert.equal(result[1].incomeDestination, 'hero:hero-1');
+  assert.deepEqual(result[1].incomeGoods, { barrel: 1 });
+});
+
 test('loadManufacturesByIds preserves Coin Pig payout config', async () => {
   const mock = createMockFirestore({
     'manufactures/m1': {
@@ -249,9 +269,40 @@ test('distributeManufactureIncome rounds Coin Pig participant shares to 0.01', a
     },
   );
 
-  assert.equal(mock.get('heroes/hero-1').goldBalance, 0.67);
-  assert.equal(mock.get('heroes/hero-2').goldBalance, 0.67);
-  assert.equal(mock.get('heroes/hero-3').goldBalance, 0.67);
+  const balances = [
+    mock.get('heroes/hero-1').goldBalance,
+    mock.get('heroes/hero-2').goldBalance,
+    mock.get('heroes/hero-3').goldBalance,
+  ];
+  assert.deepEqual(balances, [0.67, 0.67, 0.66]);
+  assert.equal(balances.reduce((sum, value) => sum + value, 0), 2);
+});
+
+test('distributeManufactureIncome routes payout rows with incomeDestination', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Auto ledger',
+      type: 'auto',
+      payouts: [
+        { incomeDestination: 'guild:guild-a', income: 25 },
+        { incomeDestination: 'hero:hero-1', income: 5, incomeGoods: { barrel: 1 } },
+      ],
+    },
+    'guilds/guild-a': { treasure: 10 },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 1, goods: {} },
+    'treasury/meta': { balance: 100 },
+  });
+
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('guilds/guild-a').treasure, 35);
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 6);
+  assert.equal(mock.get('heroes/hero-1').goods.barrel, 1);
+  assert.equal(mock.get('treasury/meta').balance, 100);
 });
 
 test('distributeManufactureIncome skips Coin Pig when previous duration is unavailable', async () => {
