@@ -1506,6 +1506,7 @@ const expeditionHeaders = [
   { title: 'Учасники', key: 'participants' },
   { title: 'Моряків', key: 'totalCrewCount' },
   { title: 'Вартість', key: 'totalCost' },
+  { title: 'Автодоходи', key: 'autoIncomeStatus', sortable: false },
   { title: '', key: 'actions', sortable: false },
 ];
 const expeditionRows = computed(() => allCycles.value
