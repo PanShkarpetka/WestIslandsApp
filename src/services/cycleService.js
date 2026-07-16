@@ -222,6 +222,10 @@ function applyBureaucratEffects(populationEntries, rng) {
   }
 }
 
+function truncateOperationError(error) {
+  return String(error?.message || error || 'Unknown auto-income error').slice(0, 500)
+}
+
 export async function distributeManufactureIncome(cycleId, startedAt, finishedAt, islandId, populationItems, {
   collection: collectionFn = collection,
   doc: docFn = doc,
@@ -232,12 +236,18 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   documentId: documentIdFn = documentId,
   runTransaction: runTransactionFn = runTransaction,
   serverTimestamp: serverTimestampFn = serverTimestamp,
+  updateDoc: updateDocFn = updateDoc,
   db: firestoreDb = db,
   rng = Math.random,
   coinPigCycle = null,
+  recordOperationCycleId = null,
+  operationSource = 'cycle-start',
+  moneyOnly = false,
+  force = false,
 } = {}) {
   const islandSnap = await getDocFn(docFn(firestoreDb, 'islands', islandId || DEFAULT_ISLAND_ID))
   if (!islandSnap.exists()) return
+  const operationCycleRef = recordOperationCycleId ? docFn(firestoreDb, 'cycles', recordOperationCycleId) : null
 
   const manufactureIds = Array.isArray(islandSnap.data()?.manufactures) ? islandSnap.data().manufactures : []
   const loadDeps = { collection: collectionFn, getDocs: getDocsFn, query: queryFn, where: whereFn, documentId: documentIdFn, db: firestoreDb }
@@ -268,7 +278,20 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   const { entries: populationEntries } = applyBureaucratEffects(rawPopulationEntries, rng)
 
   const combinedEntries = [...entries.map((item) => ({ ...item, type: 'manufacture' })), ...populationEntries]
-  if (!combinedEntries.length) return
+  if (!combinedEntries.length) {
+    const operation = {
+      status: 'done',
+      source: operationSource,
+      moneyOnly,
+      processedAt: serverTimestampFn(),
+      logCount: 0,
+      logs: [],
+      totalIncome: 0,
+      totalOutcome: 0,
+    }
+    if (operationCycleRef) await updateDocFn(operationCycleRef, { autoIncomeOperation: operation })
+    return operation
+  }
 
   const metaRef = docFn(firestoreDb, 'treasury/meta')
   const txCol = collectionFn(firestoreDb, 'treasury-transactions')
@@ -278,10 +301,22 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   )
   const totalIncome = nonHeroManufactures.reduce((sum, item) => (item.income > 0 ? sum + item.income : sum), 0)
   const totalOutcome = nonHeroManufactures.reduce((sum, item) => (item.income < 0 ? sum + Math.abs(item.income) : sum), 0)
+  let operationResult = null
 
+  try {
   await runTransactionFn(firestoreDb, async (transaction) => {
+    if (operationCycleRef) {
+      const operationCycleSnap = await transaction.get(operationCycleRef)
+      const previousOperation = operationCycleSnap.exists() ? operationCycleSnap.data()?.autoIncomeOperation || null : null
+      if (!force && previousOperation?.status === 'done') {
+        operationResult = previousOperation
+        return
+      }
+    }
+
     const metaSnap = await transaction.get(metaRef)
     let currentBalance = metaSnap.exists() ? metaSnap.data()?.balance || 0 : 0
+    const operationLogs = []
     const guildBalances = new Map()
     const guildIds = [...new Set(combinedEntries.filter((item) => item.type === 'manufacture' && item.incomeDestination?.startsWith('guild:')).map((item) => item.incomeDestination.slice('guild:'.length)).filter(Boolean))]
 
@@ -327,6 +362,15 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
           createdAt: serverTimestampFn(),
           treasureAfter: guildNext,
         })
+        operationLogs.push({
+          targetType: 'guild',
+          targetId: guildId,
+          targetName: guildId,
+          entryName: item.name || '',
+          amount: item.income,
+          balanceBefore: guildCurrent,
+          balanceAfter: guildNext,
+        })
         continue
       }
 
@@ -334,18 +378,19 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
         const heroRef = docFn(firestoreDb, 'heroes', heroId)
         const heroCurrent = Number(heroBalances.get(heroId) || 0)
         const heroNext = normalizeAmount(heroCurrent + item.income)
-        if (heroNext < 0) throw new Error(`Недостатньо коштів на рахунку героя для списання з мануфактури "${item.name}".`)
         heroBalances.set(heroId, heroNext)
 
         const currentGoods = heroGoods.get(heroId) || {}
         const updatedGoods = { ...currentGoods }
         const goodsDelta = {}
+        if (!moneyOnly) {
         for (const [goodId, qty] of Object.entries(item.incomeGoods || {})) {
           const prev = Number(updatedGoods[goodId] ?? 0)
           const next = prev + Number(qty)
           if (next < 0) throw new Error(`Недостатньо товару "${goodId}" на рахунку героя.`)
           updatedGoods[goodId] = next
           goodsDelta[goodId] = Number(qty)
+        }
         }
         heroGoods.set(heroId, updatedGoods)
 
@@ -369,10 +414,20 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
           manufactureMechanic: item.mechanic || 'fixed',
           createdAt: serverTimestampFn(),
         })
+        operationLogs.push({
+          targetType: 'hero',
+          targetId: heroId,
+          targetName: heroNames.get(heroId) || heroId,
+          entryName: item.name || '',
+          amount: item.income,
+          balanceBefore: heroCurrent,
+          balanceAfter: heroNext,
+        })
         continue
       }
 
-      currentBalance += item.income
+      const treasuryBefore = currentBalance
+      currentBalance = normalizeAmount(currentBalance + item.income)
       const label = item.income >= 0 ? 'Дохід' : 'Витрати'
       const commentParts = item.type === 'population'
         ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} зм)`]
@@ -394,6 +449,15 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
         cycleStartedAt: startedAt,
         cycleFinishedAt: finishedAt || null,
       })
+      operationLogs.push({
+        targetType: 'treasury',
+        targetId: 'treasury',
+        targetName: 'Treasury',
+        entryName: item.name || '',
+        amount: item.income,
+        balanceBefore: treasuryBefore,
+        balanceAfter: currentBalance,
+      })
     }
 
     transaction.set(metaRef, {
@@ -402,7 +466,97 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
       totalOutcome: normalizeAmount(totalOutcome),
       updatedAt: serverTimestampFn(),
     }, { merge: true })
+
+    operationResult = {
+      status: 'done',
+      source: operationSource,
+      moneyOnly,
+      processedAt: serverTimestampFn(),
+      logCount: operationLogs.length,
+      logs: operationLogs,
+      totalIncome: normalizeAmount(totalIncome),
+      totalOutcome: normalizeAmount(totalOutcome),
+    }
+    if (operationCycleRef) {
+      transaction.set(operationCycleRef, { autoIncomeOperation: operationResult }, { merge: true })
+    }
   })
+  } catch (error) {
+    if (operationCycleRef) {
+      await updateDocFn(operationCycleRef, {
+        autoIncomeOperation: {
+          status: 'failed',
+          source: operationSource,
+          moneyOnly,
+          failedAt: serverTimestampFn(),
+          error: truncateOperationError(error),
+          logCount: 0,
+          logs: [],
+          totalIncome: normalizeAmount(totalIncome),
+          totalOutcome: normalizeAmount(totalOutcome),
+        },
+      })
+    }
+    throw error
+  }
+
+  return operationResult
+}
+
+export async function rerunCycleAutoMoney(cycleId, islandId, populationItems, {
+  collection: collectionFn = collection,
+  doc: docFn = doc,
+  getDoc: getDocFn = getDoc,
+  getDocs: getDocsFn = getDocs,
+  query: queryFn = query,
+  where: whereFn = where,
+  documentId: documentIdFn = documentId,
+  runTransaction: runTransactionFn = runTransaction,
+  serverTimestamp: serverTimestampFn = serverTimestamp,
+  updateDoc: updateDocFn = updateDoc,
+  db: firestoreDb = db,
+  rng = Math.random,
+  force = false,
+} = {}) {
+  if (!cycleId) throw new Error('AUTO_INCOME_CYCLE_REQUIRED')
+  const cycleRef = docFn(firestoreDb, 'cycles', cycleId)
+  const cycleSnap = await getDocFn(cycleRef)
+  if (!cycleSnap.exists()) throw new Error('AUTO_INCOME_CYCLE_NOT_FOUND')
+
+  const cycleData = cycleSnap.data() || {}
+  if (!cycleData.startedAt || !cycleData.finishedAt) throw new Error('AUTO_INCOME_CYCLE_NOT_FINISHED')
+
+  return distributeManufactureIncome(
+    cycleId,
+    cycleData.startedAt,
+    cycleData.finishedAt,
+    islandId,
+    populationItems,
+    {
+      collection: collectionFn,
+      doc: docFn,
+      getDoc: getDocFn,
+      getDocs: getDocsFn,
+      query: queryFn,
+      where: whereFn,
+      documentId: documentIdFn,
+      runTransaction: runTransactionFn,
+      serverTimestamp: serverTimestampFn,
+      updateDoc: updateDocFn,
+      db: firestoreDb,
+      rng,
+      coinPigCycle: {
+        cycleId,
+        startedAt: cycleData.startedAt,
+        finishedAt: cycleData.finishedAt,
+        durationDays: cycleData.duration,
+      },
+      recordOperationCycleId: cycleId,
+      operationSource: 'manual-rerun',
+      moneyOnly: true,
+      force,
+    },
+  )
 }
 
 export async function distributeBuildingFaithIncome(cycleId, {
@@ -954,6 +1108,7 @@ export async function createNewCycleWithEffects({
     await updateDocFn(cycleDoc, { weatherForecast })
   }
   let coinPigCycle = null
+  let closedCycleForAutoIncome = null
 
   if (lastCycleDoc && !lastCycleDoc.data().finishedAt) {
     const previousCycle = lastCycleDoc.data()
@@ -980,6 +1135,7 @@ export async function createNewCycleWithEffects({
       finishedAt: previousUpdate.finishedAt,
       durationDays: previousDuration,
     }
+    closedCycleForAutoIncome = coinPigCycle
 
     const populationBefore = Number(previousCycle.populationAtStart)
     const hasPopulationBefore = Number.isFinite(populationBefore)
@@ -1012,7 +1168,21 @@ export async function createNewCycleWithEffects({
   })
   await applyParkBuildingGrowth(islandId, sharedDeps)
   await distributeBuildingFaithIncome(cycleDoc.id, sharedDeps)
-  await distributeManufactureIncome(cycleDoc.id, startedAt, null, islandId, populationItems, { ...sharedDeps, coinPigCycle })
+  if (closedCycleForAutoIncome) {
+    await distributeManufactureIncome(
+      closedCycleForAutoIncome.cycleId,
+      closedCycleForAutoIncome.startedAt,
+      closedCycleForAutoIncome.finishedAt,
+      islandId,
+      populationItems,
+      {
+        ...sharedDeps,
+        coinPigCycle,
+        recordOperationCycleId: closedCycleForAutoIncome.cycleId,
+        operationSource: 'cycle-start',
+      },
+    )
+  }
   await processBuildingYields(cycleDoc.id, normalizedStart, islandId, sharedDeps)
   await settlePreviousSpellRequestsFn()
   await generateSpellRequestsForCycleFn({

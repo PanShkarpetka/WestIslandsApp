@@ -116,6 +116,7 @@
       </v-form>
 
       <v-card-title class="text-h6">Експедиції</v-card-title>
+      <v-alert v-if="autoIncomeError" type="error" variant="tonal" class="mb-3">{{ autoIncomeError }}</v-alert>
       <v-data-table
         :headers="expeditionHeaders"
         :items="expeditionRows"
@@ -140,6 +141,27 @@
         </template>
         <template #item.actions="{ item }">
           <v-btn size="small" variant="text" color="primary" @click="openExpeditionEditor(item)">Редагувати</v-btn>
+        </template>
+        <template #item.autoIncomeStatus="{ item }">
+          <div class="d-flex align-center ga-1 flex-wrap">
+            <v-chip size="small" :color="autoIncomeStatusColor(item.autoIncomeStatus)" variant="tonal">
+              <v-icon start size="14">{{ autoIncomeStatusIcon(item.autoIncomeStatus) }}</v-icon>
+              {{ autoIncomeStatusLabel(item.autoIncomeStatus) }}
+            </v-chip>
+            <v-btn
+              size="x-small"
+              variant="text"
+              color="secondary"
+              :loading="autoIncomeRunningCycleId === item.id"
+              :disabled="item.autoIncomeStatus === 'done'"
+              @click="runAutoIncomeForCycle(item)"
+            >
+              Запустити
+            </v-btn>
+            <v-btn size="x-small" variant="text" color="info" :disabled="!item.autoIncomeLogs.length" @click="openAutoIncomeLog(item)">
+              Журнал
+            </v-btn>
+          </div>
         </template>
       </v-data-table>
 
@@ -912,6 +934,44 @@
     </v-card>
   </v-dialog>
 
+  <v-dialog v-model="autoIncomeLogDialog" max-width="760">
+    <v-card>
+      <div class="pa-4" style="border-bottom: 1px solid var(--wi-border)">
+        <span class="wi-heading text-h6">Журнал автодоходів</span>
+      </div>
+      <v-card-text class="pt-4">
+        <v-alert type="info" variant="tonal" class="mb-3">
+          {{ autoIncomeLogCycle?.cycleLabel || '' }} · {{ autoIncomeStatusLabel(autoIncomeLogCycle?.autoIncomeStatus) }}
+        </v-alert>
+        <v-table density="compact">
+          <thead>
+            <tr>
+              <th>Ціль</th>
+              <th>Запис</th>
+              <th>Сума</th>
+              <th>Було</th>
+              <th>Стало</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(log, index) in autoIncomeLogCycle?.autoIncomeLogs || []" :key="index">
+              <td>{{ log.targetName || log.targetId || log.targetType }}</td>
+              <td>{{ log.entryName || '—' }}</td>
+              <td>{{ formatAmount(log.amount || 0) }} зм</td>
+              <td>{{ formatAmount(log.balanceBefore || 0) }} зм</td>
+              <td>{{ formatAmount(log.balanceAfter || 0) }} зм</td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card-text>
+      <v-divider />
+      <v-card-actions>
+        <v-spacer />
+        <v-btn variant="text" @click="autoIncomeLogDialog = false">Закрити</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <v-dialog v-model="showReligionSummaryDialog" max-width="620">
     <v-card>
       <div class="pa-4" style="border-bottom: 1px solid var(--wi-border)">
@@ -964,7 +1024,7 @@ import { db } from '../services/firebase';
 import FaerunDatePicker from '@/components/FaerunDatePicker.vue';
 import { useIslandStore } from '@/store/islandStore';
 import { usePopulationStore } from '@/store/populationStore';
-import { createNewCycleWithEffects, updateExpeditionDetails } from '@/services/cycleService';
+import { createNewCycleWithEffects, rerunCycleAutoMoney, updateExpeditionDetails } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import {
   approveCraftingRequest,
@@ -996,6 +1056,10 @@ const expeditionEditSaving = ref(false);
 const expeditionEditError = ref('');
 const expeditionEditCycleId = ref('');
 const expeditionEditForm = reactive({ adventureTitle: '', participantHeroIds: [], durationDays: 1, crewGroups: [] });
+const autoIncomeRunningCycleId = ref('');
+const autoIncomeError = ref('');
+const autoIncomeLogDialog = ref(false);
+const autoIncomeLogCycle = ref(null);
 const editCycleId = ref(null);
 const editCycleForm = reactive({ startedAt: null, finishedAt: null });
 const editCycleSaving = ref(false);
@@ -1456,6 +1520,9 @@ const expeditionRows = computed(() => allCycles.value
     totalCost: cycle.expedition?.totalCost ?? null,
     autoDeduct: cycle.expedition ? cycle.expedition.autoDeduct !== false : null,
     paymentStatus: cycle.expedition?.paymentStatus || (cycle.expedition ? (cycle.expedition.autoDeduct !== false ? 'deducted' : 'skipped') : ''),
+    autoIncomeOperation: cycle.autoIncomeOperation || null,
+    autoIncomeStatus: cycle.autoIncomeOperation?.status || 'not-run',
+    autoIncomeLogs: Array.isArray(cycle.autoIncomeOperation?.logs) ? cycle.autoIncomeOperation.logs : [],
     expedition: cycle.expedition || null,
   })));
 
@@ -1479,6 +1546,45 @@ function expeditionPaymentTitle(status) {
   if (status === 'deducted') return 'Списано з учасників';
   if (status === 'skipped') return 'Без автоматичного списання';
   return 'Дані відредаговано без повторного списання';
+}
+
+function autoIncomeStatusLabel(status) {
+  if (status === 'done') return 'Готово';
+  if (status === 'failed') return 'Помилка';
+  return 'Не виконано';
+}
+
+function autoIncomeStatusColor(status) {
+  if (status === 'done') return 'success';
+  if (status === 'failed') return 'error';
+  return 'warning';
+}
+
+function autoIncomeStatusIcon(status) {
+  if (status === 'done') return 'mdi-check-circle';
+  if (status === 'failed') return 'mdi-alert-circle';
+  return 'mdi-clock-outline';
+}
+
+function openAutoIncomeLog(item) {
+  autoIncomeLogCycle.value = item;
+  autoIncomeLogDialog.value = true;
+}
+
+async function runAutoIncomeForCycle(item) {
+  if (!item?.id || autoIncomeRunningCycleId.value) return;
+  autoIncomeError.value = '';
+  autoIncomeRunningCycleId.value = item.id;
+  try {
+    await rerunCycleAutoMoney(item.id, islandStore.currentId || DEFAULT_ISLAND_ID, populationStore.items || []);
+    await loadAllCycles();
+  } catch (error) {
+    console.error('[admin] Failed to run auto income', error);
+    autoIncomeError.value = error?.message || 'Auto income operation failed.';
+    await loadAllCycles();
+  } finally {
+    autoIncomeRunningCycleId.value = '';
+  }
 }
 
 function openExpeditionEditor(item) {

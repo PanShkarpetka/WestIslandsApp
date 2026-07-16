@@ -8,6 +8,7 @@ import {
   consumeDevaFaithForMonthChange,
   createNewCycleWithEffects,
   processBuildingYields,
+  rerunCycleAutoMoney,
   buildExpeditionDetails,
   updateExpeditionDetails,
 } from '../../src/services/cycleService.js';
@@ -303,6 +304,40 @@ test('distributeManufactureIncome routes payout rows with incomeDestination', as
   assert.equal(mock.get('heroes/hero-1').goldBalance, 6);
   assert.equal(mock.get('heroes/hero-1').goods.barrel, 1);
   assert.equal(mock.get('treasury/meta').balance, 100);
+});
+
+test('rerunCycleAutoMoney applies money only and records operation status logs', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Hammer 1490', finishedAt: '3 Hammer 1490', duration: 3 },
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Auto ledger',
+      payouts: [
+        { destination: 'treasury', income: 30 },
+        { destination: 'hero:hero-1', income: 5, incomeGoods: { barrel: 2 } },
+      ],
+    },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 1, goods: {} },
+    'treasury/meta': { balance: 100 },
+  });
+
+  const result = await rerunCycleAutoMoney(
+    'prev',
+    'island_rock',
+    [],
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(result.status, 'done');
+  assert.equal(mock.get('treasury/meta').balance, 130);
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 6);
+  assert.deepEqual(mock.get('heroes/hero-1').goods, {});
+  assert.equal(mock.get('cycles/prev').autoIncomeOperation.status, 'done');
+  assert.equal(mock.get('cycles/prev').autoIncomeOperation.logCount, 2);
+  assert.deepEqual(
+    mock.get('cycles/prev').autoIncomeOperation.logs.map((log) => log.targetType),
+    ['treasury', 'hero'],
+  );
 });
 
 test('distributeManufactureIncome skips Coin Pig when previous duration is unavailable', async () => {
@@ -701,6 +736,8 @@ test('createNewCycleWithEffects pays Coin Pig for the closed previous cycle', as
   assert.equal(txs.length, 1);
   assert.equal(txs[0].cycleId, 'prev');
   assert.equal(txs[0].cycleStartedAt, '1 Hammer 1490');
+  assert.equal(mock.get('cycles/prev').autoIncomeOperation.status, 'done');
+  assert.equal(mock.get('cycles/prev').autoIncomeOperation.logCount, 1);
   assert.equal(txs[0].cycleFinishedAt, '3 Hammer 1490 рік після Потопу');
 });
 
@@ -982,7 +1019,7 @@ test('distributeManufactureIncome deducts hero goldBalance for negative income (
   assert.equal(txs[0].type, 'deduction');
 });
 
-test('distributeManufactureIncome throws when hero deduction would make balance negative', async () => {
+test('distributeManufactureIncome allows auto deductions to make hero balance negative', async () => {
   const mock = createMockFirestore({
     'islands/island_rock': { manufactures: ['m1'] },
     'manufactures/m1': { name: 'Debt', income: -50, incomeDestination: 'hero:hero-1', incomeGoods: {} },
@@ -990,14 +1027,14 @@ test('distributeManufactureIncome throws when hero deduction would make balance 
     'treasury/meta': { balance: 0 },
   });
 
-  await assert.rejects(
-    () => distributeManufactureIncome(
-      'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
-      { ...mock.firebase, db: mock.db },
-    ),
-    /Недостатньо коштів/,
+  await distributeManufactureIncome(
+    'cycle-1', '1 Hammer 1490', null, 'island_rock', [],
+    { ...mock.firebase, db: mock.db },
   );
 
-  // hero balance must be unchanged after failed transaction
-  assert.equal(mock.get('heroes/hero-1').goldBalance, 10);
+  assert.equal(mock.get('heroes/hero-1').goldBalance, -40);
+  const txs = Object.values(mock.list('hero-transactions'));
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].goldAmount, -50);
+  assert.equal(txs[0].type, 'deduction');
 });

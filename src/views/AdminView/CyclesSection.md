@@ -12,6 +12,7 @@ Creates new game cycles and records the expedition completed during the cycle be
 - **Екіпаж** — one or more role/count/daily-rate groups; the initial sailor rate is 2 gold per day
 - **Автоматичне списання** — splits crew cost between participants and writes `crew-payment` hero transactions
 - Structured expeditions can be edited later (participants, duration, and crew groups). Editing recalculates display data, marks payment status as `edited`, and never changes balances or writes another transaction.
+- The expedition table also shows `autoIncomeOperation` status for the closed cycle. Admins can run a money-only auto-income operation when it has not completed yet; this applies treasury, guild, hero-account, population, manufacture, and Coin Pig money entries, skips garden/yield goods, and stores per-target balance-change logs on the cycle document.
 
 ## Suggested date
 On mount, `suggestNextCycleDate()` pre-fills the date picker with the previous cycle start + 7 Faerun days (one week). Uses modular arithmetic to handle month/year rollovers in the 360-day Faerun calendar.

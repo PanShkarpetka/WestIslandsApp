@@ -301,6 +301,7 @@
  * @property {string|null} finishedAt - Faerun date string, null if cycle is open
  * @property {number} [populationAtStart]
  * @property {ExpeditionData} [expedition] - Expedition completed during this cycle.
+ * @property {AutoIncomeOperation} [autoIncomeOperation] - Money-only manufacture/population/Coin Pig operation status and audit logs.
  * @property {WeatherForecastDay[]} [weatherForecast] - Stored 7-day seasonal weather forecast generated from the cycle start.
  * @property {import('firebase/firestore').Timestamp} createdAt
  */
@@ -318,6 +319,31 @@
  * @property {'deducted'|'skipped'|'edited'} paymentStatus - `edited` means expedition data changed without another financial transaction.
  * @property {{heroId: string, heroName: string, amount: number}[]} participantShares
  * @property {import('firebase/firestore').Timestamp} [editedAt]
+ */
+
+/**
+ * @typedef {Object} AutoIncomeOperation
+ * @property {'done'|'failed'} status
+ * @property {'cycle-start'|'manual-rerun'} source
+ * @property {boolean} moneyOnly
+ * @property {number} logCount
+ * @property {AutoIncomeOperationLog[]} logs
+ * @property {number} totalIncome
+ * @property {number} totalOutcome
+ * @property {import('firebase/firestore').Timestamp} [processedAt]
+ * @property {import('firebase/firestore').Timestamp} [failedAt]
+ * @property {string} [error]
+ */
+
+/**
+ * @typedef {Object} AutoIncomeOperationLog
+ * @property {'treasury'|'guild'|'hero'} targetType
+ * @property {string} targetId
+ * @property {string} targetName
+ * @property {string} entryName
+ * @property {number} amount
+ * @property {number} balanceBefore
+ * @property {number} balanceAfter
  */
 
 /**
