@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { approveGoodsRequest, rejectGoodsRequest, submitGoodsDepositRequest } from '../../src/services/goodsRequestService.js'
+import {
+  approveGoodsRequest,
+  rejectGoodsRequest,
+  submitGoodsDepositRequest,
+  subscribePendingGoodsRequestCount,
+} from '../../src/services/goodsRequestService.js'
 import { createMockFirestore } from '../helpers/mockFirestore.js'
 
 function makeDeps(seed = {}) {
@@ -64,4 +69,21 @@ test('rejecting a goods request leaves the target unchanged', async () => {
   await rejectGoodsRequest({ requestId: 'request-1', reviewedBy: 'Admin' }, deps)
   assert.deepEqual(mock.get('heroes/hero-1').goods, {})
   assert.equal(mock.get('goods-requests/request-1').status, 'rejected')
+})
+
+test('pending goods request count subscription reports snapshot size', () => {
+  let received = -1
+  const stop = () => {}
+  const result = subscribePendingGoodsRequestCount((count) => { received = count }, {
+    db: {},
+    collectionFn: () => ({ collection: 'goods-requests' }),
+    queryFn: (...args) => args,
+    whereFn: (...args) => args,
+    onSnapshotFn: (_query, callback) => {
+      callback({ size: 3, docs: [{}, {}, {}] })
+      return stop
+    },
+  })
+  assert.equal(received, 3)
+  assert.equal(result, stop)
 })

@@ -94,6 +94,20 @@ export function subscribePendingGoodsRequests(callback, {
   )
 }
 
+export function subscribePendingGoodsRequestCount(callback, {
+  db: firestoreDb,
+  collectionFn = collection,
+  onSnapshotFn = onSnapshot,
+  queryFn = query,
+  whereFn = where,
+} = {}) {
+  const db = firestoreDb ?? getFirestore()
+  return onSnapshotFn(
+    queryFn(collectionFn(db, 'goods-requests'), whereFn('status', '==', 'pending')),
+    (snapshot) => callback(snapshot.size || snapshot.docs?.length || 0),
+  )
+}
+
 export async function approveGoodsRequest(
   { requestId, reviewedBy = null },
   {

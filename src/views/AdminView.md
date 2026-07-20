@@ -40,6 +40,8 @@ The Crafting tab subscribes to pending `crafting-requests`, lets admins approve 
 
 The Resources tab subscribes to pending `goods-requests` for both personal and guild destinations. Admins approve or reject requests in a batch-style checklist. Approval atomically credits the target inventory, writes the appropriate hero transaction or guild ledger row, and marks the request approved; rejection never changes inventory.
 
+The shared admin navigation badge sums pending crafting and pending goods requests, so the number always represents the total admin-review queue.
+
 ## Styling
 `WiPageHeader` provides the shared page hierarchy above the existing `.admin-card` workspace. Deep CSS overrides for Vuetify data tables, expansion panels, and inner cards remain in place to preserve the dense admin workflows.
 
