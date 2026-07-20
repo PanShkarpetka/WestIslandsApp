@@ -25,18 +25,36 @@
 
       <v-card-text class="yield-dialog-body">
 
+        <BuildingOwnerEditor
+          v-if="isAdmin"
+          :building-key="buildingKey"
+          :building-entry="buildingEntry"
+        />
+
+        <BuildingOwnerActionSection
+          v-if="isOwnerAction"
+          :building-key="buildingKey"
+          :building-entry="buildingEntry"
+          :definition="yieldBuilding"
+          :current-hero-id="currentHeroId"
+          :leader-guild-ids="leaderGuildIds"
+          :actor-name="actorName"
+          :current-cycle-id="currentCycleId"
+        />
+
         <!-- Upcoming harvest info -->
-        <div v-if="nextHarvest" class="next-harvest-row">
+        <div v-else-if="nextHarvest" class="next-harvest-row">
           <v-icon size="14" class="mr-1" color="#c8962a">mdi-calendar-clock</v-icon>
           <span class="next-harvest-label">Наступний врожай:</span>
           <span class="next-harvest-date">{{ nextHarvest.date }}</span>
           <span class="next-harvest-goods">— {{ nextHarvestGoodsLabel }}</span>
         </div>
-        <div v-else class="no-harvest-note">
+        <div v-else-if="!isOwnerAction" class="no-harvest-note">
           Немає запланованих подій.
         </div>
 
         <BuildingHarvestSection
+          v-if="!isOwnerAction"
           :building-key="buildingKey"
           :is-admin="isAdmin"
           :current-cycle-start-date="currentCycleStartDate"
@@ -72,12 +90,18 @@ import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { useGoodsStore } from '@/store/goodsStore'
 import { parseFaerunDate } from '@/utils/faerun-date.js'
 import BuildingHarvestSection from '@/components/BuildingHarvestSection.vue'
+import BuildingOwnerActionSection from '@/components/BuildingOwnerActionSection.vue'
+import BuildingOwnerEditor from '@/components/BuildingOwnerEditor.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   buildingKey: { type: String, required: true },
   isAdmin: { type: Boolean, default: false },
   currentCycleStartDate: { type: Object, default: null },
+  currentCycleId: { type: String, default: '' },
+  currentHeroId: { type: String, default: '' },
+  leaderGuildIds: { type: Array, default: () => [] },
+  actorName: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -93,6 +117,7 @@ const yieldBuilding = computed(() => {
   const id = buildingEntry.value?.yieldBuildingId
   return id ? yieldBuildingStore.byId.get(id) : null
 })
+const isOwnerAction = computed(() => yieldBuilding.value?.incomeType === 'owner-action')
 
 const pendingYields = computed(() => {
   const yields = buildingEntry.value?.yields || []

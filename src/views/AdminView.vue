@@ -707,13 +707,29 @@
       <v-card variant="outlined" class="pa-4 mb-4">
         <div class="text-subtitle-1 mb-3">Додати будівлю-постачальника</div>
         <v-row>
-          <v-col cols="12" md="5">
+          <v-col cols="12" md="4">
             <v-text-field v-model="newYieldBuildingForm.name" label="Назва будівлі" hide-details="auto" density="comfortable" />
           </v-col>
-          <v-col cols="12" md="5">
+          <v-col cols="12" md="4">
             <v-text-field v-model="newYieldBuildingForm.description" label="Опис (необов'язково)" hide-details="auto" density="comfortable" />
           </v-col>
-          <v-col cols="12" md="2" class="d-flex align-end">
+          <v-col cols="12" md="4">
+            <v-select v-model="newYieldBuildingForm.incomeType" :items="yieldIncomeTypeOptions" label="Тип доходу" hide-details="auto" density="comfortable" />
+          </v-col>
+          <v-col v-if="newYieldBuildingForm.incomeType === 'owner-action'" cols="12">
+            <div class="text-caption text-medium-emphasis mb-2">Спочатку створіть потрібні товари вище в розділі «Товари».</div>
+            <v-row>
+              <v-col cols="12" md="4"><v-text-field v-model.number="newYieldBuildingForm.actionCostGold" type="number" min="0.01" step="0.01" label="Вартість дії, зм" /></v-col>
+              <v-col cols="12" md="4"><v-text-field v-model.number="newYieldBuildingForm.maxUsesPerCycle" type="number" min="1" step="1" label="Використань за цикл" /></v-col>
+            </v-row>
+            <div v-for="(variant, index) in newYieldBuildingForm.actionVariants" :key="variant.id" class="d-flex align-center ga-2 mb-2">
+              <v-select v-model="variant.goodId" :items="goodOptions" label="Товар" density="compact" hide-details class="flex-grow-1" />
+              <v-text-field v-model.number="variant.amount" type="number" min="1" step="1" label="Кількість" density="compact" hide-details style="max-width: 150px" />
+              <v-btn icon="mdi-delete-outline" variant="text" color="error" :disabled="newYieldBuildingForm.actionVariants.length === 1" @click="removeYieldActionVariant(newYieldBuildingForm, index)" />
+            </div>
+            <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" @click="addYieldActionVariant(newYieldBuildingForm)">Додати варіант</v-btn>
+          </v-col>
+          <v-col cols="12" class="d-flex justify-end">
             <v-btn color="primary" prepend-icon="mdi-sprout" :loading="yieldBuildingsSaving" @click="createYieldBuilding">
               Додати
             </v-btn>
@@ -734,12 +750,24 @@
         </template>
       </v-data-table>
 
-      <v-dialog v-model="yieldBuildingEditDialog" max-width="480">
+      <v-dialog v-model="yieldBuildingEditDialog" max-width="680">
         <v-card>
           <v-card-title class="text-h6">Редагування будівлі-постачальника</v-card-title>
           <v-card-text>
             <v-text-field v-model="editYieldBuildingForm.name" label="Назва будівлі" class="mb-2" />
             <v-text-field v-model="editYieldBuildingForm.description" label="Опис" class="mb-2" />
+            <v-select v-model="editYieldBuildingForm.incomeType" :items="yieldIncomeTypeOptions" label="Тип доходу" class="mb-2" />
+            <template v-if="editYieldBuildingForm.incomeType === 'owner-action'">
+              <v-alert type="info" density="compact" variant="tonal" class="mb-3">У списку доступні лише товари, вже створені в адмін-панелі.</v-alert>
+              <v-text-field v-model.number="editYieldBuildingForm.actionCostGold" type="number" min="0.01" step="0.01" label="Вартість дії, зм" class="mb-2" />
+              <v-text-field v-model.number="editYieldBuildingForm.maxUsesPerCycle" type="number" min="1" step="1" label="Використань за цикл" class="mb-2" />
+              <div v-for="(variant, index) in editYieldBuildingForm.actionVariants" :key="variant.id" class="d-flex align-center ga-2 mb-2">
+                <v-select v-model="variant.goodId" :items="goodOptions" label="Товар" density="compact" hide-details class="flex-grow-1" />
+                <v-text-field v-model.number="variant.amount" type="number" min="1" step="1" label="Кількість" density="compact" hide-details style="max-width: 130px" />
+                <v-btn icon="mdi-delete-outline" variant="text" color="error" :disabled="editYieldBuildingForm.actionVariants.length === 1" @click="removeYieldActionVariant(editYieldBuildingForm, index)" />
+              </div>
+              <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" @click="addYieldActionVariant(editYieldBuildingForm)">Додати варіант</v-btn>
+            </template>
           </v-card-text>
           <v-card-actions>
             <v-spacer />
@@ -1142,23 +1170,44 @@ const yieldBuildingsError = ref('');
 const yieldBuildingsSuccess = ref('');
 const yieldBuildingEditDialog = ref(false);
 const selectedYieldBuildingId = ref('');
-const newYieldBuildingForm = reactive({ name: '', description: '' });
-const editYieldBuildingForm = reactive({ name: '', description: '' });
+const createYieldVariant = () => ({ id: `variant-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, goodId: '', amount: 1 });
+const newYieldBuildingForm = reactive({ name: '', description: '', incomeType: 'scheduled', actionCostGold: 1, maxUsesPerCycle: 1, actionVariants: [createYieldVariant()] });
+const editYieldBuildingForm = reactive({ name: '', description: '', incomeType: 'scheduled', actionCostGold: 1, maxUsesPerCycle: 1, actionVariants: [createYieldVariant()] });
+const yieldIncomeTypeOptions = [
+  { title: 'Заплановані врожаї', value: 'scheduled' },
+  { title: 'Платна дія власника', value: 'owner-action' },
+];
+
+function addYieldActionVariant(form) { form.actionVariants.push(createYieldVariant()); }
+function removeYieldActionVariant(form, index) {
+  if (form.actionVariants.length > 1) form.actionVariants.splice(index, 1);
+}
 
 const yieldBuildingsHeaders = [
   { title: 'Назва', key: 'name' },
   { title: 'Опис', key: 'description' },
+  { title: 'Тип доходу', key: 'incomeTypeLabel' },
   { title: '', key: 'actions', sortable: false },
 ];
 
 const yieldBuildingRows = computed(() =>
-  yieldBuildingStore.yieldBuildings.map(yb => ({ id: yb.id, name: yb.name, description: yb.description || '—' }))
+  yieldBuildingStore.yieldBuildings.map(yb => ({
+    ...yb,
+    description: yb.description || '—',
+    incomeTypeLabel: yb.incomeType === 'owner-action' ? 'Платна дія власника' : 'Заплановані врожаї',
+  }))
 );
 
 function openYieldBuildingEditor(item) {
   selectedYieldBuildingId.value = item.id;
   editYieldBuildingForm.name = item.name;
   editYieldBuildingForm.description = item.description === '—' ? '' : item.description;
+  editYieldBuildingForm.incomeType = item.incomeType || 'scheduled';
+  editYieldBuildingForm.actionCostGold = Number(item.actionCostGold || 1);
+  editYieldBuildingForm.maxUsesPerCycle = Math.max(1, Number(item.maxUsesPerCycle || 1));
+  editYieldBuildingForm.actionVariants = item.actionVariants?.length
+    ? item.actionVariants.map((variant) => ({ ...variant }))
+    : [createYieldVariant()];
   yieldBuildingEditDialog.value = true;
 }
 
@@ -1169,13 +1218,17 @@ async function createYieldBuilding() {
   if (!name) { yieldBuildingsError.value = 'Вкажіть назву будівлі.'; return; }
   yieldBuildingsSaving.value = true;
   try {
-    await yieldBuildingStore.create(name, newYieldBuildingForm.description);
+    await yieldBuildingStore.create(name, newYieldBuildingForm.description, newYieldBuildingForm);
     newYieldBuildingForm.name = '';
     newYieldBuildingForm.description = '';
+    newYieldBuildingForm.incomeType = 'scheduled';
+    newYieldBuildingForm.actionCostGold = 1;
+    newYieldBuildingForm.maxUsesPerCycle = 1;
+    newYieldBuildingForm.actionVariants = [createYieldVariant()];
     yieldBuildingsSuccess.value = 'Будівлю додано.';
   } catch (e) {
     console.error('[admin] Failed to create yield building', e);
-    yieldBuildingsError.value = 'Не вдалося додати будівлю.';
+    yieldBuildingsError.value = e?.message || 'Не вдалося додати будівлю.';
   } finally {
     yieldBuildingsSaving.value = false;
   }
@@ -1187,12 +1240,12 @@ async function saveYieldBuilding() {
   if (!selectedYieldBuildingId.value || !name) { yieldBuildingsError.value = 'Вкажіть назву.'; return; }
   yieldBuildingsSaving.value = true;
   try {
-    await yieldBuildingStore.update(selectedYieldBuildingId.value, { name, description: editYieldBuildingForm.description });
+    await yieldBuildingStore.update(selectedYieldBuildingId.value, { name, description: editYieldBuildingForm.description, ...editYieldBuildingForm });
     yieldBuildingEditDialog.value = false;
     yieldBuildingsSuccess.value = 'Будівлю оновлено.';
   } catch (e) {
     console.error('[admin] Failed to save yield building', e);
-    yieldBuildingsError.value = 'Не вдалося зберегти будівлю.';
+    yieldBuildingsError.value = e?.message || 'Не вдалося зберегти будівлю.';
   } finally {
     yieldBuildingsSaving.value = false;
   }

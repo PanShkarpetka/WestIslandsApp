@@ -960,6 +960,94 @@ test('processBuildingYields keeps future yield events pending', async () => {
   assert.equal(mock.get('islands/island_rock')['buildings.yield_garden.yields'], undefined);
 });
 
+test('processBuildingYields still processes scheduled buildings when an owner-action building is installed', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': {
+      buildings: {
+        yield_garden: {
+          name: 'Garden',
+          yields: [
+            {
+              id: 'garden-12-kythorn',
+              destination: 'hero:hero-1',
+              date: '12 Kythorn 1490',
+              goods: { vegetables: 4 },
+              processed: false,
+            },
+          ],
+        },
+        yield_herbal_action: {
+          name: 'Herbal action garden',
+          yieldBuildingId: 'herbal-action',
+          ownerType: 'guild',
+          ownerId: 'mage-guild',
+          yields: [
+            {
+              id: 'legacy-herbs-12-kythorn',
+              destination: 'guild:mage-guild',
+              date: '12 Kythorn 1490',
+              goods: { herbs: 9 },
+              processed: false,
+            },
+          ],
+        },
+      },
+    },
+    'yield-buildings/herbal-action': { name: 'Herbal action garden', incomeType: 'owner-action' },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 0, goods: {} },
+    'guilds/mage-guild': { name: 'Mage Guild', treasure: 100, goods: {} },
+  });
+
+  await processBuildingYields(
+    'cycle-12-kythorn',
+    { day: 12, month: 5, year: 1490 },
+    'island_rock',
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goods.vegetables, 4);
+  assert.deepEqual(mock.get('guilds/mage-guild').goods, {});
+  assert.equal(mock.get('guilds/mage-guild').treasure, 100);
+  assert.equal(mock.get('islands/island_rock')['buildings.yield_garden.yields'][0].processed, true);
+  assert.equal(mock.get('islands/island_rock')['buildings.yield_herbal_action.yields'], undefined);
+});
+
+test('processBuildingYields automatically credits a guild destination on the due date', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': {
+      buildings: {
+        yield_guild_garden: {
+          name: 'Guild Garden',
+          yields: [
+            {
+              id: 'guild-garden-12-kythorn',
+              destination: 'guild:mage-guild',
+              date: '12 Kythorn 1490',
+              goods: { herbs: 3 },
+              processed: false,
+            },
+          ],
+        },
+      },
+    },
+    'guilds/mage-guild': { name: 'Mage Guild', treasure: 100, goods: { herbs: 2 } },
+  });
+
+  await processBuildingYields(
+    'cycle-12-kythorn',
+    { day: 12, month: 5, year: 1490 },
+    'island_rock',
+    { ...mock.firebase, db: mock.db },
+  );
+
+  assert.equal(mock.get('guilds/mage-guild').goods.herbs, 5);
+  const logs = Object.values(mock.list('guilds/mage-guild/logs'));
+  assert.equal(logs.length, 1);
+  assert.equal(logs[0].type, 'goods-deposit');
+  assert.deepEqual(logs[0].goods, { herbs: 3 });
+  assert.equal(mock.get('islands/island_rock')['buildings.yield_guild_garden.yields'][0].processed, true);
+});
+
 test('distributeManufactureIncome credits hero goldBalance from manufacture income', async () => {
   const mock = createMockFirestore({
     'islands/island_rock': { manufactures: ['m1'] },

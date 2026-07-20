@@ -49,9 +49,16 @@
           <div class="yield-building-info">
             <div class="yield-building-name">{{ yb.name }}</div>
             <div class="yield-building-meta">
-              <span v-if="yb.nextHarvest">Наступний врожай: <b>{{ yb.nextHarvest }}</b></span>
-              <span v-else>Немає запланованих подій</span>
-              <span>{{ yb.pendingCount }} {{ eventWord(yb.pendingCount) }}</span>
+              <template v-if="yb.incomeType === 'owner-action'">
+                <span>Дія власника: <b>{{ yb.usesRemaining }} / {{ yb.maxUsesPerCycle }}</b> у циклі</span>
+                <span v-if="yb.ownerName">Власник: {{ yb.ownerName }}</span>
+              </template>
+              <template v-else>
+                <span v-if="yb.nextHarvest">Наступний врожай: <b>{{ yb.nextHarvest }}</b></span>
+                <span v-else>Немає запланованих подій</span>
+                <span>{{ yb.pendingCount }} {{ eventWord(yb.pendingCount) }}</span>
+                <span v-if="yb.ownerName">Власник: {{ yb.ownerName }}</span>
+              </template>
             </div>
           </div>
           <v-icon size="18" class="yield-building-chevron">mdi-chevron-right</v-icon>
@@ -73,9 +80,13 @@
     :building-key="activeYieldKey"
     :is-admin="isAdmin"
     :current-cycle-start-date="currentCycleStartDate"
+    :current-cycle-id="currentCycleId"
+    :current-hero-id="auth.heroId"
+    :leader-guild-ids="auth.leaderGuildAccessIds"
+    :actor-name="auth.nickname"
   />
 
-  <v-dialog v-model="showAddYieldDialog" max-width="420">
+  <v-dialog v-model="showAddYieldDialog" max-width="460">
     <WiDialogFrame title="Додати будівлю-постачальника" icon="mdi-sprout">
       <v-select
         v-model="selectedYieldBuildingId"
@@ -87,6 +98,27 @@
         hide-details="auto"
         class="mb-2"
         clearable
+      />
+      <v-select
+        v-if="selectedDefinition?.incomeType === 'owner-action'"
+        v-model="selectedOwnerType"
+        :items="ownerTypeOptions"
+        label="Тип власника"
+        density="comfortable"
+        hide-details="auto"
+        class="mt-3"
+        @update:modelValue="selectedOwnerId = null"
+      />
+      <v-select
+        v-if="selectedDefinition?.incomeType === 'owner-action'"
+        v-model="selectedOwnerId"
+        :items="ownerOptions"
+        item-title="name"
+        item-value="id"
+        :label="selectedOwnerType === 'guild' ? 'Гільдія-власник' : 'Герой-власник'"
+        density="comfortable"
+        hide-details="auto"
+        class="mt-3"
       />
       <v-alert v-if="addYieldError" type="error" density="compact" variant="tonal" class="mt-2">{{ addYieldError }}</v-alert>
 
@@ -111,12 +143,16 @@ import WiDialogFrame from '@/components/ui/WiDialogFrame.vue'
 import WiEmptyState from '@/components/ui/WiEmptyState.vue'
 import WiPanel from '@/components/ui/WiPanel.vue'
 import { useIslandStore } from '@/store/islandStore'
+import { useHeroesStore } from '@/store/heroesStore'
+import { useGuildStore } from '@/store/guildStore'
 import { useUserStore } from '@/store/userStore.js'
 import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { parseFaerunDate } from '@/utils/faerun-date.js'
 
 const islandStore = useIslandStore()
 const yieldBuildingStore = useYieldBuildingStore()
+const heroesStore = useHeroesStore()
+const guildStore = useGuildStore()
 const auth = useUserStore()
 const { data: island } = storeToRefs(islandStore)
 const isAdmin = computed(() => auth?.isAdmin ?? false)
@@ -127,11 +163,15 @@ const showYieldDialog = ref(false)
 const activeYieldKey = ref(null)
 const showAddYieldDialog = ref(false)
 const selectedYieldBuildingId = ref(null)
+const selectedOwnerType = ref('hero')
+const selectedOwnerId = ref(null)
 const addYieldError = ref('')
 const addingYield = ref(false)
 
 onMounted(async () => {
   yieldBuildingStore.subscribe()
+  heroesStore.subscribeHeroes()
+  guildStore.subscribeGuilds()
 
   try {
     const db = getFirestore()
@@ -149,6 +189,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   yieldBuildingStore.stop()
+  heroesStore.unsubscribeHeroes()
+  guildStore.unsubscribeGuilds()
 })
 
 function openYieldBuilding(key) {
@@ -172,7 +214,26 @@ const islandYieldBuildings = computed(() => {
         if (!pa || !pb) return 0
         return (pa.year * 360 + pa.month * 30 + pa.day) - (pb.year * 360 + pb.month * 30 + pb.day)
       })[0]
-    result.push({ key, name, yieldBuildingId: entry.yieldBuildingId, nextHarvest: nextPending?.date || null, pendingCount })
+    const incomeType = ybDef?.incomeType || 'scheduled'
+    const maxUsesPerCycle = Math.max(0, Number(ybDef?.maxUsesPerCycle || 0))
+    const used = entry.actionUsage?.cycleId === currentCycleId.value ? Number(entry.actionUsage.count || 0) : 0
+    const ownerType = entry.ownerType || (entry.ownerGuildId ? 'guild' : 'hero')
+    const ownerId = entry.ownerId || entry.ownerGuildId || entry.ownerHeroId || ''
+    const ownerName = ownerType === 'guild'
+      ? guildStore.guilds.find(guild => guild.id === ownerId)?.name || ownerId
+      : heroesStore.heroes.find(hero => hero.id === ownerId)?.name || ownerId
+    result.push({
+      key,
+      name,
+      yieldBuildingId: entry.yieldBuildingId,
+      nextHarvest: nextPending?.date || null,
+      pendingCount,
+      incomeType,
+      maxUsesPerCycle,
+      usesRemaining: Math.max(0, maxUsesPerCycle - used),
+      ownerName,
+      ownerType,
+    })
   }
   return result.sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'))
 })
@@ -183,6 +244,14 @@ const availableYieldBuildingsForSelect = computed(() => {
   const installedIds = new Set(islandYieldBuildings.value.map(yb => yb.yieldBuildingId))
   return yieldBuildingStore.yieldBuildings.filter(yb => !installedIds.has(yb.id))
 })
+const selectedDefinition = computed(() => yieldBuildingStore.byId.get(selectedYieldBuildingId.value) || null)
+const ownerTypeOptions = [
+  { title: 'Герой', value: 'hero' },
+  { title: 'Гільдія', value: 'guild' },
+]
+const ownerOptions = computed(() => selectedOwnerType.value === 'guild'
+  ? guildStore.guilds.map(guild => ({ id: guild.id, name: guild.name || guild.id }))
+  : heroesStore.heroes.filter(hero => !hero.inactive))
 
 async function addYieldBuildingToIsland() {
   addYieldError.value = ''
@@ -190,11 +259,21 @@ async function addYieldBuildingToIsland() {
     addYieldError.value = 'Оберіть будівлю.'
     return
   }
+  if (selectedDefinition.value?.incomeType === 'owner-action' && !selectedOwnerId.value) {
+    addYieldError.value = 'Оберіть власника будівлі.'
+    return
+  }
   addingYield.value = true
   try {
     const yb = yieldBuildingStore.byId.get(selectedYieldBuildingId.value)
-    await islandStore.addYieldBuilding(selectedYieldBuildingId.value, yb?.name || selectedYieldBuildingId.value, { cycleId: currentCycleId.value })
+    await islandStore.addYieldBuilding(selectedYieldBuildingId.value, yb?.name || selectedYieldBuildingId.value, {
+      cycleId: currentCycleId.value,
+      ownerType: yb?.incomeType === 'owner-action' ? selectedOwnerType.value : null,
+      ownerId: yb?.incomeType === 'owner-action' ? selectedOwnerId.value : null,
+    })
     selectedYieldBuildingId.value = null
+    selectedOwnerType.value = 'hero'
+    selectedOwnerId.value = null
     showAddYieldDialog.value = false
   } catch (e) {
     addYieldError.value = 'Помилка додавання.'

@@ -36,3 +36,7 @@ The Crafting tab subscribes to pending `crafting-requests`, lets admins approve 
 
 ## Styling
 `WiPageHeader` provides the shared page hierarchy above the existing `.admin-card` workspace. Deep CSS overrides for Vuetify data tables, expansion panels, and inner cards remain in place to preserve the dense admin workflows.
+
+## Yield building definitions
+
+The Resources tab supports both legacy scheduled-harvest buildings and paid owner-action buildings. For an owner action, admins configure its gold cost, maximum uses per cycle, and one or more good/quantity choices. The good selector is intentionally backed only by existing `goods` documents, so the catalog item must be created first.

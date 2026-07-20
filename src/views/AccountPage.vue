@@ -36,6 +36,20 @@
 
       <v-card class="account-card mb-4" elevation="0">
         <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-home-city-outline</v-icon>
+          Мої будівлі
+          <span class="account-header-count">{{ ownedBuildings.length }}</span>
+        </div>
+        <v-card-text class="account-card-body">
+          <OwnedBuildingsList
+            :buildings="ownedBuildings"
+            empty-text="У цього героя поки немає власних будівель."
+          />
+        </v-card-text>
+      </v-card>
+
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-package-variant</v-icon>
           Товари
         </div>
@@ -310,7 +324,9 @@ import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp, wh
 import { db } from '@/services/firebase'
 import { useUserStore } from '@/store/userStore'
 import { useGoodsStore } from '@/store/goodsStore'
+import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { formatAmount } from '@/utils/formatters'
+import { getOwnedBuildings } from '@/utils/ownedBuildings.js'
 import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
 import {
   calculateFishSaleTotals,
@@ -330,9 +346,11 @@ import WiEmptyState from '@/components/ui/WiEmptyState.vue'
 import WiActionButton from '@/components/ui/WiActionButton.vue'
 import WiPageHeader from '@/components/ui/WiPageHeader.vue'
 import WiPanel from '@/components/ui/WiPanel.vue'
+import OwnedBuildingsList from '@/components/OwnedBuildingsList.vue'
 
 const userStore = useUserStore()
 const goodsStore = useGoodsStore()
+const yieldBuildingStore = useYieldBuildingStore()
 
 const hero = ref({ id: '', name: '', goldBalance: 0, goods: {}, telegramId: '' })
 const transactions = ref([])
@@ -358,6 +376,7 @@ const selectedGood = ref(null)
 const withdrawError = ref('')
 const withdrawing = ref(false)
 const usedDays = ref({ craftingDays: 0, mageGuildDays: 0, religionDays: 0, religionActions: 0, totalDays: 0 })
+const islandBuildings = ref({})
 
 let unsubscribeHero = null
 let unsubscribeTx = null
@@ -384,6 +403,15 @@ const goodsList = computed(() => {
     })
 })
 
+const ownedBuildings = computed(() =>
+  getOwnedBuildings(
+    islandBuildings.value,
+    yieldBuildingStore.byId,
+    'hero',
+    userStore.heroId,
+  )
+)
+
 function txTypeLabel(type) {
   if (type === 'income') return 'Дохід'
   if (type === 'withdrawal') return 'Зняття'
@@ -392,6 +420,8 @@ function txTypeLabel(type) {
   if (type === 'treasure-remove') return 'Скарб прибрано'
   if (type === 'admin-balance-adjustment') return 'Корекція балансу'
   if (type === 'admin-goods-adjustment') return 'Корекція товарів'
+  if (type === 'building-yield') return 'Врожай будівлі'
+  if (type === 'building-action') return 'Дія будівлі'
   if (type === 'mage-guild-reward') return 'Магічна допомога'
   if (type === 'crew-payment') return 'Оплата екіпажу'
   return 'Списання'
@@ -403,6 +433,7 @@ function txTypeClass(type) {
   if (type === 'fish-release') return 'wi-sea-text'
   if (type === 'treasure-remove') return 'wi-sea-text'
   if (type === 'admin-balance-adjustment' || type === 'admin-goods-adjustment') return 'wi-gold-text'
+  if (type === 'building-yield' || type === 'building-action') return 'wi-gold-text'
   return 'wi-danger-text'
 }
 
@@ -650,6 +681,8 @@ onMounted(() => {
     return
   }
 
+  yieldBuildingStore.subscribe()
+
   const heroRef = doc(db, 'heroes', userStore.heroId)
   unsubscribeHero = onSnapshot(heroRef, (snap) => {
     if (!snap.exists()) {
@@ -685,7 +718,9 @@ onMounted(() => {
   })
 
   unsubscribeIsland = onSnapshot(doc(db, 'islands', DEFAULT_ISLAND_ID), (snap) => {
-    fishSaleTaxRate.value = Number(snap.data()?.fishSaleTaxRate ?? 0.1) || 0.1
+    const island = snap.data() || {}
+    fishSaleTaxRate.value = Number(island.fishSaleTaxRate ?? 0.1) || 0.1
+    islandBuildings.value = island.buildings || {}
   })
 
   unsubscribeUsedDays = subscribeCurrentCycleUsedDays({ heroIds: [userStore.heroId] }, (usedDaysByHero) => {
@@ -708,6 +743,7 @@ onBeforeUnmount(() => {
   unsubscribeIsland?.()
   unsubscribeUsedDays?.()
   goodsStore.unsubscribeGoods()
+  yieldBuildingStore.stop()
 })
 </script>
 
@@ -734,6 +770,17 @@ onBeforeUnmount(() => {
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--wi-gold);
+}
+
+.account-header-count {
+  margin-left: auto;
+  min-width: 24px;
+  padding: 1px 7px;
+  border: 1px solid rgba(200, 150, 42, 0.35);
+  border-radius: 999px;
+  color: var(--wi-gold-light);
+  text-align: center;
+  font-size: 0.72rem;
 }
 
 .account-card-body {
