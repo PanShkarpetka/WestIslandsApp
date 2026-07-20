@@ -193,6 +193,8 @@
  * @property {number} treasureAfter
  * @property {string} [spellRequestId]
  * @property {string} [requestId]
+ * @property {string} [approvedFromRequestId]
+ * @property {string} [approvedBy]
  * @property {number} [taxRate]
  * @property {number} [grossAmount]
  * @property {Record<string, number>} [goods] - Goods delta (positive = added, negative = removed); set for goods transactions
@@ -460,7 +462,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'building-action'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'mage-guild-reward'|'crew-payment'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'building-action'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'goods-request-deposit'|'mage-guild-reward'|'crew-payment'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
@@ -482,6 +484,27 @@
  * @property {string} [adventureTitle]
  * @property {number} [guildTaxRate]
  * @property {import('firebase/firestore').Timestamp} createdAt
+ */
+
+/**
+ * Collection: `goods-requests/{requestId}`
+ * Player-submitted requests to credit goods to a personal or guild account.
+ * Target inventories are unchanged until an admin approves the request.
+ * @typedef {Object} GoodsRequestDoc
+ * @property {string} id
+ * @property {'hero'|'guild'} targetType
+ * @property {string} targetId
+ * @property {string} targetName
+ * @property {Record<string, number>} goods - Positive whole quantities keyed by goodId
+ * @property {Record<string, {name: string, unit: string}>} goodsMeta - Good name/unit snapshots for admin review
+ * @property {string} comment
+ * @property {'pending'|'approved'|'rejected'} status
+ * @property {import('firebase/firestore').Timestamp} createdAt
+ * @property {string|null} createdBy
+ * @property {import('firebase/firestore').Timestamp|null} reviewedAt
+ * @property {string|null} reviewedBy
+ * @property {string} reviewNote
+ * @property {string|null} approvedLogId
  */
 
 /**

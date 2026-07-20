@@ -54,6 +54,13 @@
           Товари
         </div>
         <v-card-text class="account-card-body">
+          <v-btn
+            class="withdraw-btn mb-4"
+            prepend-icon="mdi-package-variant-plus"
+            @click="openGoodsDepositDialog"
+          >
+            Додати товари
+          </v-btn>
           <div v-if="!goodsList.length" class="account-empty-state">
             <v-icon class="mr-1" size="14">mdi-anchor</v-icon>
             Товарів немає.
@@ -315,6 +322,62 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <v-dialog v-model="goodsDepositDialog" max-width="440">
+      <v-card class="account-dialog">
+        <div class="account-dialog-header">
+          <v-icon class="mr-2">mdi-package-variant-plus</v-icon>
+          Заявка на додавання товару
+        </div>
+        <v-card-text class="pa-5">
+          <v-alert type="info" variant="tonal" density="compact" class="mb-3">
+            Товар з’явиться на рахунку після підтвердження адміністратором.
+          </v-alert>
+          <v-select
+            v-model="goodsDepositGoodId"
+            :items="goodsDepositOptions"
+            item-title="title"
+            item-value="value"
+            label="Товар"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-text-field
+            v-model.number="goodsDepositAmount"
+            label="Кількість"
+            type="number"
+            min="1"
+            step="1"
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+            class="mb-3"
+          />
+          <v-textarea
+            v-model="goodsDepositComment"
+            label="Коментар"
+            rows="2"
+            auto-grow
+            variant="outlined"
+            density="compact"
+            hide-details="auto"
+          />
+          <div v-if="goodsDepositError" class="account-error-msg mt-2">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ goodsDepositError }}
+          </div>
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="pa-4">
+          <v-btn variant="text" class="cancel-btn" @click="goodsDepositDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <WiActionButton :loading="goodsDepositSaving" prepend-icon="mdi-send" @click="submitGoodsDeposit">
+            Подати заявку
+          </WiActionButton>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -328,6 +391,7 @@ import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { formatAmount } from '@/utils/formatters'
 import { getOwnedBuildings } from '@/utils/ownedBuildings.js'
 import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
+import { submitGoodsDepositRequest } from '@/services/goodsRequestService.js'
 import {
   calculateFishSaleTotals,
   getCaughtFishLookup,
@@ -370,8 +434,14 @@ const loading = ref(true)
 const loadError = ref('')
 const goldDialog = ref(false)
 const goodsDialog = ref(false)
+const goodsDepositDialog = ref(false)
 const goldWithdrawAmount = ref(0)
 const goodsWithdrawAmount = ref(1)
+const goodsDepositGoodId = ref('')
+const goodsDepositAmount = ref(1)
+const goodsDepositComment = ref('')
+const goodsDepositError = ref('')
+const goodsDepositSaving = ref(false)
 const selectedGood = ref(null)
 const withdrawError = ref('')
 const withdrawing = ref(false)
@@ -403,6 +473,11 @@ const goodsList = computed(() => {
     })
 })
 
+const goodsDepositOptions = computed(() => goodsStore.goods.map((good) => ({
+  title: `${good.name}${good.unit ? ` (${good.unit})` : ''}`,
+  value: good.id,
+})))
+
 const ownedBuildings = computed(() =>
   getOwnedBuildings(
     islandBuildings.value,
@@ -420,6 +495,7 @@ function txTypeLabel(type) {
   if (type === 'treasure-remove') return 'Скарб прибрано'
   if (type === 'admin-balance-adjustment') return 'Корекція балансу'
   if (type === 'admin-goods-adjustment') return 'Корекція товарів'
+  if (type === 'goods-request-deposit') return 'Поповнення товарів'
   if (type === 'building-yield') return 'Врожай будівлі'
   if (type === 'building-action') return 'Дія будівлі'
   if (type === 'mage-guild-reward') return 'Магічна допомога'
@@ -428,7 +504,7 @@ function txTypeLabel(type) {
 }
 
 function txTypeClass(type) {
-  if (type === 'income' || type === 'fish-sale' || type === 'mage-guild-reward') return 'wi-success-text'
+  if (type === 'income' || type === 'fish-sale' || type === 'mage-guild-reward' || type === 'goods-request-deposit') return 'wi-success-text'
   if (type === 'withdrawal') return 'wi-gold-text'
   if (type === 'fish-release') return 'wi-sea-text'
   if (type === 'treasure-remove') return 'wi-sea-text'
@@ -467,6 +543,37 @@ function openGoodsWithdrawDialog(item) {
   goodsWithdrawAmount.value = 1
   selectedGood.value = item
   goodsDialog.value = true
+}
+
+function openGoodsDepositDialog() {
+  goodsDepositGoodId.value = goodsDepositOptions.value[0]?.value || ''
+  goodsDepositAmount.value = 1
+  goodsDepositComment.value = ''
+  goodsDepositError.value = ''
+  goodsDepositDialog.value = true
+}
+
+async function submitGoodsDeposit() {
+  goodsDepositError.value = ''
+  const amount = Math.trunc(Number(goodsDepositAmount.value || 0))
+  if (!goodsDepositGoodId.value) return (goodsDepositError.value = 'Оберіть товар.')
+  if (amount <= 0) return (goodsDepositError.value = 'Введіть кількість більше 0.')
+
+  goodsDepositSaving.value = true
+  try {
+    await submitGoodsDepositRequest({
+      targetType: 'hero',
+      targetId: userStore.heroId,
+      goods: { [goodsDepositGoodId.value]: amount },
+      comment: goodsDepositComment.value,
+      createdBy: userStore.nickname || null,
+    })
+    goodsDepositDialog.value = false
+  } catch (error) {
+    goodsDepositError.value = error?.message || 'Не вдалося подати заявку.'
+  } finally {
+    goodsDepositSaving.value = false
+  }
 }
 
 function subscribeCaughtFish() {

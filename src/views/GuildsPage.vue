@@ -237,7 +237,7 @@
       </v-card>
     </v-dialog>
 
-    <!-- Goods dialog (admin only) -->
+    <!-- Goods dialog -->
     <v-dialog v-model="showGoodsDialog" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
       <v-card class="guild-dialog">
         <div class="guild-dialog-header">
@@ -266,6 +266,16 @@
               <v-icon start size="14">mdi-tray-arrow-up</v-icon>Зняти
             </v-btn>
           </v-btn-toggle>
+
+          <v-alert
+            v-if="goodsTxMode === 'deposit' && !isAdmin"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            Поповнення буде надіслано адміністратору на підтвердження.
+          </v-alert>
 
           <v-text-field
             v-if="goodsTxMode === 'withdraw' && !isAdmin"
@@ -328,7 +338,9 @@
         <v-card-actions class="guild-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="showGoodsDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <WiActionButton :loading="goodsTxLoading" @click="submitGoodsTransaction">Підтвердити</WiActionButton>
+          <WiActionButton :loading="goodsTxLoading" @click="submitGoodsTransaction">
+            {{ goodsTxMode === 'deposit' && !isAdmin ? 'Подати заявку' : 'Підтвердити' }}
+          </WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -346,6 +358,7 @@ import { useIslandStore } from '@/store/islandStore'
 import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { formatAmount } from '@/utils/formatters'
 import { getOwnedBuildings } from '@/utils/ownedBuildings.js'
+import { submitGoodsDepositRequest } from '@/services/goodsRequestService.js'
 import OwnedBuildingsList from '@/components/OwnedBuildingsList.vue'
 import WiActionButton from '@/components/ui/WiActionButton.vue'
 import WiEmptyState from '@/components/ui/WiEmptyState.vue'
@@ -541,7 +554,17 @@ async function submitGoodsTransaction() {
   goodsTxLoading.value = true
   try {
     if (goodsTxMode.value === 'deposit') {
-      await store.depositGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
+      if (isAdmin.value) {
+        await store.depositGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
+      } else {
+        await submitGoodsDepositRequest({
+          targetType: 'guild',
+          targetId: selectedGuild.value.id,
+          goods,
+          comment: goodsTxComment.value,
+          createdBy: user.nickname || null,
+        })
+      }
     } else {
       await store.withdrawGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
     }

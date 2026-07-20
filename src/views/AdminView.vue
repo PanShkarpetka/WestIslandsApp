@@ -609,6 +609,55 @@
 
         <v-window-item value="assets">
 
+      <v-card variant="outlined" class="pa-4 mb-4">
+        <div class="d-flex align-center mb-3">
+          <div class="text-subtitle-1">Заявки на поповнення товарів</div>
+          <v-chip v-if="pendingGoodsRequestRows.length" size="small" color="warning" variant="tonal" class="ml-2">
+            {{ pendingGoodsRequestRows.length }}
+          </v-chip>
+          <v-spacer />
+          <v-btn
+            color="primary"
+            :loading="goodsRequestReviewing"
+            :disabled="!selectedApproveGoodsRequestIds.length && !selectedRejectGoodsRequestIds.length"
+            @click="applyGoodsRequestReviews"
+          >
+            Застосувати рішення
+          </v-btn>
+        </div>
+        <v-alert v-if="goodsRequestError" type="error" variant="tonal" density="compact" class="mb-3">{{ goodsRequestError }}</v-alert>
+        <v-alert v-if="goodsRequestSuccess" type="success" variant="tonal" density="compact" class="mb-3">{{ goodsRequestSuccess }}</v-alert>
+        <v-alert v-if="!pendingGoodsRequestRows.length" type="info" variant="tonal" density="compact">
+          Немає заявок, що очікують розгляду.
+        </v-alert>
+        <v-data-table
+          v-else
+          :headers="goodsRequestHeaders"
+          :items="pendingGoodsRequestRows"
+          :items-per-page="20"
+          density="compact"
+          class="elevation-1"
+        >
+          <template #item.createdAt="{ item }">{{ formatTimestamp(item.createdAt) }}</template>
+          <template #item.targetType="{ item }">{{ item.targetType === 'hero' ? 'Особистий' : 'Гільдія' }}</template>
+          <template #item.goods="{ item }">{{ formatGoodsRequestItems(item) }}</template>
+          <template #item.approve="{ item }">
+            <v-checkbox-btn
+              :model-value="selectedApproveGoodsRequestIds.includes(item.id)"
+              color="success"
+              @update:model-value="setGoodsRequestDecision(item.id, 'approve', $event)"
+            />
+          </template>
+          <template #item.reject="{ item }">
+            <v-checkbox-btn
+              :model-value="selectedRejectGoodsRequestIds.includes(item.id)"
+              color="error"
+              @update:model-value="setGoodsRequestDecision(item.id, 'reject', $event)"
+            />
+          </template>
+        </v-data-table>
+      </v-card>
+
       <!-- Trade Goods -->
       <v-card-title class="text-h6">Торгові товари</v-card-title>
       <v-alert v-if="goodsError" type="error" variant="tonal" class="mb-4">{{ goodsError }}</v-alert>
@@ -660,7 +709,7 @@
       </v-dialog>
 
       <v-card variant="outlined" class="pa-4 mb-4">
-        <div class="text-subtitle-1 mb-3">Товари на балансах персонажів</div>
+        <div class="text-subtitle-1 mb-3">Товари на балансах персонажів і гільдій</div>
         <v-alert v-if="heroGoodsError" type="error" variant="tonal" class="mb-3">{{ heroGoodsError }}</v-alert>
         <v-alert v-if="heroGoodsSuccess" type="success" variant="tonal" class="mb-3">{{ heroGoodsSuccess }}</v-alert>
         <v-row class="mb-2">
@@ -681,8 +730,8 @@
           </v-col>
         </v-row>
         <v-data-table
-          :headers="heroGoodsHeaders"
-          :items="heroGoodsRows"
+          :headers="balanceGoodsHeaders"
+          :items="balanceGoodsRows"
           :items-per-page="20"
           density="compact"
           class="elevation-1"
@@ -691,8 +740,11 @@
             <span class="font-weight-medium">{{ item.qty }}</span>
           </template>
           <template #item.actions="{ item }">
-            <v-btn size="small" variant="text" color="primary" @click="prepareHeroGoodsAdjustment(item, 1)">+1</v-btn>
-            <v-btn size="small" variant="text" color="error" @click="prepareHeroGoodsAdjustment(item, -1)">-1</v-btn>
+            <template v-if="item.targetType === 'hero'">
+              <v-btn size="small" variant="text" color="primary" @click="prepareHeroGoodsAdjustment(item, 1)">+1</v-btn>
+              <v-btn size="small" variant="text" color="error" @click="prepareHeroGoodsAdjustment(item, -1)">-1</v-btn>
+            </template>
+            <span v-else class="text-medium-emphasis">—</span>
           </template>
         </v-data-table>
       </v-card>
@@ -1065,6 +1117,11 @@ import { aggregateReligionActions, buildReligionSummaryText } from '@/utils/reli
 import { getFirestoreTimestampMillis } from '@/utils/firestoreTimestamp.js';
 import { adjustHeroGoldBalance, SNAPSHOT_HISTORY_DEFAULT_OPEN } from '@/services/heroBalanceService.js';
 import { adjustHeroGoods } from '@/services/heroGoodsService.js';
+import {
+  approveGoodsRequest,
+  rejectGoodsRequest,
+  subscribePendingGoodsRequests,
+} from '@/services/goodsRequestService.js';
 import { subscribeCurrentCycleUsedDays } from '@/services/usedDaysService.js';
 import { formatAmount } from '@/utils/formatters.js';
 import { getLegacyExpeditionDurationDays, isCycleStartAction } from '@/services/dashboardService.js';
@@ -1288,33 +1345,118 @@ const heroGoodsSaving = ref(false);
 const heroGoodsError = ref('');
 const heroGoodsSuccess = ref('');
 const heroGoodsForm = reactive({ heroId: '', goodId: '', delta: 1, comment: '' });
+const guildRows = ref([]);
+let stopGuilds = null;
 
-const heroGoodsHeaders = [
-  { title: 'Герой', key: 'heroName' },
+const balanceGoodsHeaders = [
+  { title: 'Тип', key: 'targetLabel' },
+  { title: 'Власник', key: 'ownerName' },
   { title: 'Товар', key: 'goodName' },
   { title: 'Кількість', key: 'qty' },
   { title: 'Одиниця', key: 'unit' },
   { title: '', key: 'actions', sortable: false },
 ];
 
-const heroGoodsRows = computed(() => {
+const balanceGoodsRows = computed(() => {
   const goodsById = new Map(goodsList.value.map((good) => [good.id, good]));
-  return heroRows.value
+  const heroItems = heroRows.value
     .flatMap((hero) => Object.entries(hero.goods || {})
       .filter(([, qty]) => Number(qty) > 0)
       .map(([goodId, qty]) => {
         const good = goodsById.get(goodId);
         return {
+          targetType: 'hero',
+          targetLabel: 'Персонаж',
           heroId: hero.id,
-          heroName: hero.name,
+          ownerName: hero.name,
           goodId,
           goodName: good?.name || goodId,
           qty: Number(qty || 0),
           unit: good?.unit || '—',
         };
-      }))
-    .sort((a, b) => a.heroName.localeCompare(b.heroName, 'uk-UA') || a.goodName.localeCompare(b.goodName, 'uk-UA'));
+      }));
+  const guildItems = guildRows.value
+    .flatMap((guild) => Object.entries(guild.goods || {})
+      .filter(([, qty]) => Number(qty) > 0)
+      .map(([goodId, qty]) => {
+        const good = goodsById.get(goodId);
+        return {
+          targetType: 'guild',
+          targetLabel: 'Гільдія',
+          guildId: guild.id,
+          ownerName: guild.name || guild.shortName || guild.id,
+          goodId,
+          goodName: good?.name || goodId,
+          qty: Number(qty || 0),
+          unit: good?.unit || '—',
+        };
+      }));
+  return [...heroItems, ...guildItems]
+    .sort((a, b) => a.targetLabel.localeCompare(b.targetLabel, 'uk-UA')
+      || a.ownerName.localeCompare(b.ownerName, 'uk-UA')
+      || a.goodName.localeCompare(b.goodName, 'uk-UA'));
 });
+
+const pendingGoodsRequests = ref([]);
+const selectedApproveGoodsRequestIds = ref([]);
+const selectedRejectGoodsRequestIds = ref([]);
+const goodsRequestReviewing = ref(false);
+const goodsRequestError = ref('');
+const goodsRequestSuccess = ref('');
+
+const goodsRequestHeaders = [
+  { title: 'Час', key: 'createdAt' },
+  { title: 'Рахунок', key: 'targetType' },
+  { title: 'Отримувач', key: 'targetName' },
+  { title: 'Товари', key: 'goods' },
+  { title: 'Хто подав', key: 'createdBy' },
+  { title: 'Коментар', key: 'comment' },
+  { title: 'Підтвердити', key: 'approve', sortable: false },
+  { title: 'Відхилити', key: 'reject', sortable: false },
+];
+
+const pendingGoodsRequestRows = computed(() => pendingGoodsRequests.value);
+
+function formatGoodsRequestItems(request) {
+  return Object.entries(request.goods || {}).map(([goodId, amount]) => {
+    const meta = request.goodsMeta?.[goodId] || goodsList.value.find((good) => good.id === goodId) || {};
+    return `${meta.name || goodId}: ${amount}${meta.unit ? ` ${meta.unit}` : ''}`;
+  }).join(', ');
+}
+
+function setGoodsRequestDecision(requestId, decision, checked) {
+  const approve = selectedApproveGoodsRequestIds.value;
+  const reject = selectedRejectGoodsRequestIds.value;
+  if (decision === 'approve') {
+    selectedApproveGoodsRequestIds.value = checked ? [...new Set([...approve, requestId])] : approve.filter((id) => id !== requestId);
+    if (checked) selectedRejectGoodsRequestIds.value = reject.filter((id) => id !== requestId);
+  } else {
+    selectedRejectGoodsRequestIds.value = checked ? [...new Set([...reject, requestId])] : reject.filter((id) => id !== requestId);
+    if (checked) selectedApproveGoodsRequestIds.value = approve.filter((id) => id !== requestId);
+  }
+}
+
+async function applyGoodsRequestReviews() {
+  goodsRequestError.value = '';
+  goodsRequestSuccess.value = '';
+  const approveIds = [...selectedApproveGoodsRequestIds.value];
+  const rejectIds = [...selectedRejectGoodsRequestIds.value];
+  if (!approveIds.length && !rejectIds.length) return;
+
+  goodsRequestReviewing.value = true;
+  try {
+    for (const requestId of approveIds) await approveGoodsRequest({ requestId, reviewedBy: 'Admin' });
+    for (const requestId of rejectIds) await rejectGoodsRequest({ requestId, reviewedBy: 'Admin' });
+    selectedApproveGoodsRequestIds.value = [];
+    selectedRejectGoodsRequestIds.value = [];
+    goodsRequestSuccess.value = `Підтверджено: ${approveIds.length}, відхилено: ${rejectIds.length}.`;
+  } catch (error) {
+    console.error('[admin] Failed to review goods requests', error);
+    goodsRequestError.value = error?.message || 'Не вдалося застосувати рішення по заявках.';
+  } finally {
+    goodsRequestReviewing.value = false;
+  }
+}
 
 const goodOptions = computed(() => goodsRows.value.map((good) => ({ title: `${good.name}${good.unit && good.unit !== '—' ? ` (${good.unit})` : ''}`, value: good.id })));
 
@@ -1477,6 +1619,7 @@ let stopReligions = null;
 let stopClergy = null;
 let stopHeroBalanceSyncLogs = null;
 let stopCraftingRequests = null;
+let stopGoodsRequests = null;
 let stopUsedDays = null;
 
 const headers = [
@@ -2603,6 +2746,9 @@ onMounted(async () => {
   stopGoods = onSnapshot(query(collection(db, 'goods'), orderBy('name')), (snap) => {
     goodsList.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   });
+  stopGuilds = onSnapshot(query(collection(db, 'guilds'), orderBy('name')), (snap) => {
+    guildRows.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  });
   yieldBuildingStore.subscribe();
   await refreshCraftingAdminData();
   stopCraftingRequests = subscribePendingCraftingRequests((requests) => {
@@ -2610,6 +2756,12 @@ onMounted(async () => {
     const pendingIds = new Set(requests.map((request) => request.id));
     selectedApproveCraftRequestIds.value = selectedApproveCraftRequestIds.value.filter((id) => pendingIds.has(id));
     selectedRejectCraftRequestIds.value = selectedRejectCraftRequestIds.value.filter((id) => pendingIds.has(id));
+  });
+  stopGoodsRequests = subscribePendingGoodsRequests((requests) => {
+    pendingGoodsRequests.value = requests;
+    const pendingIds = new Set(requests.map((request) => request.id));
+    selectedApproveGoodsRequestIds.value = selectedApproveGoodsRequestIds.value.filter((id) => pendingIds.has(id));
+    selectedRejectGoodsRequestIds.value = selectedRejectGoodsRequestIds.value.filter((id) => pendingIds.has(id));
   });
   stopUsedDays = subscribeCurrentCycleUsedDays({}, (rows) => {
     usedDaysByHero.value = rows;
@@ -2626,7 +2778,9 @@ onBeforeUnmount(() => {
   stopClergy?.();
   stopHeroBalanceSyncLogs?.();
   stopGoods?.();
+  stopGuilds?.();
   stopCraftingRequests?.();
+  stopGoodsRequests?.();
   stopUsedDays?.();
   yieldBuildingStore.stop();
 });
