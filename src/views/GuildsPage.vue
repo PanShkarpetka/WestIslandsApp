@@ -61,6 +61,9 @@
             <v-btn class="guild-deposit-btn" size="small" prepend-icon="mdi-tray-arrow-down" @click="openTransaction(guild, 'deposit')">Внести</v-btn>
             <v-btn v-if="isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
             <v-btn v-if="canManageGuildGoods(guild)" class="guild-goods-btn" size="small" prepend-icon="mdi-package-variant" variant="tonal" @click="openGoodsDialog(guild)">Товари</v-btn>
+            <v-btn class="guild-buildings-btn" size="small" prepend-icon="mdi-home-city-outline" variant="tonal" @click="openBuildingsDialog(guild)">
+              Будівлі ({{ guildOwnedBuildings(guild.id).length }})
+            </v-btn>
             <v-spacer />
             <v-btn v-if="isAdmin" size="small" variant="text" icon="mdi-feather" class="guild-edit-btn" @click="openEditDialog(guild)" />
           </div>
@@ -133,6 +136,27 @@
       </v-card>
     </v-dialog>
 
+    <!-- Owned buildings dialog -->
+    <v-dialog v-model="showBuildingsDialog" max-width="620" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-home-city-outline</v-icon>
+          Будівлі · {{ buildingsGuild?.name || buildingsGuild?.id }}
+        </div>
+        <v-card-text class="guild-dialog-body">
+          <OwnedBuildingsList
+            :buildings="selectedGuildBuildings"
+            empty-text="Ця гільдія поки не володіє жодною будівлею."
+          />
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-spacer />
+          <v-btn variant="text" class="cancel-btn" @click="showBuildingsDialog = false">Закрити</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Logs dialog -->
     <v-dialog v-model="showLogsDialog" max-width="860" :fullscreen="$vuetify.display.smAndDown" scrollable>
       <v-card class="guild-dialog guild-logs-dialog">
@@ -170,7 +194,11 @@
                     </span>
                   </td>
                   <td class="text-right">
-                    <span v-if="isGoodsLog(log)" :class="goodsLogDeltaClass(log)">
+                    <template v-if="isBuildingActionLog(log)">
+                      <div class="amount-negative">-{{ formatAmount(Math.abs(log.amount || 0)) }}</div>
+                      <div class="amount-positive">{{ formatLogGoods(log.goods) }}</div>
+                    </template>
+                    <span v-else-if="isGoodsLog(log)" :class="goodsLogDeltaClass(log)">
                       {{ formatLogGoods(log.goods) }}
                     </span>
                     <span v-else :class="log.amount >= 0 ? 'amount-positive' : 'amount-negative'">
@@ -186,7 +214,11 @@
                     </v-tooltip>
                   </td>
                   <td class="text-right ledger-balance-after">
-                    {{ isGoodsLog(log) ? formatLogGoods(log.goodsAfter, { includeSign: false }) : formatAmount(log.treasureAfter || 0) }}
+                    <template v-if="isBuildingActionLog(log)">
+                      <div>{{ formatAmount(log.treasureAfter || 0) }} зм</div>
+                      <div>{{ formatLogGoods(log.goodsAfter, { includeSign: false }) }}</div>
+                    </template>
+                    <template v-else>{{ isGoodsLog(log) ? formatLogGoods(log.goodsAfter, { includeSign: false }) : formatAmount(log.treasureAfter || 0) }}</template>
                   </td>
                 </tr>
               </tbody>
@@ -205,7 +237,7 @@
       </v-card>
     </v-dialog>
 
-    <!-- Goods dialog (admin only) -->
+    <!-- Goods dialog -->
     <v-dialog v-model="showGoodsDialog" max-width="520" :fullscreen="$vuetify.display.smAndDown" scrollable>
       <v-card class="guild-dialog">
         <div class="guild-dialog-header">
@@ -234,6 +266,16 @@
               <v-icon start size="14">mdi-tray-arrow-up</v-icon>Зняти
             </v-btn>
           </v-btn-toggle>
+
+          <v-alert
+            v-if="goodsTxMode === 'deposit' && !isAdmin"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            Поповнення буде надіслано адміністратору на підтвердження.
+          </v-alert>
 
           <v-text-field
             v-if="goodsTxMode === 'withdraw' && !isAdmin"
@@ -296,7 +338,9 @@
         <v-card-actions class="guild-dialog-actions">
           <v-btn variant="text" class="cancel-btn" @click="showGoodsDialog = false">Скасувати</v-btn>
           <v-spacer />
-          <WiActionButton :loading="goodsTxLoading" @click="submitGoodsTransaction">Підтвердити</WiActionButton>
+          <WiActionButton :loading="goodsTxLoading" @click="submitGoodsTransaction">
+            {{ goodsTxMode === 'deposit' && !isAdmin ? 'Подати заявку' : 'Підтвердити' }}
+          </WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -310,7 +354,12 @@ import { Timestamp } from 'firebase/firestore'
 import { useGuildStore } from '@/store/guildStore'
 import { useUserStore } from '@/store/userStore'
 import { useGoodsStore } from '@/store/goodsStore'
+import { useIslandStore } from '@/store/islandStore'
+import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { formatAmount } from '@/utils/formatters'
+import { getOwnedBuildings } from '@/utils/ownedBuildings.js'
+import { submitGoodsDepositRequest } from '@/services/goodsRequestService.js'
+import OwnedBuildingsList from '@/components/OwnedBuildingsList.vue'
 import WiActionButton from '@/components/ui/WiActionButton.vue'
 import WiEmptyState from '@/components/ui/WiEmptyState.vue'
 import WiPageHeader from '@/components/ui/WiPageHeader.vue'
@@ -319,6 +368,8 @@ import WiPanel from '@/components/ui/WiPanel.vue'
 const store = useGuildStore()
 const user = useUserStore()
 const goodsStore = useGoodsStore()
+const islandStore = useIslandStore()
+const yieldBuildingStore = useYieldBuildingStore()
 const isAdmin = computed(() => user.isAdmin ?? false)
 
 const showGuildDialog = ref(false)
@@ -341,6 +392,12 @@ const logsGuild = ref(null)
 const guildLogs = ref([])
 const logsLoading = ref(false)
 const logsError = ref('')
+const showBuildingsDialog = ref(false)
+const buildingsGuild = ref(null)
+
+const selectedGuildBuildings = computed(() =>
+  guildOwnedBuildings(buildingsGuild.value?.id)
+)
 
 const visibleGuilds = computed(() =>
   store.guilds.filter((guild) => {
@@ -363,6 +420,20 @@ function canManageGuildGoods(guild) {
 }
 
 function isNegativeGuild(guild) { return Number(guild?.treasure || 0) < 0 }
+
+function guildOwnedBuildings(guildId) {
+  return getOwnedBuildings(
+    islandStore.data?.buildings,
+    yieldBuildingStore.byId,
+    'guild',
+    guildId,
+  )
+}
+
+function openBuildingsDialog(guild) {
+  buildingsGuild.value = guild
+  showBuildingsDialog.value = true
+}
 
 async function openGuildLogs(guild) {
   if (!canViewGuildLogs(guild)) return
@@ -483,7 +554,17 @@ async function submitGoodsTransaction() {
   goodsTxLoading.value = true
   try {
     if (goodsTxMode.value === 'deposit') {
-      await store.depositGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
+      if (isAdmin.value) {
+        await store.depositGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
+      } else {
+        await submitGoodsDepositRequest({
+          targetType: 'guild',
+          targetId: selectedGuild.value.id,
+          goods,
+          comment: goodsTxComment.value,
+          createdBy: user.nickname || null,
+        })
+      }
     } else {
       await store.withdrawGoods({ guildId: selectedGuild.value.id, goods, comment: goodsTxComment.value, actor: { nickname: user.nickname } })
     }
@@ -499,18 +580,22 @@ function isGoodsLog(log) {
   return log?.type === 'goods-deposit' || log?.type === 'goods-withdraw'
 }
 
+function isBuildingActionLog(log) { return log?.type === 'building-action' }
+
 function logOperationClass(log) {
   if (log?.type === 'deposit' || log?.type === 'goods-deposit') return 'tx-deposit'
   return 'tx-withdraw'
 }
 
 function logOperationIcon(log) {
+  if (log?.type === 'building-action') return 'mdi-basket-fill'
   if (log?.type === 'goods-deposit') return 'mdi-package-down'
   if (log?.type === 'goods-withdraw') return 'mdi-package-up'
   return log?.type === 'deposit' ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold'
 }
 
 function logOperationLabel(log) {
+  if (log?.type === 'building-action') return 'Дія будівлі'
   if (log?.type === 'goods-deposit') return 'Товари +'
   if (log?.type === 'goods-withdraw') return 'Товари -'
   return log?.type === 'deposit' ? 'Внесок' : 'Зняття'
@@ -544,8 +629,18 @@ function formatDate(value) {
   return new Intl.DateTimeFormat('uk-UA', { dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
 
-onMounted(() => { store.subscribeGuilds(); goodsStore.subscribeGoods() })
-onBeforeUnmount(() => { store.unsubscribeGuilds(); goodsStore.unsubscribeGoods() })
+onMounted(() => {
+  store.subscribeGuilds()
+  goodsStore.subscribeGoods()
+  islandStore.subscribe()
+  yieldBuildingStore.subscribe()
+})
+onBeforeUnmount(() => {
+  store.unsubscribeGuilds()
+  goodsStore.unsubscribeGoods()
+  islandStore.stop()
+  yieldBuildingStore.stop()
+})
 </script>
 
 <style scoped>
@@ -676,6 +771,7 @@ onBeforeUnmount(() => { store.unsubscribeGuilds(); goodsStore.unsubscribeGoods()
   grid-column: 1 / 4;
   grid-row: 4;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 12px;
@@ -706,6 +802,14 @@ onBeforeUnmount(() => { store.unsubscribeGuilds(); goodsStore.unsubscribeGoods()
 
 .guild-edit-btn { color: var(--wi-text-muted) !important; }
 .guild-edit-btn :deep(.v-btn__overlay) { background-color: var(--wi-gold) !important; }
+
+.guild-buildings-btn {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.04em !important;
+  color: var(--wi-sea) !important;
+  border: 1px solid rgba(58, 96, 128, 0.4) !important;
+}
 
 .guild-log-hint {
   grid-column: 1 / 4;

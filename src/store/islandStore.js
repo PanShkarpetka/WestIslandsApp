@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
-    getFirestore, doc, onSnapshot, updateDoc, getDoc,
+    getFirestore, doc, onSnapshot, updateDoc, getDoc, deleteField,
 } from 'firebase/firestore'
 import { DEFAULT_ISLAND_ID } from '@/config/constants.js'
 
@@ -67,10 +67,19 @@ export const useIslandStore = defineStore('islands', () => {
         await updateDoc(doc(db, 'islands', data.value.id), updates)
     }
 
-    async function addYieldBuilding (yieldBuildingId, yieldBuildingName, { cycleId = null } = {}) {
+    async function addYieldBuilding (yieldBuildingId, yieldBuildingName, { cycleId = null, ownerType = null, ownerId = null, ownerHeroId = null } = {}) {
         if (!data.value?.id) return
         const key = `yield_${yieldBuildingId}`
-        const entry = { built: true, yieldBuildingId, name: yieldBuildingName || yieldBuildingId, yields: [], ...(cycleId ? { builtCycleId: cycleId } : {}) }
+        const entry = {
+            built: true,
+            yieldBuildingId,
+            name: yieldBuildingName || yieldBuildingId,
+            yields: [],
+            ...(cycleId ? { builtCycleId: cycleId } : {}),
+            ...(ownerType && ownerId ? { ownerType, ownerId } : {}),
+            ...((ownerType === 'hero' && ownerId) || ownerHeroId ? { ownerHeroId: ownerId || ownerHeroId } : {}),
+            ...(ownerType === 'guild' && ownerId ? { ownerGuildId: ownerId } : {}),
+        }
         const cur = { ...(data.value.buildings || {}) }
         cur[key] = entry
         data.value = { ...data.value, buildings: cur }
@@ -86,9 +95,36 @@ export const useIslandStore = defineStore('islands', () => {
         delete cur[key]
         data.value = { ...data.value, buildings: cur }
         // Firestore field deletion requires FieldValue.delete()
-        const { deleteField } = await import('firebase/firestore')
         await updateDoc(doc(db, 'islands', data.value.id), {
             [`buildings.${key}`]: deleteField()
+        })
+    }
+
+    async function updateYieldBuildingOwner (key, { ownerType, ownerId } = {}) {
+        if (!data.value?.id) return
+        if (!['hero', 'guild'].includes(ownerType) || !ownerId) throw new Error('Оберіть тип і власника будівлі.')
+
+        const cur = { ...(data.value.buildings || {}) }
+        const entry = {
+            ...(cur[key] || {}),
+            ownerType,
+            ownerId,
+        }
+        if (ownerType === 'hero') {
+            entry.ownerHeroId = ownerId
+            delete entry.ownerGuildId
+        } else {
+            entry.ownerGuildId = ownerId
+            delete entry.ownerHeroId
+        }
+        cur[key] = entry
+        data.value = { ...data.value, buildings: cur }
+
+        await updateDoc(doc(db, 'islands', data.value.id), {
+            [`buildings.${key}.ownerType`]: ownerType,
+            [`buildings.${key}.ownerId`]: ownerId,
+            [`buildings.${key}.ownerHeroId`]: ownerType === 'hero' ? ownerId : deleteField(),
+            [`buildings.${key}.ownerGuildId`]: ownerType === 'guild' ? ownerId : deleteField(),
         })
     }
 
@@ -102,6 +138,6 @@ export const useIslandStore = defineStore('islands', () => {
     return {
         currentId, data, loading, error,
         subscribe, loadOnce, stop, updateIsland, setBuildingBuilt, buildingDiscount,
-        updateBuildingYields, addYieldBuilding, removeYieldBuilding,
+        updateBuildingYields, addYieldBuilding, removeYieldBuilding, updateYieldBuildingOwner,
     }
 })

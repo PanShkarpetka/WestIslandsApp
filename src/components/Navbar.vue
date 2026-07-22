@@ -26,8 +26,8 @@
       <v-btn v-if="isAdmin" icon to="/admin" variant="text" class="nav-icon-btn" title="Адмін">
         <v-icon>mdi-shield-account</v-icon>
         <v-badge
-          v-if="pendingCraftRequestCount"
-          :content="pendingCraftRequestCount"
+          v-if="pendingAdminRequestCount"
+          :content="pendingAdminRequestCount"
           color="error"
           floating
         />
@@ -98,6 +98,9 @@
       >
         <template #prepend><v-icon>mdi-shield-account</v-icon></template>
         <v-list-item-title>Адмін</v-list-item-title>
+        <template v-if="pendingAdminRequestCount" #append>
+          <v-chip color="error" size="x-small" variant="flat">{{ pendingAdminRequestCount }}</v-chip>
+        </template>
       </v-list-item>
     </v-list>
 
@@ -122,13 +125,17 @@ import { ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useDisplay } from 'vuetify'
 import { DEFAULT_ISLAND_ID } from '../config/constants.js';
 import { subscribePendingCraftingRequestCount } from '../services/craftingService';
+import { subscribePendingGoodsRequestCount } from '../services/goodsRequestService.js';
 
 const userStore = useUserStore();
 const router = useRouter();
 const { smAndDown } = useDisplay()
 const drawer = ref(false);
 const pendingCraftRequestCount = ref(0);
+const pendingGoodsRequestCount = ref(0);
+const pendingAdminRequestCount = computed(() => pendingCraftRequestCount.value + pendingGoodsRequestCount.value);
 let stopPendingCraftRequestCount = null;
+let stopPendingGoodsRequestCount = null;
 
 const navItems = [
   { to: '/ships',                       icon: 'mdi-sail-boat',           label: 'Кораблі' },
@@ -166,11 +173,17 @@ watch(
   isAdmin,
   (isAdmin) => {
     stopPendingCraftRequestCount?.();
+    stopPendingGoodsRequestCount?.();
     stopPendingCraftRequestCount = null;
+    stopPendingGoodsRequestCount = null;
     pendingCraftRequestCount.value = 0;
+    pendingGoodsRequestCount.value = 0;
     if (isAdmin) {
       stopPendingCraftRequestCount = subscribePendingCraftingRequestCount((count) => {
         pendingCraftRequestCount.value = count;
+      });
+      stopPendingGoodsRequestCount = subscribePendingGoodsRequestCount((count) => {
+        pendingGoodsRequestCount.value = count;
       });
     }
   },
@@ -179,6 +192,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopPendingCraftRequestCount?.();
+  stopPendingGoodsRequestCount?.();
 });
 </script>
 

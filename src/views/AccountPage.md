@@ -4,12 +4,14 @@ Route: `/account` (`requiresAuth: false`, but the page requires `userStore.heroI
 
 Shows the logged-in hero account: gold balance, goods inventory, caught fish inventory, fishing treasure inventory, and hero transaction history.
 
-Shared page-header, panel, and empty-state primitives handle page identity and top-level loading/error states. Account data and actions are unchanged.
+Shared page-header, panel, and empty-state primitives handle page identity and top-level loading/error states.
 Primary sell and withdrawal confirmations use the shared `WiActionButton` styling.
 
 ## Sections
 - Gold balance: displays `heroes/{heroId}.goldBalance` and allows the player to withdraw gold. The withdrawal writes a `hero-transactions` record.
-- Goods: displays positive quantities from `heroes/{heroId}.goods` with names from `goods/{goodId}` and allows withdrawal with a transaction log.
+- Goods: displays positive quantities from `heroes/{heroId}.goods` with names from `goods/{goodId}` and allows withdrawal with a transaction log. Adding goods submits a pending `goods-requests` document; it does not change the hero inventory until an admin approves it.
+- Hero-owned building actions appear in account history as `building-action`, including both the gold deduction and credited goods. Guild-owned actions are recorded in the owning guild's ledger instead.
+- The **Мої будівлі** block lists all active island buildings owned by the authenticated hero. Both typed ownership (`ownerType`/`ownerId`) and legacy `ownerHeroId` records are supported; owner-action rows show their gold cost and per-cycle limit.
 - Caught fish: requires `heroes/{heroId}.telegramId`. The field accepts either a numeric Telegram user ID or a username (`PanShkarpetka` / `@PanShkarpetka`). If it is empty, the page shows an error asking the player to contact an admin. If present, the page lists `caught-fish` rows by `telegramUserId` for numeric links or by normalized `telegramUsernameKey` for username links, then filters to `status === 'available'`.
 - Treasures: uses the same Telegram lookup as caught fish and lists `caught-treasures` rows with `status === 'available'`. Treasures are separate inventory items; their `valueGold` is informational/collectible and is not added to gold balance or fish sale value.
 - Used cycle days: shows current-cycle downtime already spent by the hero, derived from `cycle-crafting-logs`, fulfilled `spell-requests`, and hero-linked `religion-actions` (7 days each).

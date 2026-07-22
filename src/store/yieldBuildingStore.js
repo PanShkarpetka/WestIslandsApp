@@ -4,6 +4,10 @@ import {
   getFirestore, collection, query, orderBy, onSnapshot,
   addDoc, doc, updateDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore'
+import {
+  YIELD_BUILDING_INCOME_TYPES,
+  validateYieldBuildingActionConfig,
+} from '@/services/yieldBuildingActionService.js'
 
 export const useYieldBuildingStore = defineStore('yieldBuildings', () => {
   const db = getFirestore()
@@ -14,7 +18,14 @@ export const useYieldBuildingStore = defineStore('yieldBuildings', () => {
 
   function mapDoc(d) {
     const x = d.data() || {}
-    return { id: d.id, name: x.name || 'Без назви', description: x.description || '' }
+    return {
+      id: d.id,
+      ...x,
+      name: x.name || 'Без назви',
+      description: x.description || '',
+      incomeType: x.incomeType || YIELD_BUILDING_INCOME_TYPES.SCHEDULED,
+      actionVariants: Array.isArray(x.actionVariants) ? x.actionVariants : [],
+    }
   }
 
   function subscribe() {
@@ -35,10 +46,16 @@ export const useYieldBuildingStore = defineStore('yieldBuildings', () => {
     return m
   })
 
-  async function create(name, description = '') {
+  async function create(name, description = '', config = {}) {
+    const incomeType = config.incomeType || YIELD_BUILDING_INCOME_TYPES.SCHEDULED
+    const actionConfig = incomeType === YIELD_BUILDING_INCOME_TYPES.OWNER_ACTION
+      ? validateYieldBuildingActionConfig(config)
+      : {}
     await addDoc(collection(db, 'yield-buildings'), {
       name: name.trim(),
       description: description.trim(),
+      incomeType,
+      ...actionConfig,
       createdAt: serverTimestamp(),
     })
   }
@@ -47,6 +64,16 @@ export const useYieldBuildingStore = defineStore('yieldBuildings', () => {
     const updates = {}
     if (payload.name !== undefined) updates.name = payload.name.trim()
     if (payload.description !== undefined) updates.description = payload.description.trim()
+    if (payload.incomeType !== undefined) {
+      updates.incomeType = payload.incomeType
+      if (payload.incomeType === YIELD_BUILDING_INCOME_TYPES.OWNER_ACTION) {
+        Object.assign(updates, validateYieldBuildingActionConfig(payload))
+      } else {
+        updates.actionCostGold = 0
+        updates.maxUsesPerCycle = 0
+        updates.actionVariants = []
+      }
+    }
     await updateDoc(doc(db, 'yield-buildings', id), updates)
   }
 

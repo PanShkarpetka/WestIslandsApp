@@ -971,6 +971,12 @@ export async function processBuildingYields(cycleId, newCycleStart, islandId, {
   let anyProcessed = false
 
   for (const [buildingKey, buildingEntry] of Object.entries(buildings)) {
+    if (buildingEntry.yieldBuildingId) {
+      const definitionRef = docFn(firestoreDb, 'yield-buildings', buildingEntry.yieldBuildingId)
+      const definitionSnap = await getDocFn(definitionRef)
+      if (definitionSnap.exists() && definitionSnap.data()?.incomeType === 'owner-action') continue
+    }
+
     const yields = Array.isArray(buildingEntry.yields) ? buildingEntry.yields : []
     const pendingEvents = yields.filter((event) => {
       if (event.processed) return false

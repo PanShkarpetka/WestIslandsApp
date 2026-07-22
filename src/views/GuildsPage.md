@@ -24,14 +24,17 @@ Fields: name, shortName, leader, visibleToAll (checkbox), withdrawUsername, with
 Modes: `deposit` or `withdraw`. Password field shown for non-admin withdrawals. Withdraw access: admin always allowed; leader if `nickname === guild.withdrawUsername && password === guild.withdrawPassword`.
 
 ### Goods dialog (`showGoodsDialog`)
-Modes: `deposit` or `withdraw`. Available to admins and users with `canAccessGuild`. Non-admin goods withdrawals use the same password check as gold withdrawals. Goods log rows render item deltas and goods-after snapshots instead of coin amounts.
+Modes: `deposit` or `withdraw`. Available to admins and users with `canAccessGuild`. Admin deposits update the guild immediately; non-admin deposits create a pending `goods-requests` document and do not change the guild inventory until an admin approves it. Non-admin goods withdrawals use the same password check as gold withdrawals. Goods log rows render item deltas and goods-after snapshots instead of coin amounts.
 
 ### Logs dialog (`showLogsDialog`)
-Ledger table: when, who, type (deposit/withdraw/goods deposit/goods withdraw), amount or goods delta, comment, balance after or goods after. Available to admins and users with `canAccessGuild`. "Оновити" button reloads logs on demand.
+Ledger table: when, who, type (deposit/withdraw/goods deposit/goods withdraw/building action), amount or goods delta, comment, balance after or goods after. Building-action rows show both the gold cost and gathered goods. Available to admins and users with `canAccessGuild`. "Оновити" button reloads logs on demand.
+
+Each visible guild card has a **Будівлі (N)** button. It opens a read-only dialog listing every active island building whose typed or legacy owner fields resolve to that guild, including the configured action cost and per-cycle limit for owner-action buildings. The button is visible independently of treasury/log permissions.
 
 ## Guild card layout
 CSS Grid: crest (col 1, rows 1-2), info (col 2, row 1), balance (col 3, rows 1-2), actions (col 1-3, row 3), log-hint (col 1-3, row 4). Negative balance triggers red border and `var(--wi-danger)` amount color.
 
 ## Stores
-- `useGuildStore` — `subscribeGuilds()` / `unsubscribeGuilds()`, `guilds`, `addGuild()`, `updateGuild()`, `deposit()`, `withdraw()`, `depositGoods()`, `withdrawGoods()`, `getGuildLogs(guildId)`
+- `useGuildStore` — `subscribeGuilds()` / `unsubscribeGuilds()`, `guilds`, `addGuild()`, `updateGuild()`, `deposit()`, `withdraw()`, admin-only UI use of `depositGoods()`, `withdrawGoods()`, `getGuildLogs(guildId)`
+- `goodsRequestService` — `submitGoodsDepositRequest()` for non-admin guild deposits
 - `useUserStore` — `isAdmin`, `isLoggedIn`, `nickname`, `canAccessGuild(guildId)`

@@ -24,6 +24,11 @@
  * @property {string} [builtCycleId] - Cycle ID when the building was constructed
  * @property {string} [yieldBuildingId] - Links to yield-buildings collection if this is a custom yield building
  * @property {YieldEvent[]} [yields] - Scheduled harvest events for this building
+ * @property {'hero'|'guild'} [ownerType] - Kind of owner used by building lists and owner-action access
+ * @property {string} [ownerId] - Hero or guild document ID selected by `ownerType`; scheduled yield destinations remain event-specific
+ * @property {string} [ownerHeroId] - Legacy/compatibility hero owner ID
+ * @property {string} [ownerGuildId] - Compatibility guild owner ID
+ * @property {{cycleId: string, count: number}} [actionUsage] - Owner-action usage counter for the referenced cycle
  */
 
 /**
@@ -49,6 +54,17 @@
  * @property {string} id
  * @property {string} name
  * @property {string} [description]
+ * @property {'scheduled'|'owner-action'} [incomeType] - Scheduled harvests (legacy/default) or a paid owner-triggered action
+ * @property {number} [actionCostGold] - Gold deducted from the owner per action
+ * @property {number} [maxUsesPerCycle] - Maximum successful owner actions in one cycle
+ * @property {YieldBuildingActionVariant[]} [actionVariants] - Goods choices offered for each action
+ */
+
+/**
+ * @typedef {Object} YieldBuildingActionVariant
+ * @property {string} id - Stable variant ID stored in transaction audit rows
+ * @property {string} goodId - Existing `goods/{goodId}` document ID
+ * @property {number} amount - Whole number of goods credited per action
  */
 
 // ─── BUILDINGS ───────────────────────────────────────────────────────────────
@@ -170,17 +186,24 @@
  * @typedef {Object} GuildLogDoc
  * @property {string} id
  * @property {number} amount
- * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'|'mage-guild-tax'} type
+ * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'|'mage-guild-tax'|'building-action'} type
  * @property {string} comment
  * @property {string} userNickname
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {number} treasureAfter
  * @property {string} [spellRequestId]
  * @property {string} [requestId]
+ * @property {string} [approvedFromRequestId]
+ * @property {string} [approvedBy]
  * @property {number} [taxRate]
  * @property {number} [grossAmount]
  * @property {Record<string, number>} [goods] - Goods delta (positive = added, negative = removed); set for goods transactions
  * @property {Record<string, number>} [goodsAfter] - Goods snapshot after the transaction
+ * @property {string} [islandId]
+ * @property {string} [buildingKey]
+ * @property {string} [yieldBuildingId]
+ * @property {string} [cycleId]
+ * @property {string} [actionVariantId]
  */
 
 // ─── RELIGION ────────────────────────────────────────────────────────────────
@@ -439,13 +462,17 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'mage-guild-reward'|'crew-payment'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'building-action'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'goods-request-deposit'|'mage-guild-reward'|'crew-payment'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
  * @property {string} [cycleFinishedAt]
  * @property {string} [manufactureId]
  * @property {string} [manufactureName]
+ * @property {string} [islandId]
+ * @property {string} [buildingKey]
+ * @property {string} [yieldBuildingId]
+ * @property {string} [actionVariantId]
  * @property {'fixed'|'coinPig'} [manufactureMechanic]
  * @property {string} [spellRequestId]
  * @property {string} [requestId]
@@ -457,6 +484,27 @@
  * @property {string} [adventureTitle]
  * @property {number} [guildTaxRate]
  * @property {import('firebase/firestore').Timestamp} createdAt
+ */
+
+/**
+ * Collection: `goods-requests/{requestId}`
+ * Player-submitted requests to credit goods to a personal or guild account.
+ * Target inventories are unchanged until an admin approves the request.
+ * @typedef {Object} GoodsRequestDoc
+ * @property {string} id
+ * @property {'hero'|'guild'} targetType
+ * @property {string} targetId
+ * @property {string} targetName
+ * @property {Record<string, number>} goods - Positive whole quantities keyed by goodId
+ * @property {Record<string, {name: string, unit: string}>} goodsMeta - Good name/unit snapshots for admin review
+ * @property {string} comment
+ * @property {'pending'|'approved'|'rejected'} status
+ * @property {import('firebase/firestore').Timestamp} createdAt
+ * @property {string|null} createdBy
+ * @property {import('firebase/firestore').Timestamp|null} reviewedAt
+ * @property {string|null} reviewedBy
+ * @property {string} reviewNote
+ * @property {string|null} approvedLogId
  */
 
 /**
