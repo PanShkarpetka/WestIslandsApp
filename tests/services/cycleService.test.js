@@ -676,6 +676,43 @@ test('createNewCycleWithEffects closes open previous cycle', async () => {
   assert.equal(summary.populationDelta, 30);
 });
 
+test('createNewCycleWithEffects includes Park growth in cycle summary population delta', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Uktar 1489', populationAtStart: 100, createdAt: 'old' },
+    'buildings/park': { name: 'Park', currentLvl: 2, growthPerCycle: { 1: 1, 2: 2, 3: 3 } },
+    'population/peasants': { count: 40 },
+    'islands/island_rock': { population: 101, manufactures: [] },
+    'religions/Unknown': { followers: 40 },
+    'treasury/meta': { balance: 0 },
+  });
+
+  await createNewCycleWithEffects(
+    { startedDate: '1 Hammer 1490', islandId: 'island_rock', population: 101 },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      getDocs: async (q) => {
+        if (q.__colPath === 'cycles') {
+          return {
+            docs: [{ id: 'prev', data: () => mock.get('cycles/prev'), ref: { __path: 'cycles/prev', __type: 'doc', id: 'prev' } }],
+            empty: false,
+          };
+        }
+        return mock.firebase.getDocs(q);
+      },
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  const summary = mock.get('cycle-summaries/prev');
+  assert.equal(summary.populationBefore, 100);
+  assert.equal(summary.populationAfter, 103);
+  assert.equal(summary.populationDelta, 3);
+  assert.equal(mock.get('islands/island_rock').population, 103);
+  assert.equal(mock.get('population/peasants').count, 42);
+});
+
 test('createNewCycleWithEffects consumes Deva faith when the new cycle changes month', async () => {
   const mock = createMockFirestore({
     'cycles/prev': { startedAt: '24 Alturiak 1490', createdAt: 'old' },

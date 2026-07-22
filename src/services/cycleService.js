@@ -822,12 +822,15 @@ export async function applyParkBuildingGrowth(islandId, {
     .map((d) => ({ id: d.id, ref: d.ref, ...d.data() }))
     .filter((b) => b.growthPerCycle && Number(b.currentLvl) > 0)
 
-  if (!parkBuildings.length) return
+  if (!parkBuildings.length) return 0
+
+  let totalGrowth = 0
 
   for (const building of parkBuildings) {
     const lvl = Number(building.currentLvl)
     const growth = Number(building.growthPerCycle?.[lvl] ?? 0)
     if (!growth) continue
+    totalGrowth += growth
 
     const peasantsRef = docFn(firestoreDb, 'population', 'peasants')
     const peasantsSnap = await getDocFn(peasantsRef)
@@ -847,6 +850,8 @@ export async function applyParkBuildingGrowth(islandId, {
       await updateDocFn(unknownReligionRef, { followers: Number(unknownReligionSnap.data().followers ?? 0) + growth })
     }
   }
+
+  return totalGrowth
 }
 
 /**
@@ -1077,6 +1082,7 @@ export async function createNewCycleWithEffects({
   where: whereFn = where,
   orderBy: orderByFn = orderBy,
   limit: limitFn = limit,
+  writeBatch: writeBatchFn = writeBatch,
   serverTimestamp: serverTimestampFn = serverTimestamp,
   db: firestoreDb = db,
   rng = Math.random,
@@ -1098,6 +1104,7 @@ export async function createNewCycleWithEffects({
     where: whereFn,
     documentId: documentIdFn,
     runTransaction: runTransactionFn,
+    writeBatch: writeBatchFn,
     serverTimestamp: serverTimestampFn,
     db: firestoreDb,
     rng,
@@ -1112,6 +1119,11 @@ export async function createNewCycleWithEffects({
   const weatherForecast = generateCycleWeatherForecast({ cycleId: cycleDoc.id, startedAt })
   if (weatherForecast.length) {
     await updateDocFn(cycleDoc, { weatherForecast })
+  }
+  const parkPopulationGrowth = await applyParkBuildingGrowth(islandId, sharedDeps)
+  const adjustedPopulationAtStart = populationAtStart + parkPopulationGrowth
+  if (parkPopulationGrowth) {
+    await updateDocFn(cycleDoc, { populationAtStart: adjustedPopulationAtStart })
   }
   let coinPigCycle = null
   let closedCycleForAutoIncome = null
@@ -1145,14 +1157,14 @@ export async function createNewCycleWithEffects({
 
     const populationBefore = Number(previousCycle.populationAtStart)
     const hasPopulationBefore = Number.isFinite(populationBefore)
-    const hasPopulationAfter = Number.isFinite(populationAtStart)
+    const hasPopulationAfter = Number.isFinite(adjustedPopulationAtStart)
     await setDocFn(docFn(firestoreDb, 'cycle-summaries', lastCycleDoc.id), {
       cycleId: lastCycleDoc.id,
       cycleStartedAt: previousCycle.startedAt || '',
       cycleFinishedAt: previousUpdate.finishedAt,
       populationBefore: hasPopulationBefore ? populationBefore : null,
-      populationAfter: hasPopulationAfter ? populationAtStart : null,
-      populationDelta: hasPopulationBefore && hasPopulationAfter ? populationAtStart - populationBefore : null,
+      populationAfter: hasPopulationAfter ? adjustedPopulationAtStart : null,
+      populationDelta: hasPopulationBefore && hasPopulationAfter ? adjustedPopulationAtStart - populationBefore : null,
       updatedAt: serverTimestampFn(),
     }, { merge: true })
   }
@@ -1172,7 +1184,6 @@ export async function createNewCycleWithEffects({
     convertedFollowers: 0,
     result: 0,
   })
-  await applyParkBuildingGrowth(islandId, sharedDeps)
   await distributeBuildingFaithIncome(cycleDoc.id, sharedDeps)
   if (closedCycleForAutoIncome) {
     await distributeManufactureIncome(
@@ -1195,7 +1206,7 @@ export async function createNewCycleWithEffects({
     cycleRef: cycleDoc,
     cycleId: cycleDoc.id,
     islandId,
-    population,
+    population: adjustedPopulationAtStart,
     cycleStartedAt: startedAt,
     cycleFinishedAt: '',
   })
