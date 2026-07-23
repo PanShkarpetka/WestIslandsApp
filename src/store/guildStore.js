@@ -95,6 +95,8 @@ export const useGuildStore = defineStore('guilds', {
 
       await setDoc(guildRef, {
         ...sanitizeGuild(payload),
+        memberHeroIds: [],
+        rules: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -108,6 +110,30 @@ export const useGuildStore = defineStore('guilds', {
         guildRef,
         {
           ...sanitizeGuild(payload),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    },
+
+    async updateGuildMembers(id, memberHeroIds) {
+      const db = getFirestore();
+      await setDoc(
+        doc(db, 'guilds', id),
+        {
+          memberHeroIds: normalizeMemberHeroIds(memberHeroIds),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    },
+
+    async updateGuildRules(id, rules) {
+      const db = getFirestore();
+      await setDoc(
+        doc(db, 'guilds', id),
+        {
+          rules: normalizeGuildRules(rules),
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -219,6 +245,31 @@ function sanitizeGuild(payload) {
     withdrawUsername: (payload?.withdrawUsername || '').trim(),
     withdrawPassword: (payload?.withdrawPassword || '').trim(),
   };
+}
+
+function normalizeMemberHeroIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((id) => String(id || '').trim())
+    .filter(Boolean))];
+}
+
+function normalizeGuildRules(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((rule) => {
+      const type = String(rule?.type || 'membership_payment_per_adventure').trim();
+      const amountGold = roundAmount(rule?.amountGold ?? rule?.amount ?? 0);
+      return {
+        id: String(rule?.id || `rule-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).trim(),
+        type,
+        title: String(rule?.title || '').trim() || 'Пригодницький внесок',
+        description: String(rule?.description || '').trim(),
+        amountGold,
+        enabled: rule?.enabled !== false,
+      };
+    })
+    .filter((rule) => rule.id && rule.type && rule.amountGold > 0);
 }
 
 function buildGuildId(name) {

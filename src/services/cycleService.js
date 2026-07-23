@@ -668,10 +668,84 @@ export function buildExpeditionDetails(expedition = {}) {
   }
 }
 
+export const GUILD_RULE_MEMBERSHIP_PAYMENT_PER_ADVENTURE = 'membership_payment_per_adventure'
+
+function normalizeGuildMemberIds(value) {
+  return normalizeHeroIds(value)
+}
+
+function normalizeGuildRule(rule = {}) {
+  const type = String(rule.type || '').trim()
+  if (type !== GUILD_RULE_MEMBERSHIP_PAYMENT_PER_ADVENTURE) return null
+
+  const amount = normalizeAmount(Number(rule.amountGold ?? rule.amount ?? 0))
+  if (!Number.isFinite(amount) || amount <= 0) return null
+
+  return {
+    id: String(rule.id || `${type}:${amount}`).trim(),
+    type,
+    title: String(rule.title || 'Пригодницький внесок').trim() || 'Пригодницький внесок',
+    description: String(rule.description || '').trim(),
+    enabled: rule.enabled !== false,
+    amountGold: amount,
+  }
+}
+
+export function buildGuildMembershipPaymentEntries(guilds = [], participantHeroIds = []) {
+  const participants = normalizeHeroIds(participantHeroIds)
+  if (!participants.length) return []
+
+  const participantSet = new Set(participants)
+  const entries = []
+
+  for (const guild of guilds || []) {
+    const guildId = String(guild?.id || '').trim()
+    if (!guildId) continue
+
+    const memberHeroIds = normalizeGuildMemberIds(guild.memberHeroIds)
+      .filter((heroId) => participantSet.has(heroId))
+    if (!memberHeroIds.length) continue
+
+    const rules = (Array.isArray(guild.rules) ? guild.rules : [])
+      .map(normalizeGuildRule)
+      .filter((rule) => rule && rule.enabled)
+    if (!rules.length) continue
+
+    for (const heroId of memberHeroIds) {
+      for (const rule of rules) {
+        entries.push({
+          guildId,
+          guildName: guild.name || guild.shortName || guildId,
+          heroId,
+          ruleId: rule.id,
+          ruleType: rule.type,
+          ruleTitle: rule.title,
+          ruleDescription: rule.description,
+          amount: rule.amountGold,
+        })
+      }
+    }
+  }
+
+  entries.sort((a, b) => (
+    participants.indexOf(a.heroId) - participants.indexOf(b.heroId)
+    || a.guildName.localeCompare(b.guildName, 'uk-UA')
+    || a.ruleTitle.localeCompare(b.ruleTitle, 'uk-UA')
+  ))
+  return entries
+}
+
 async function settleExpedition(cycleRef, cycleData, expedition, finishedAt, {
-  collectionFn, docFn, runTransactionFn, serverTimestampFn, firestoreDb,
+  collectionFn, docFn, getDocsFn, runTransactionFn, serverTimestampFn, firestoreDb,
 }) {
   const details = buildExpeditionDetails(expedition)
+  const guildSnapshot = await getDocsFn(collectionFn(firestoreDb, 'guilds'))
+  const candidateGuildIds = buildGuildMembershipPaymentEntries(
+    guildSnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() || {}) })),
+    details.participantHeroIds,
+  ).map((entry) => entry.guildId)
+  const uniqueCandidateGuildIds = [...new Set(candidateGuildIds)]
+
   await runTransactionFn(firestoreDb, async (transaction) => {
     const heroRows = []
     for (const share of details.participantShares) {
@@ -682,6 +756,19 @@ async function settleExpedition(cycleRef, cycleData, expedition, finishedAt, {
       if (hero.inactive) throw new Error(`EXPEDITION_HERO_INACTIVE:${share.heroId}`)
       heroRows.push({ ref: heroRef, share, hero })
     }
+
+    const guildRows = []
+    for (const guildId of uniqueCandidateGuildIds) {
+      const guildRef = docFn(firestoreDb, 'guilds', guildId)
+      const guildSnap = await transaction.get(guildRef)
+      if (guildSnap.exists()) {
+        guildRows.push({ ref: guildRef, id: guildId, data: guildSnap.data() || {} })
+      }
+    }
+    const guildMembershipPayments = buildGuildMembershipPaymentEntries(
+      guildRows.map(({ id, data }) => ({ id, ...data })),
+      details.participantHeroIds,
+    )
 
     const participantNames = heroRows.map(({ share, hero }) => ({
       heroId: share.heroId,
@@ -695,26 +782,91 @@ async function settleExpedition(cycleRef, cycleData, expedition, finishedAt, {
       ...details,
       participants: participantNames,
       participantShares,
+      guildMembershipPayments: guildMembershipPayments.map((entry) => ({
+        ...entry,
+        heroName: heroRows.find(({ share }) => share.heroId === entry.heroId)?.hero.name || entry.heroId,
+      })),
+      totalGuildMembershipCost: normalizeAmount(guildMembershipPayments.reduce((sum, entry) => sum + entry.amount, 0)),
+      crewPaymentStatus: details.autoDeduct ? 'deducted' : 'skipped',
+      guildMembershipPaymentStatus: guildMembershipPayments.length ? 'deducted' : 'none',
       paymentStatus: details.autoDeduct ? 'deducted' : 'skipped',
     }
     transaction.update(cycleRef, { finishedAt, expedition: storedExpedition })
 
-    if (!details.autoDeduct) return
-    for (const { ref, share, hero } of heroRows) {
-      const nextBalance = normalizeAmount(Number(hero.goldBalance ?? 0) - share.amount)
-      transaction.set(ref, { goldBalance: nextBalance, updatedAt: serverTimestampFn() }, { merge: true })
+    const heroBalances = new Map(heroRows.map(({ share, hero }) => [share.heroId, Number(hero.goldBalance ?? 0)]))
+    const guildBalances = new Map(guildRows.map(({ id, data }) => [id, Number(data.treasure ?? 0)]))
+
+    if (details.autoDeduct) {
+      for (const { ref, share, hero } of heroRows) {
+        const currentBalance = heroBalances.get(share.heroId) ?? Number(hero.goldBalance ?? 0)
+        const nextBalance = normalizeAmount(currentBalance - share.amount)
+        heroBalances.set(share.heroId, nextBalance)
+        transaction.set(ref, { goldBalance: nextBalance, updatedAt: serverTimestampFn() }, { merge: true })
+        transaction.set(docFn(collectionFn(firestoreDb, 'hero-transactions')), {
+          heroId: share.heroId,
+          heroName: hero.name || share.heroId,
+          goldAmount: -share.amount,
+          goods: {},
+          type: 'crew-payment',
+          comment: `Оплата екіпажу за пригоду "${details.adventureTitle}": ${details.durationDays} дн., частка ${formatAmount(share.amount)} зм.`.slice(0, 500),
+          cycleId: cycleRef.id,
+          cycleStartedAt: cycleData.startedAt || '',
+          cycleFinishedAt: finishedAt,
+          adventureTitle: details.adventureTitle,
+          createdAt: serverTimestampFn(),
+        })
+      }
+    }
+
+    for (const entry of guildMembershipPayments) {
+      const heroRow = heroRows.find(({ share }) => share.heroId === entry.heroId)
+      const guildRow = guildRows.find((row) => row.id === entry.guildId)
+      if (!heroRow || !guildRow) continue
+
+      const heroCurrent = heroBalances.get(entry.heroId) ?? Number(heroRow.hero.goldBalance ?? 0)
+      const heroNext = normalizeAmount(heroCurrent - entry.amount)
+      const guildCurrent = guildBalances.get(entry.guildId) ?? Number(guildRow.data.treasure ?? 0)
+      const guildNext = normalizeAmount(guildCurrent + entry.amount)
+      heroBalances.set(entry.heroId, heroNext)
+      guildBalances.set(entry.guildId, guildNext)
+
+      transaction.set(heroRow.ref, { goldBalance: heroNext, updatedAt: serverTimestampFn() }, { merge: true })
+      transaction.set(guildRow.ref, { treasure: guildNext, updatedAt: serverTimestampFn() }, { merge: true })
+
+      const heroName = heroRow.hero.name || entry.heroId
+      const guildName = entry.guildName || guildRow.data.name || entry.guildId
       transaction.set(docFn(collectionFn(firestoreDb, 'hero-transactions')), {
-        heroId: share.heroId,
-        heroName: hero.name || share.heroId,
-        goldAmount: -share.amount,
+        heroId: entry.heroId,
+        heroName,
+        goldAmount: -entry.amount,
         goods: {},
-        type: 'crew-payment',
-        comment: `Оплата екіпажу за пригоду "${details.adventureTitle}": ${details.durationDays} дн., частка ${formatAmount(share.amount)} зм.`.slice(0, 500),
+        type: 'guild-membership-payment',
+        comment: `Внесок гільдії "${entry.ruleTitle}" до ${guildName} за пригоду "${details.adventureTitle}": ${formatAmount(entry.amount)} зм.`.slice(0, 500),
         cycleId: cycleRef.id,
         cycleStartedAt: cycleData.startedAt || '',
         cycleFinishedAt: finishedAt,
         adventureTitle: details.adventureTitle,
+        guildId: entry.guildId,
+        guildName,
+        guildRuleId: entry.ruleId,
+        guildRuleTitle: entry.ruleTitle,
         createdAt: serverTimestampFn(),
+      })
+      transaction.set(docFn(collectionFn(firestoreDb, 'guilds', entry.guildId, 'logs')), {
+        amount: entry.amount,
+        type: 'membership-payment',
+        comment: `Внесок "${entry.ruleTitle}" від ${heroName} за пригоду "${details.adventureTitle}".`.slice(0, 500),
+        userNickname: 'Система',
+        createdAt: serverTimestampFn(),
+        treasureAfter: guildNext,
+        heroId: entry.heroId,
+        heroName,
+        cycleId: cycleRef.id,
+        cycleStartedAt: cycleData.startedAt || '',
+        cycleFinishedAt: finishedAt,
+        adventureTitle: details.adventureTitle,
+        guildRuleId: entry.ruleId,
+        guildRuleTitle: entry.ruleTitle,
       })
     }
   })
@@ -1141,7 +1293,7 @@ export async function createNewCycleWithEffects({
     if (previousDuration && previousDuration > 0) previousUpdate.duration = previousDuration
     if (expedition) {
       await settleExpedition(lastCycleDoc.ref, previousCycle, expedition, previousUpdate.finishedAt, {
-        collectionFn, docFn, runTransactionFn, serverTimestampFn, firestoreDb,
+        collectionFn, docFn, getDocsFn, runTransactionFn, serverTimestampFn, firestoreDb,
       })
       if (previousUpdate.duration) await updateDocFn(lastCycleDoc.ref, { duration: previousUpdate.duration })
     } else {

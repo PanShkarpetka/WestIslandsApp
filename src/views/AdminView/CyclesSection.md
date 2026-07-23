@@ -11,6 +11,9 @@ Creates new game cycles and records the expedition completed during the cycle be
 - **Тривалість експедиції** — expedition days excluding the seven-day rest period
 - **Екіпаж** — one or more role/count/daily-rate groups; the initial sailor rate is 2 gold per day
 - **Автоматичне списання** — splits crew cost between participants and writes `crew-payment` hero transactions
+- **Guild payment preview** — when selected participants are members of guilds with enabled `membership_payment_per_adventure` rules, the cycle form previews each automatic guild payment before saving.
+- On cycle creation, guild membership payments are applied after crew payments: the member hero receives a `guild-membership-payment` deduction, the guild balance increases, and `guilds/{guildId}/logs` receives a `membership-payment` row. Negative hero balances are allowed for these deductions.
+- Expedition records store separate `crewPaymentStatus` and `guildMembershipPaymentStatus` fields. The table combines them for display, so a cycle where only guild dues were charged does not appear as "no automatic deductions".
 - Structured expeditions can be edited later (participants, duration, and crew groups). Editing recalculates display data, marks payment status as `edited`, and never changes balances or writes another transaction.
 - The expedition table also shows `autoIncomeOperation` status for the closed cycle. Admins can run a money-only auto-income operation when it has not completed yet; this applies treasury, guild, hero-account, population, manufacture, and Coin Pig money entries, skips garden/yield goods, and stores per-target balance-change logs on the cycle document.
 

@@ -50,6 +50,29 @@
 
       <v-card class="account-card mb-4" elevation="0">
         <div class="account-card-header">
+          <v-icon class="mr-2" size="18">mdi-scroll-text-outline</v-icon>
+          Правила гільдій
+          <span class="account-header-count">{{ heroGuildRules.length }}</span>
+        </div>
+        <v-card-text class="account-card-body">
+          <div v-if="!heroGuildRules.length" class="account-empty-state">
+            <v-icon class="mr-1" size="14">mdi-scroll-outline</v-icon>
+            Активних правил гільдій немає.
+          </div>
+          <div v-else class="guild-rules-list">
+            <div v-for="rule in heroGuildRules" :key="`${rule.guildId}:${rule.id}`" class="guild-rule-row">
+              <div class="guild-rule-info">
+                <span class="guild-rule-title">{{ rule.title }}</span>
+                <span class="guild-rule-meta wi-muted-text">{{ rule.guildName }} · {{ guildRuleDescription(rule) }}</span>
+              </div>
+              <span class="wi-number guild-rule-amount">{{ formatAmount(rule.amountGold) }} зм</span>
+            </div>
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <v-card class="account-card mb-4" elevation="0">
+        <div class="account-card-header">
           <v-icon class="mr-2" size="18">mdi-package-variant</v-icon>
           Товари
         </div>
@@ -387,6 +410,7 @@ import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp, wh
 import { db } from '@/services/firebase'
 import { useUserStore } from '@/store/userStore'
 import { useGoodsStore } from '@/store/goodsStore'
+import { useGuildStore } from '@/store/guildStore'
 import { useYieldBuildingStore } from '@/store/yieldBuildingStore'
 import { formatAmount } from '@/utils/formatters'
 import { getOwnedBuildings } from '@/utils/ownedBuildings.js'
@@ -414,6 +438,7 @@ import OwnedBuildingsList from '@/components/OwnedBuildingsList.vue'
 
 const userStore = useUserStore()
 const goodsStore = useGoodsStore()
+const guildStore = useGuildStore()
 const yieldBuildingStore = useYieldBuildingStore()
 
 const hero = ref({ id: '', name: '', goldBalance: 0, goods: {}, telegramId: '' })
@@ -487,6 +512,25 @@ const ownedBuildings = computed(() =>
   )
 )
 
+const heroGuildRules = computed(() => {
+  const heroId = userStore.heroId
+  if (!heroId) return []
+  return guildStore.guilds.flatMap((guild) => {
+    const isMember = Array.isArray(guild.memberHeroIds) && guild.memberHeroIds.includes(heroId)
+    if (!isMember) return []
+    return (Array.isArray(guild.rules) ? guild.rules : [])
+      .filter((rule) => rule?.enabled !== false)
+      .filter((rule) => rule?.type === 'membership_payment_per_adventure')
+      .filter((rule) => Number(rule.amountGold ?? rule.amount ?? 0) > 0)
+      .map((rule) => ({
+        ...rule,
+        amountGold: Number(rule.amountGold ?? rule.amount ?? 0),
+        guildId: guild.id,
+        guildName: guild.name || guild.shortName || guild.id,
+      }))
+  })
+})
+
 function txTypeLabel(type) {
   if (type === 'income') return 'Дохід'
   if (type === 'withdrawal') return 'Зняття'
@@ -500,6 +544,7 @@ function txTypeLabel(type) {
   if (type === 'building-action') return 'Дія будівлі'
   if (type === 'mage-guild-reward') return 'Магічна допомога'
   if (type === 'crew-payment') return 'Оплата екіпажу'
+  if (type === 'guild-membership-payment') return 'Внесок гільдії'
   return 'Списання'
 }
 
@@ -521,6 +566,12 @@ function formatTxGoods(goods) {
       return `${qty > 0 ? '+' : ''}${qty} ${meta?.name || goodId}`
     })
     .join(', ')
+}
+
+function guildRuleDescription(rule) {
+  if (rule.description) return rule.description
+  if (rule.type === 'membership_payment_per_adventure') return 'Сплачується після пригод, у яких герой брав участь'
+  return 'Правило гільдії'
 }
 
 function toMillis(value) {
@@ -781,6 +832,7 @@ async function withdrawGoods() {
 
 onMounted(() => {
   goodsStore.subscribeGoods()
+  guildStore.subscribeGuilds()
 
   if (!userStore.heroId) {
     loadError.value = 'Ви не авторизовані як гравець.'
@@ -850,6 +902,7 @@ onBeforeUnmount(() => {
   unsubscribeIsland?.()
   unsubscribeUsedDays?.()
   goodsStore.unsubscribeGoods()
+  guildStore.unsubscribeGuilds()
   yieldBuildingStore.stop()
 })
 </script>
@@ -944,7 +997,8 @@ onBeforeUnmount(() => {
 
 .goods-list,
 .fish-list,
-.treasure-list {
+.treasure-list,
+.guild-rules-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -952,7 +1006,8 @@ onBeforeUnmount(() => {
 
 .goods-row,
 .fish-row,
-.treasure-row {
+.treasure-row,
+.guild-rule-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -985,7 +1040,8 @@ onBeforeUnmount(() => {
 
 .goods-info,
 .fish-info,
-.treasure-info {
+.treasure-info,
+.guild-rule-info {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -998,9 +1054,16 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
+.guild-rule-info {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
 .goods-name,
 .fish-name,
-.treasure-name {
+.treasure-name,
+.guild-rule-title {
   font-family: var(--wi-font-body);
   color: var(--wi-text);
   font-size: 0.9rem;
@@ -1019,12 +1082,14 @@ onBeforeUnmount(() => {
 
 .goods-unit,
 .fish-meta,
-.treasure-meta {
+.treasure-meta,
+.guild-rule-meta {
   font-size: 0.8rem;
 }
 
 .fish-price,
-.treasure-price {
+.treasure-price,
+.guild-rule-amount {
   font-size: 0.95rem;
   white-space: nowrap;
   margin-left: auto;

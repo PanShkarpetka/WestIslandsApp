@@ -92,6 +92,12 @@
           <v-alert type="info" variant="tonal" density="comfortable" class="mb-3">
             {{ expeditionCostSummary }}
           </v-alert>
+          <v-alert v-if="guildMembershipPaymentPreview.length" type="warning" variant="tonal" density="comfortable" class="mb-3">
+            Внески гільдій:
+            <span v-for="(entry, index) in guildMembershipPaymentPreview" :key="`${entry.guildId}:${entry.heroId}:${entry.ruleId}`">
+              {{ index ? '; ' : '' }}{{ heroNameById.get(entry.heroId) || entry.heroId }} -> {{ entry.guildName }} / {{ entry.ruleTitle }}: {{ formatAmount(entry.amount) }} зм
+            </span>
+          </v-alert>
           <v-checkbox
             v-model="cycleForm.autoDeductCrewPayment"
             label="Автоматично списати оплату екіпажу порівну з учасників"
@@ -1104,7 +1110,7 @@ import { db } from '../services/firebase';
 import FaerunDatePicker from '@/components/FaerunDatePicker.vue';
 import { useIslandStore } from '@/store/islandStore';
 import { usePopulationStore } from '@/store/populationStore';
-import { createNewCycleWithEffects, rerunCycleAutoMoney, updateExpeditionDetails } from '@/services/cycleService';
+import { createNewCycleWithEffects, rerunCycleAutoMoney, updateExpeditionDetails, buildGuildMembershipPaymentEntries } from '@/services/cycleService';
 import CraftActionForm from '@/components/crafting/CraftActionForm.vue';
 import {
   approveCraftingRequest,
@@ -1695,6 +1701,7 @@ const heroRows = computed(() =>
 
 const heroOptions = computed(() => heroRows.value.map((hero) => ({ title: hero.name, value: hero.id })));
 const activeHeroOptions = computed(() => heroRows.value.filter((hero) => !hero.inactive).map((hero) => ({ id: hero.id, name: hero.name })));
+const heroNameById = computed(() => new Map(heroRows.value.map((hero) => [hero.id, hero.name])));
 const expeditionHeaders = [
   { title: 'Назва пригоди', key: 'adventureTitle' },
   { title: 'Цикл', key: 'cycleLabel' },
@@ -1716,7 +1723,7 @@ const expeditionRows = computed(() => allCycles.value
     totalCrewCount: cycle.expedition?.totalCrewCount ?? null,
     totalCost: cycle.expedition?.totalCost ?? null,
     autoDeduct: cycle.expedition ? cycle.expedition.autoDeduct !== false : null,
-    paymentStatus: cycle.expedition?.paymentStatus || (cycle.expedition ? (cycle.expedition.autoDeduct !== false ? 'deducted' : 'skipped') : ''),
+    paymentStatus: getExpeditionPaymentStatus(cycle.expedition),
     autoIncomeOperation: cycle.autoIncomeOperation || null,
     autoIncomeStatus: cycle.autoIncomeOperation?.status || 'not-run',
     autoIncomeLogs: Array.isArray(cycle.autoIncomeOperation?.logs) ? cycle.autoIncomeOperation.logs : [],
@@ -1727,21 +1734,34 @@ const editableExpeditionHeroOptions = computed(() => heroRows.value
   .filter((hero) => !hero.inactive || expeditionEditForm.participantHeroIds.includes(hero.id))
   .map((hero) => ({ id: hero.id, name: hero.name })));
 
+function getExpeditionPaymentStatus(expedition) {
+  if (!expedition) return ''
+  if (expedition.paymentStatus === 'edited') return 'edited'
+  const crewStatus = expedition.crewPaymentStatus || expedition.paymentStatus || (expedition.autoDeduct !== false ? 'deducted' : 'skipped')
+  const guildStatus = expedition.guildMembershipPaymentStatus || (Array.isArray(expedition.guildMembershipPayments) && expedition.guildMembershipPayments.length ? 'deducted' : 'none')
+  if (crewStatus === 'deducted' && (guildStatus === 'deducted' || guildStatus === 'none')) return 'deducted'
+  if (crewStatus === 'skipped' && guildStatus === 'deducted') return 'partial'
+  return 'skipped'
+}
+
 function expeditionPaymentIcon(status) {
   if (status === 'deducted') return 'mdi-check-circle';
+  if (status === 'partial') return 'mdi-check-circle-outline';
   if (status === 'skipped') return 'mdi-minus-circle-outline';
   return 'mdi-pencil-circle-outline';
 }
 
 function expeditionPaymentColor(status) {
   if (status === 'deducted') return 'success';
+  if (status === 'partial') return 'info';
   if (status === 'skipped') return 'warning';
   return 'grey';
 }
 
 function expeditionPaymentTitle(status) {
-  if (status === 'deducted') return 'Списано з учасників';
-  if (status === 'skipped') return 'Без автоматичного списання';
+  if (status === 'deducted') return 'Списано оплату екіпажу і внески гільдій';
+  if (status === 'partial') return 'Частина автоматичних списань виконана';
+  if (status === 'skipped') return 'Без автоматичних списань';
   return 'Дані відредаговано без повторного списання';
 }
 
@@ -1834,6 +1854,10 @@ const expeditionCostSummary = computed(() => {
   const share = participants ? total / participants : 0;
   return `Екіпаж: ${crewCount}. Загальна оплата: ${formatAmount(total)} зм.${participants ? ` Орієнтовно по ${formatAmount(share)} зм з учасника.` : ''}`;
 });
+
+const guildMembershipPaymentPreview = computed(() =>
+  buildGuildMembershipPaymentEntries(guildRows.value, cycleForm.participantHeroIds)
+);
 
 function addCrewGroup() {
   cycleForm.crewGroups.push({ role: '', count: 1, dailyRate: 2 });

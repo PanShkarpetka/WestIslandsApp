@@ -1,11 +1,11 @@
 # GuildsPage
 
-Route: `/guilds` — `requiresAuth: false`.
+Route: `/guilds` - `requiresAuth: false`.
 
 ## Purpose
-Guild management page. Shows guild cards with coin balance and goods inventory. Users can deposit funds; leaders and admins can withdraw funds and manage goods. Admins can create/edit guilds and view full logs.
+Guild management page. Shows guild cards with coin balance, goods inventory, members, and active member rules. Users can deposit funds; leaders and admins can withdraw funds and manage goods. Admins can create/edit guilds, manage members, and view full logs. Leaders can manage rules for guilds they can access.
 
-Shared page-header, action, panel, and empty-state primitives provide consistent hierarchy. Guild permissions and mutations are unchanged.
+Shared page-header, action, panel, and empty-state primitives provide consistent hierarchy.
 
 ## Visibility rules
 - Admin: sees all guilds
@@ -13,7 +13,7 @@ Shared page-header, action, panel, and empty-state primitives provide consistent
 - Regular user: sees only `visibleToAll` guilds
 
 ## Dialogs
-Three separate dialogs on the same page:
+Five separate dialogs on the same page.
 
 Primary create and transaction confirmations use the shared `WiActionButton` styling.
 
@@ -26,15 +26,21 @@ Modes: `deposit` or `withdraw`. Password field shown for non-admin withdrawals. 
 ### Goods dialog (`showGoodsDialog`)
 Modes: `deposit` or `withdraw`. Available to admins and users with `canAccessGuild`. Admin deposits update the guild immediately; non-admin deposits create a pending `goods-requests` document and do not change the guild inventory until an admin approves it. Non-admin goods withdrawals use the same password check as gold withdrawals. Goods log rows render item deltas and goods-after snapshots instead of coin amounts.
 
-### Logs dialog (`showLogsDialog`)
-Ledger table: when, who, type (deposit/withdraw/goods deposit/goods withdraw/building action), amount or goods delta, comment, balance after or goods after. Building-action rows show both the gold cost and gathered goods. Available to admins and users with `canAccessGuild`. "Оновити" button reloads logs on demand.
+### Members dialog (`showMembersDialog`)
+Admin-only. Selects active heroes and saves their IDs to `guilds/{guildId}.memberHeroIds`. A hero may be a member of multiple guilds, so the dialog does not enforce exclusivity.
 
-Each visible guild card has a **Будівлі (N)** button. It opens a read-only dialog listing every active island building whose typed or legacy owner fields resolve to that guild, including the configured action cost and per-cycle limit for owner-action buildings. The button is visible independently of treasury/log permissions.
+### Rules dialog (`showRulesDialog`)
+Available to admins and users with `canAccessGuild`. Saves `guilds/{guildId}.rules` as an array so future rule types can be added without changing the guild document shape. The current rule type is `membership_payment_per_adventure`, with `title`, optional `description`, `amountGold`, and `enabled`. Enabled membership-payment rules are applied on cycle change to guild members who participated in the closing adventure.
+
+### Logs dialog (`showLogsDialog`)
+Ledger table: when, who, type (deposit/withdraw/goods deposit/goods withdraw/building action/membership payment), amount or goods delta, comment, balance after or goods after. Building-action rows show both the gold cost and gathered goods. Available to admins and users with `canAccessGuild`. Refresh button reloads logs on demand.
+
+Each visible guild card has a buildings button. It opens a read-only dialog listing every active island building whose typed or legacy owner fields resolve to that guild, including the configured action cost and per-cycle limit for owner-action buildings. The button is visible independently of treasury/log permissions.
 
 ## Guild card layout
-CSS Grid: crest (col 1, rows 1-2), info (col 2, row 1), balance (col 3, rows 1-2), actions (col 1-3, row 3), log-hint (col 1-3, row 4). Negative balance triggers red border and `var(--wi-danger)` amount color.
+CSS Grid: crest (col 1, rows 1-2), info (col 2, row 1), balance (col 3, rows 1-2), goods (row 2), members (row 3), active rules (row 4), actions (col 1-3, row 5), log-hint (col 1-3, row 6). Negative balance triggers red border and `var(--wi-danger)` amount color.
 
 ## Stores
-- `useGuildStore` — `subscribeGuilds()` / `unsubscribeGuilds()`, `guilds`, `addGuild()`, `updateGuild()`, `deposit()`, `withdraw()`, admin-only UI use of `depositGoods()`, `withdrawGoods()`, `getGuildLogs(guildId)`
-- `goodsRequestService` — `submitGoodsDepositRequest()` for non-admin guild deposits
-- `useUserStore` — `isAdmin`, `isLoggedIn`, `nickname`, `canAccessGuild(guildId)`
+- `useGuildStore` - `subscribeGuilds()` / `unsubscribeGuilds()`, `guilds`, `addGuild()`, `updateGuild()`, `updateGuildMembers()`, `updateGuildRules()`, `deposit()`, `withdraw()`, admin-only UI use of `depositGoods()`, `withdrawGoods()`, `getGuildLogs(guildId)`
+- `goodsRequestService` - `submitGoodsDepositRequest()` for non-admin guild deposits
+- `useUserStore` - `isAdmin`, `isLoggedIn`, `nickname`, `canAccessGuild(guildId)`

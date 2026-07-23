@@ -10,6 +10,7 @@ import {
   processBuildingYields,
   rerunCycleAutoMoney,
   buildExpeditionDetails,
+  buildGuildMembershipPaymentEntries,
   updateExpeditionDetails,
 } from '../../src/services/cycleService.js';
 import { createMockFirestore } from '../helpers/mockFirestore.js';
@@ -128,6 +129,36 @@ test('loadManufacturesByIds preserves Coin Pig payout config', async () => {
   assert.equal(result[0].mechanic, 'coinPig');
   assert.deepEqual(result[0].participantHeroIds, ['hero-1', 'hero-2']);
   assert.equal(result[0].income, 0);
+});
+
+test('buildGuildMembershipPaymentEntries returns enabled adventure-dues rules for participant members', () => {
+  const result = buildGuildMembershipPaymentEntries([
+    {
+      id: 'guild-a',
+      name: 'Sailors',
+      memberHeroIds: ['hero-1', 'hero-2'],
+      rules: [
+        { id: 'dues', type: 'membership_payment_per_adventure', title: 'Adventure dues', amountGold: 2.5, enabled: true },
+        { id: 'paused', type: 'membership_payment_per_adventure', title: 'Paused', amountGold: 10, enabled: false },
+      ],
+    },
+    {
+      id: 'guild-b',
+      name: 'Mages',
+      memberHeroIds: ['hero-1'],
+      rules: [{ id: 'mages-dues', type: 'membership_payment_per_adventure', title: 'Mage dues', amountGold: 1 }],
+    },
+  ], ['hero-1', 'hero-3']);
+
+  assert.deepEqual(result.map((entry) => ({
+    guildId: entry.guildId,
+    heroId: entry.heroId,
+    ruleId: entry.ruleId,
+    amount: entry.amount,
+  })), [
+    { guildId: 'guild-b', heroId: 'hero-1', ruleId: 'mages-dues', amount: 1 },
+    { guildId: 'guild-a', heroId: 'hero-1', ruleId: 'dues', amount: 2.5 },
+  ]);
 });
 
 // ─── distributeManufactureIncome ─────────────────────────────────────────────
@@ -674,6 +705,143 @@ test('createNewCycleWithEffects closes open previous cycle', async () => {
   assert.equal(summary.populationBefore, 90);
   assert.equal(summary.populationAfter, 120);
   assert.equal(summary.populationDelta, 30);
+});
+
+test('createNewCycleWithEffects applies guild membership payments for adventure participants', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Hammer 1490', populationAtStart: 90, createdAt: 'old' },
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 1 },
+    'heroes/hero-2': { name: 'Faramir', goldBalance: 4 },
+    'guilds/guild-a': {
+      name: 'Sailors',
+      treasure: 10,
+      memberHeroIds: ['hero-1'],
+      rules: [
+        { id: 'dues', type: 'membership_payment_per_adventure', title: 'Adventure dues', amountGold: 2.5, enabled: true },
+      ],
+    },
+    'guilds/guild-b': {
+      name: 'Mages',
+      treasure: 1,
+      memberHeroIds: ['hero-1'],
+      rules: [
+        { id: 'mage-dues', type: 'membership_payment_per_adventure', title: 'Mage dues', amountGold: 1, enabled: true },
+      ],
+    },
+  });
+
+  await createNewCycleWithEffects(
+    {
+      startedDate: '4 Hammer 1490',
+      islandId: 'island_rock',
+      population: 120,
+      expedition: {
+        adventureTitle: 'The Sea Gate',
+        participantHeroIds: ['hero-1', 'hero-2'],
+        durationDays: 3,
+        crewGroups: [{ role: 'Sailors', count: 1, dailyRate: 2 }],
+        autoDeduct: true,
+      },
+    },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      getDocs: async (q) => {
+        if (q.__colPath === 'cycles') {
+          return {
+            docs: [{ id: 'prev', data: () => mock.get('cycles/prev'), ref: { __path: 'cycles/prev', __type: 'doc', id: 'prev' } }],
+            empty: false,
+          };
+        }
+        return mock.firebase.getDocs(q);
+      },
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, -5.5);
+  assert.equal(mock.get('heroes/hero-2').goldBalance, 1);
+  assert.equal(mock.get('guilds/guild-a').treasure, 12.5);
+  assert.equal(mock.get('guilds/guild-b').treasure, 2);
+
+  const heroGuildPayments = Object.values(mock.list('hero-transactions'))
+    .filter((tx) => tx.type === 'guild-membership-payment')
+    .sort((a, b) => a.guildId.localeCompare(b.guildId));
+  assert.equal(heroGuildPayments.length, 2);
+  assert.deepEqual(heroGuildPayments.map((tx) => tx.goldAmount), [-2.5, -1]);
+  assert.equal(heroGuildPayments[0].adventureTitle, 'The Sea Gate');
+
+  const guildLogs = [
+    ...Object.values(mock.list('guilds/guild-a/logs')),
+    ...Object.values(mock.list('guilds/guild-b/logs')),
+  ].sort((a, b) => a.guildRuleId.localeCompare(b.guildRuleId));
+  assert.equal(guildLogs.length, 2);
+  assert.equal(guildLogs[0].type, 'membership-payment');
+  assert.equal(guildLogs[0].heroId, 'hero-1');
+
+  const storedExpedition = mock.get('cycles/prev').expedition;
+  assert.equal(storedExpedition.totalGuildMembershipCost, 3.5);
+  assert.equal(storedExpedition.guildMembershipPayments.length, 2);
+  assert.equal(storedExpedition.crewPaymentStatus, 'deducted');
+  assert.equal(storedExpedition.guildMembershipPaymentStatus, 'deducted');
+});
+
+test('createNewCycleWithEffects applies guild dues even when crew auto deduction is disabled', async () => {
+  const mock = createMockFirestore({
+    'cycles/prev': { startedAt: '1 Hammer 1490', populationAtStart: 90, createdAt: 'old' },
+    'islands/island_rock': { manufactures: [] },
+    'treasury/meta': { balance: 0 },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 5 },
+    'guilds/guild-a': {
+      name: 'Sailors',
+      treasure: 10,
+      memberHeroIds: ['hero-1'],
+      rules: [
+        { id: 'dues', type: 'membership_payment_per_adventure', title: 'Adventure dues', amountGold: 2, enabled: true },
+      ],
+    },
+  });
+
+  await createNewCycleWithEffects(
+    {
+      startedDate: '4 Hammer 1490',
+      islandId: 'island_rock',
+      population: 120,
+      expedition: {
+        adventureTitle: 'The Sea Gate',
+        participantHeroIds: ['hero-1'],
+        durationDays: 3,
+        crewGroups: [{ role: 'Sailors', count: 1, dailyRate: 2 }],
+        autoDeduct: false,
+      },
+    },
+    {
+      ...mock.firebase,
+      db: mock.db,
+      getDocs: async (q) => {
+        if (q.__colPath === 'cycles') {
+          return {
+            docs: [{ id: 'prev', data: () => mock.get('cycles/prev'), ref: { __path: 'cycles/prev', __type: 'doc', id: 'prev' } }],
+            empty: false,
+          };
+        }
+        return mock.firebase.getDocs(q);
+      },
+      settlePreviousSpellRequestsFn: async () => {},
+      generateSpellRequestsForCycleFn: async () => {},
+    },
+  );
+
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 3);
+  assert.equal(mock.get('guilds/guild-a').treasure, 12);
+  assert.equal(Object.values(mock.list('hero-transactions')).filter((tx) => tx.type === 'crew-payment').length, 0);
+  assert.equal(Object.values(mock.list('hero-transactions')).filter((tx) => tx.type === 'guild-membership-payment').length, 1);
+  assert.equal(mock.get('cycles/prev').expedition.paymentStatus, 'skipped');
+  assert.equal(mock.get('cycles/prev').expedition.crewPaymentStatus, 'skipped');
+  assert.equal(mock.get('cycles/prev').expedition.guildMembershipPaymentStatus, 'deducted');
 });
 
 test('createNewCycleWithEffects includes Park growth in cycle summary population delta', async () => {

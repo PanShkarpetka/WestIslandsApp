@@ -56,11 +56,25 @@
             </span>
           </div>
 
+          <div class="guild-members-row" @click.stop>
+            <v-icon size="12" class="mr-1" color="#c8962a">mdi-account-group</v-icon>
+            <span>{{ guildMemberNames(guild).join(', ') || 'Учасників немає' }}</span>
+          </div>
+
+          <div v-if="activeGuildRules(guild).length" class="guild-rules-row" @click.stop>
+            <v-icon size="12" class="mr-1" color="#c8962a">mdi-scroll-text-outline</v-icon>
+            <span v-for="rule in activeGuildRules(guild)" :key="rule.id" class="guild-rule-chip">
+              {{ rule.title }}: {{ formatAmount(rule.amountGold) }} зм/пригода
+            </span>
+          </div>
+
           <!-- Footer actions -->
           <div class="guild-actions" @click.stop>
             <v-btn class="guild-deposit-btn" size="small" prepend-icon="mdi-tray-arrow-down" @click="openTransaction(guild, 'deposit')">Внести</v-btn>
             <v-btn v-if="isAdmin || user.canAccessGuild(guild.id)" class="guild-withdraw-btn" size="small" prepend-icon="mdi-tray-arrow-up" variant="tonal" @click="openTransaction(guild, 'withdraw')">Зняти</v-btn>
             <v-btn v-if="canManageGuildGoods(guild)" class="guild-goods-btn" size="small" prepend-icon="mdi-package-variant" variant="tonal" @click="openGoodsDialog(guild)">Товари</v-btn>
+            <v-btn v-if="isAdmin" class="guild-members-btn" size="small" prepend-icon="mdi-account-group" variant="tonal" @click="openMembersDialog(guild)">Учасники</v-btn>
+            <v-btn v-if="canManageGuildRules(guild)" class="guild-rules-btn" size="small" prepend-icon="mdi-scroll-text-outline" variant="tonal" @click="openRulesDialog(guild)">Правила</v-btn>
             <v-btn class="guild-buildings-btn" size="small" prepend-icon="mdi-home-city-outline" variant="tonal" @click="openBuildingsDialog(guild)">
               Будівлі ({{ guildOwnedBuildings(guild.id).length }})
             </v-btn>
@@ -153,6 +167,70 @@
         <v-card-actions class="guild-dialog-actions">
           <v-spacer />
           <v-btn variant="text" class="cancel-btn" @click="showBuildingsDialog = false">Закрити</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Members dialog -->
+    <v-dialog v-model="showMembersDialog" max-width="560" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-account-group</v-icon>
+          Учасники · {{ selectedGuild?.name }}
+        </div>
+        <v-card-text class="guild-dialog-body">
+          <v-autocomplete
+            v-model="memberFormHeroIds"
+            :items="activeHeroOptions"
+            item-title="name"
+            item-value="id"
+            label="Активні персонажі"
+            multiple
+            chips
+            closable-chips
+            density="comfortable"
+            hide-details="auto"
+          />
+          <div v-if="membersError" class="guild-dialog-error mt-3">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ membersError }}
+          </div>
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="showMembersDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <WiActionButton :loading="membersSaving" prepend-icon="mdi-content-save" @click="saveMembers">Зберегти</WiActionButton>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Rules dialog -->
+    <v-dialog v-model="showRulesDialog" max-width="720" :fullscreen="$vuetify.display.smAndDown" scrollable>
+      <v-card class="guild-dialog">
+        <div class="guild-dialog-header">
+          <v-icon class="mr-2">mdi-scroll-text-outline</v-icon>
+          Правила · {{ selectedGuild?.name }}
+        </div>
+        <v-card-text class="guild-dialog-body">
+          <div v-for="(rule, index) in rulesForm" :key="rule.id" class="guild-rule-editor">
+            <div class="guild-rule-editor-top">
+              <v-switch v-model="rule.enabled" color="primary" density="compact" hide-details label="Увімкнено" />
+              <v-btn icon="mdi-delete-outline" variant="text" color="error" size="small" @click="removeRule(index)" />
+            </div>
+            <v-text-field v-model="rule.title" label="Назва" variant="outlined" density="compact" hide-details="auto" class="mb-2" />
+            <v-text-field v-model.number="rule.amountGold" type="number" min="0.01" step="0.01" label="Золото за пригоду" variant="outlined" density="compact" hide-details="auto" class="mb-2" />
+            <v-textarea v-model="rule.description" label="Опис" rows="2" auto-grow variant="outlined" density="compact" hide-details="auto" />
+          </div>
+          <v-btn size="small" variant="tonal" prepend-icon="mdi-plus" class="mt-2" @click="addRule">Додати правило</v-btn>
+          <div v-if="rulesError" class="guild-dialog-error mt-3">
+            <v-icon size="13" class="mr-1">mdi-skull-crossbones</v-icon>{{ rulesError }}
+          </div>
+        </v-card-text>
+        <v-divider style="border-color: var(--wi-border)" />
+        <v-card-actions class="guild-dialog-actions">
+          <v-btn variant="text" class="cancel-btn" @click="showRulesDialog = false">Скасувати</v-btn>
+          <v-spacer />
+          <WiActionButton :loading="rulesSaving" prepend-icon="mdi-content-save" @click="saveRules">Зберегти</WiActionButton>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -350,7 +428,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Timestamp } from 'firebase/firestore'
+import { collection, onSnapshot, Timestamp } from 'firebase/firestore'
+import { db } from '@/services/firebase'
 import { useGuildStore } from '@/store/guildStore'
 import { useUserStore } from '@/store/userStore'
 import { useGoodsStore } from '@/store/goodsStore'
@@ -371,6 +450,8 @@ const goodsStore = useGoodsStore()
 const islandStore = useIslandStore()
 const yieldBuildingStore = useYieldBuildingStore()
 const isAdmin = computed(() => user.isAdmin ?? false)
+const activeHeroes = ref([])
+let unsubscribeHeroes = null
 
 const showGuildDialog = ref(false)
 const showTxDialog = ref(false)
@@ -394,6 +475,14 @@ const logsLoading = ref(false)
 const logsError = ref('')
 const showBuildingsDialog = ref(false)
 const buildingsGuild = ref(null)
+const showMembersDialog = ref(false)
+const memberFormHeroIds = ref([])
+const membersError = ref('')
+const membersSaving = ref(false)
+const showRulesDialog = ref(false)
+const rulesForm = ref([])
+const rulesError = ref('')
+const rulesSaving = ref(false)
 
 const selectedGuildBuildings = computed(() =>
   guildOwnedBuildings(buildingsGuild.value?.id)
@@ -407,6 +496,16 @@ const visibleGuilds = computed(() =>
   })
 )
 
+const activeHeroOptions = computed(() =>
+  activeHeroes.value.map((hero) => ({ id: hero.id, name: hero.name || hero.id }))
+)
+
+const heroNameById = computed(() => {
+  const map = new Map()
+  activeHeroes.value.forEach((hero) => map.set(hero.id, hero.name || hero.id))
+  return map
+})
+
 function canViewGuildLogs(guild) {
   if (!guild) return false
   if (isAdmin.value) return true
@@ -414,6 +513,12 @@ function canViewGuildLogs(guild) {
 }
 
 function canManageGuildGoods(guild) {
+  if (!guild) return false
+  if (isAdmin.value) return true
+  return user.canAccessGuild(guild.id)
+}
+
+function canManageGuildRules(guild) {
   if (!guild) return false
   if (isAdmin.value) return true
   return user.canAccessGuild(guild.id)
@@ -428,6 +533,102 @@ function guildOwnedBuildings(guildId) {
     'guild',
     guildId,
   )
+}
+
+function guildMemberNames(guild) {
+  return (Array.isArray(guild?.memberHeroIds) ? guild.memberHeroIds : [])
+    .map((heroId) => heroNameById.value.get(heroId) || heroId)
+    .filter(Boolean)
+}
+
+function activeGuildRules(guild) {
+  return (Array.isArray(guild?.rules) ? guild.rules : [])
+    .filter((rule) => rule?.enabled !== false)
+    .filter((rule) => rule?.type === 'membership_payment_per_adventure')
+    .filter((rule) => Number(rule.amountGold ?? rule.amount ?? 0) > 0)
+}
+
+function createRule() {
+  return {
+    id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type: 'membership_payment_per_adventure',
+    title: 'Пригодницький внесок',
+    description: '',
+    amountGold: 1,
+    enabled: true,
+  }
+}
+
+function normalizeRuleForForm(rule) {
+  return {
+    id: String(rule?.id || createRule().id),
+    type: String(rule?.type || 'membership_payment_per_adventure'),
+    title: String(rule?.title || 'Пригодницький внесок'),
+    description: String(rule?.description || ''),
+    amountGold: Number(rule?.amountGold ?? rule?.amount ?? 0),
+    enabled: rule?.enabled !== false,
+  }
+}
+
+function openMembersDialog(guild) {
+  selectedGuild.value = guild
+  memberFormHeroIds.value = Array.isArray(guild?.memberHeroIds) ? [...guild.memberHeroIds] : []
+  membersError.value = ''
+  showMembersDialog.value = true
+}
+
+async function saveMembers() {
+  if (!selectedGuild.value?.id) return
+  membersSaving.value = true
+  membersError.value = ''
+  try {
+    await store.updateGuildMembers(selectedGuild.value.id, memberFormHeroIds.value)
+    showMembersDialog.value = false
+  } catch (error) {
+    membersError.value = error?.message || String(error)
+  } finally {
+    membersSaving.value = false
+  }
+}
+
+function openRulesDialog(guild) {
+  selectedGuild.value = guild
+  rulesForm.value = (Array.isArray(guild?.rules) && guild.rules.length)
+    ? guild.rules.map(normalizeRuleForForm)
+    : [createRule()]
+  rulesError.value = ''
+  showRulesDialog.value = true
+}
+
+function addRule() {
+  rulesForm.value.push(createRule())
+}
+
+function removeRule(index) {
+  rulesForm.value.splice(index, 1)
+}
+
+async function saveRules() {
+  if (!selectedGuild.value?.id) return
+  rulesError.value = ''
+  const invalid = rulesForm.value.some((rule) =>
+    !String(rule.title || '').trim()
+    || rule.type !== 'membership_payment_per_adventure'
+    || !Number.isFinite(Number(rule.amountGold))
+    || Number(rule.amountGold) <= 0)
+  if (invalid) {
+    rulesError.value = 'Для кожного правила потрібна назва і сума золота більше 0.'
+    return
+  }
+  rulesSaving.value = true
+  try {
+    await store.updateGuildRules(selectedGuild.value.id, rulesForm.value)
+    showRulesDialog.value = false
+  } catch (error) {
+    rulesError.value = error?.message || String(error)
+  } finally {
+    rulesSaving.value = false
+  }
 }
 
 function openBuildingsDialog(guild) {
@@ -583,12 +784,13 @@ function isGoodsLog(log) {
 function isBuildingActionLog(log) { return log?.type === 'building-action' }
 
 function logOperationClass(log) {
-  if (log?.type === 'deposit' || log?.type === 'goods-deposit') return 'tx-deposit'
+  if (log?.type === 'deposit' || log?.type === 'goods-deposit' || log?.type === 'membership-payment') return 'tx-deposit'
   return 'tx-withdraw'
 }
 
 function logOperationIcon(log) {
   if (log?.type === 'building-action') return 'mdi-basket-fill'
+  if (log?.type === 'membership-payment') return 'mdi-account-cash-outline'
   if (log?.type === 'goods-deposit') return 'mdi-package-down'
   if (log?.type === 'goods-withdraw') return 'mdi-package-up'
   return log?.type === 'deposit' ? 'mdi-arrow-up-bold' : 'mdi-arrow-down-bold'
@@ -596,6 +798,7 @@ function logOperationIcon(log) {
 
 function logOperationLabel(log) {
   if (log?.type === 'building-action') return 'Дія будівлі'
+  if (log?.type === 'membership-payment') return 'Внесок учасника'
   if (log?.type === 'goods-deposit') return 'Товари +'
   if (log?.type === 'goods-withdraw') return 'Товари -'
   return log?.type === 'deposit' ? 'Внесок' : 'Зняття'
@@ -634,12 +837,22 @@ onMounted(() => {
   goodsStore.subscribeGoods()
   islandStore.subscribe()
   yieldBuildingStore.subscribe()
+  unsubscribeHeroes = onSnapshot(collection(db, 'heroes'), (snapshot) => {
+    activeHeroes.value = snapshot.docs
+      .map((docSnap) => {
+        const data = docSnap.data() || {}
+        return { id: docSnap.id, name: data.name || data.heroName || data.nickname || docSnap.id, inactive: Boolean(data.inactive) }
+      })
+      .filter((hero) => !hero.inactive)
+      .sort((a, b) => a.name.localeCompare(b.name, 'uk-UA'))
+  })
 })
 onBeforeUnmount(() => {
   store.unsubscribeGuilds()
   goodsStore.unsubscribeGoods()
   islandStore.stop()
   yieldBuildingStore.stop()
+  unsubscribeHeroes?.()
 })
 </script>
 
@@ -769,7 +982,7 @@ onBeforeUnmount(() => {
 
 .guild-actions {
   grid-column: 1 / 4;
-  grid-row: 4;
+  grid-row: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -813,7 +1026,7 @@ onBeforeUnmount(() => {
 
 .guild-log-hint {
   grid-column: 1 / 4;
-  grid-row: 5;
+  grid-row: 6;
   display: flex;
   align-items: center;
   font-family: var(--wi-font-heading);
@@ -923,6 +1136,54 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 0.75rem;
   color: var(--wi-text-muted);
+}
+
+.guild-members-row,
+.guild-rules-row {
+  grid-column: 1 / 4;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--wi-text-muted);
+}
+
+.guild-members-row { grid-row: 3; }
+.guild-rules-row { grid-row: 4; }
+
+.guild-rule-chip {
+  background: rgba(58, 96, 128, 0.12);
+  border: 1px solid rgba(58, 96, 128, 0.28);
+  border-radius: 3px;
+  padding: 1px 6px;
+  color: var(--wi-text);
+  font-size: 0.73rem;
+}
+
+.guild-members-btn,
+.guild-rules-btn {
+  font-family: var(--wi-font-heading) !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.05em !important;
+  color: var(--wi-gold) !important;
+  border-color: rgba(200, 150, 42, 0.35) !important;
+}
+
+.guild-rule-editor {
+  border: 1px solid rgba(90, 62, 32, 0.55);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.guild-rule-editor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .guild-good-chip {

@@ -177,8 +177,20 @@
  * @property {string} leaderPassword
  * @property {Record<string, unknown>} assets
  * @property {Record<string, number>} [goods] - Goods inventory keyed by goodId
+ * @property {string[]} [memberHeroIds] - Hero document IDs that are members of this guild; a hero may belong to multiple guilds.
+ * @property {GuildRule[]} [rules] - Configurable member rules; currently only adventure membership payments are applied automatically.
  * @property {import('firebase/firestore').Timestamp} createdAt
  * @property {import('firebase/firestore').Timestamp} updatedAt
+ */
+
+/**
+ * @typedef {Object} GuildRule
+ * @property {string} id
+ * @property {'membership_payment_per_adventure'} type
+ * @property {string} title
+ * @property {string} [description]
+ * @property {number} amountGold
+ * @property {boolean} enabled
  */
 
 /**
@@ -186,7 +198,7 @@
  * @typedef {Object} GuildLogDoc
  * @property {string} id
  * @property {number} amount
- * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'|'mage-guild-tax'|'building-action'} type
+ * @property {'deposit'|'withdraw'|'goods-deposit'|'goods-withdraw'|'mage-guild-tax'|'building-action'|'membership-payment'} type
  * @property {string} comment
  * @property {string} userNickname
  * @property {import('firebase/firestore').Timestamp} createdAt
@@ -203,6 +215,13 @@
  * @property {string} [buildingKey]
  * @property {string} [yieldBuildingId]
  * @property {string} [cycleId]
+ * @property {string} [cycleStartedAt]
+ * @property {string} [cycleFinishedAt]
+ * @property {string} [adventureTitle]
+ * @property {string} [heroId]
+ * @property {string} [heroName]
+ * @property {string} [guildRuleId]
+ * @property {string} [guildRuleTitle]
  * @property {string} [actionVariantId]
  */
 
@@ -339,9 +358,26 @@
  * @property {number} totalCrewCount
  * @property {number} totalCost
  * @property {boolean} autoDeduct
- * @property {'deducted'|'skipped'|'edited'} paymentStatus - `edited` means expedition data changed without another financial transaction.
+ * @property {'deducted'|'skipped'|'edited'} paymentStatus - Legacy crew-payment status; `edited` means expedition data changed without another financial transaction.
+ * @property {'deducted'|'skipped'|'edited'} [crewPaymentStatus] - Crew-cost deduction status.
+ * @property {'deducted'|'none'|'edited'} [guildMembershipPaymentStatus] - Guild membership payment status.
  * @property {{heroId: string, heroName: string, amount: number}[]} participantShares
+ * @property {GuildMembershipPayment[]} [guildMembershipPayments]
+ * @property {number} [totalGuildMembershipCost]
  * @property {import('firebase/firestore').Timestamp} [editedAt]
+ */
+
+/**
+ * @typedef {Object} GuildMembershipPayment
+ * @property {string} guildId
+ * @property {string} guildName
+ * @property {string} heroId
+ * @property {string} heroName
+ * @property {string} ruleId
+ * @property {'membership_payment_per_adventure'} ruleType
+ * @property {string} ruleTitle
+ * @property {string} [ruleDescription]
+ * @property {number} amount
  */
 
 /**
@@ -462,7 +498,7 @@
  * @property {string} heroName - snapshot of hero name at transaction time
  * @property {number} goldAmount - positive = credit, negative = debit
  * @property {Record<string, number>} goods - keyed by goodId; positive = credit, negative = debit
- * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'building-action'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'goods-request-deposit'|'mage-guild-reward'|'crew-payment'} type
+ * @property {'income'|'withdrawal'|'deduction'|'building-yield'|'building-action'|'fish-sale'|'fish-release'|'treasure-remove'|'admin-balance-adjustment'|'admin-goods-adjustment'|'goods-request-deposit'|'mage-guild-reward'|'crew-payment'|'guild-membership-payment'} type
  * @property {string} comment
  * @property {string} [cycleId]
  * @property {string} [cycleStartedAt]
@@ -481,6 +517,10 @@
  * @property {number} [treasuryTaxAmount]
  * @property {number} [treasuryTaxRate]
  * @property {number} [guildTaxAmount]
+ * @property {string} [guildId]
+ * @property {string} [guildName]
+ * @property {string} [guildRuleId]
+ * @property {string} [guildRuleTitle]
  * @property {string} [adventureTitle]
  * @property {number} [guildTaxRate]
  * @property {import('firebase/firestore').Timestamp} createdAt
