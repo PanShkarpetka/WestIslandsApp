@@ -647,6 +647,13 @@
 // ─── MAGE GUILD ──────────────────────────────────────────────────────────────
 
 /**
+ * Singleton document: `mage-guild-configs/spell-request-prices`
+ * @typedef {Object} MageGuildSpellRequestConfigDoc
+ * @property {number} [requestCountMaxMultiplier] - Multiplies `ceil(population / 100)` to get request count upper bound; defaults to 3
+ * @property {Object<string, Object>} spellTypes - Spell level/tier weights, downtime ranges, and price rules
+ */
+
+/**
  * Collection: `spell-requests/{requestId}`
  * @typedef {Object} SpellRequestDoc
  * @property {string} id
@@ -657,6 +664,7 @@
  * @property {string} cycleLabel
  * @property {string} islandId
  * @property {number} population
+ * @property {number} [requestCountMaxMultiplier]
  * @property {number} requestsMin
  * @property {number} requestsMax
  * @property {number} rolledRequestsCount

@@ -340,6 +340,7 @@ export async function generateSpellRequestsForCycle({
   const [config, spells] = await Promise.all([fetchMageGuildConfig(), fetchSpells()])
   const generation = buildSpellRequestDrafts({
     population,
+    requestCountMaxMultiplier: config.requestCountMaxMultiplier,
     spellTypes: config.spellTypes || {},
     spells,
   })
@@ -352,6 +353,7 @@ export async function generateSpellRequestsForCycle({
     cycleFinishedAt,
     islandId: islandId || '',
     population: Number(population ?? 0),
+    requestCountMaxMultiplier: generation.requestCountMaxMultiplier,
     requestsMin: generation.requestsMin,
     requestsMax: generation.requestsMax,
     rolledRequestsCount: generation.requestsCount,

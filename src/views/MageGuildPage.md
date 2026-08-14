@@ -31,7 +31,8 @@ On mount and when `islandStore.currentId` changes, `ensureCurrentCycleRequests()
 
 ### Request count
 - `requestsMin = ceil(population / 100)`
-- `requestsMax = requestsMin × 3`
+- `requestCountMaxMultiplier` = `mage-guild-configs/spell-request-prices.requestCountMaxMultiplier` (defaults to `3`)
+- `requestsMax = ceil(requestsMin * requestCountMaxMultiplier)`
 - Actual count = random integer between min and max
 
 ### Spell selection

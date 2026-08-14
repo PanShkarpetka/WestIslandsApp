@@ -6,6 +6,7 @@ import {
   getSpellCompensation,
   getSpellMaterialComponentPrice,
   getSpellPrice,
+  normalizeRequestCountMaxMultiplier,
   normalizeSpellLevel,
   pickWeightedKey,
 } from '../../src/utils/mageGuildRequests.js'
@@ -47,6 +48,26 @@ test('getSpellCompensation adds material component price to base compensation', 
   assert.equal(getSpellCompensation({ currentPrice: 42, materialComponentPrice: 25 }, 0), 67)
 })
 
+test('normalizeRequestCountMaxMultiplier falls back to legacy multiplier', () => {
+  assert.equal(normalizeRequestCountMaxMultiplier(undefined), 3)
+  assert.equal(normalizeRequestCountMaxMultiplier(0), 3)
+  assert.equal(normalizeRequestCountMaxMultiplier('5'), 5)
+})
+
+test('buildSpellRequestDrafts uses configured request count max multiplier', () => {
+  const result = buildSpellRequestDrafts({
+    population: 250,
+    requestCountMaxMultiplier: 5,
+    spellTypes: {},
+    spells: [],
+    rng: () => 0,
+  })
+
+  assert.equal(result.requestCountMaxMultiplier, 5)
+  assert.equal(result.requestsMin, 3)
+  assert.equal(result.requestsMax, 15)
+  assert.equal(result.requestsCount, 3)
+})
 
 test('buildSpellRequestDrafts matches cantrip spells to level 0 request config', () => {
   const result = buildSpellRequestDrafts({

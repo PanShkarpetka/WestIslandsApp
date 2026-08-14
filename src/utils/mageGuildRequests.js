@@ -114,6 +114,13 @@ export function pickWeightedKey(weightMap, rng = Math.random) {
   return entries[entries.length - 1].key
 }
 
+export function normalizeRequestCountMaxMultiplier(value, fallback = 3) {
+  const normalized = toFiniteNumber(value, fallback)
+  const safeFallback = Math.max(1, toFiniteNumber(fallback, 3))
+
+  return normalized >= 1 ? normalized : safeFallback
+}
+
 function buildEligiblePools(normalizedSpells, spellTypes) {
   const pools = []
 
@@ -163,9 +170,16 @@ function buildRequestFromPool(entry, requestIndex, rng) {
   }
 }
 
-export function buildSpellRequestDrafts({ population = 0, spellTypes = {}, spells = [], rng = Math.random }) {
+export function buildSpellRequestDrafts({
+  population = 0,
+  requestCountMaxMultiplier = 3,
+  spellTypes = {},
+  spells = [],
+  rng = Math.random,
+}) {
   const requestsMin = Math.max(0, Math.ceil(toFiniteNumber(population, 0) / 100))
-  const requestsMax = requestsMin * 3
+  const normalizedRequestCountMaxMultiplier = normalizeRequestCountMaxMultiplier(requestCountMaxMultiplier)
+  const requestsMax = Math.ceil(requestsMin * normalizedRequestCountMaxMultiplier)
   const requestsCount = requestsMin > 0 ? rollInteger(requestsMin, requestsMax, rng) : 0
 
   const normalizedSpells = spells.map((spell) => ({
@@ -180,6 +194,7 @@ export function buildSpellRequestDrafts({ population = 0, spellTypes = {}, spell
 
   if (!eligiblePools.length || requestsCount === 0) {
     return {
+      requestCountMaxMultiplier: normalizedRequestCountMaxMultiplier,
       requestsMin,
       requestsMax,
       requestsCount,
@@ -232,6 +247,7 @@ export function buildSpellRequestDrafts({ population = 0, spellTypes = {}, spell
   }
 
   return {
+    requestCountMaxMultiplier: normalizedRequestCountMaxMultiplier,
     requestsMin,
     requestsMax,
     requestsCount,
