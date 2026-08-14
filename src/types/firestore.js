@@ -451,7 +451,7 @@
  * @property {string} description
  * @property {number} income
  * @property {'manufacture'|'auto'} [type] - 'manufacture' (default) or 'auto' (auto income/expense)
- * @property {PayoutRow[]} [payouts] - per-cycle payouts; if absent falls back to legacy income/incomeDestination fields
+ * @property {PayoutRow[]} [payouts] - payout rows; if absent falls back to legacy income/incomeDestination fields
  * @property {string} [incomeDestination] - legacy single destination (kept for backward compat)
  * @property {number} [income] - legacy single income amount (kept for backward compat)
  * @property {Record<string, number>} [incomeGoods] - legacy single goods map (kept for backward compat)
@@ -459,10 +459,10 @@
 
 /**
  * @typedef {Object} PayoutRow
- * @property {'coinPig'} [mechanic] - omitted/absent for fixed payouts; 'coinPig' rolls 1d4-1 per closed-cycle day and splits gold between heroes
- * @property {string} [destination] - fixed payouts: 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
- * @property {number} [income] - fixed payouts: gold amount per cycle (negative = deduction)
- * @property {Record<string, number>} [incomeGoods] - goods per cycle, keyed by goodId (hero destinations only)
+ * @property {'fixed'|'dailyGold'|'coinPig'} [mechanic] - omitted/absent for fixed payouts; 'dailyGold' multiplies `income` by closed-cycle days; 'coinPig' rolls 1d4-1 per closed-cycle day and splits gold between heroes
+ * @property {string} [destination] - fixed/dailyGold payouts: 'treasury', 'guild:{guildId}', or 'hero:{heroId}'
+ * @property {number} [income] - fixed: gold amount per cycle; dailyGold: gold amount per day; negative = deduction
+ * @property {Record<string, number>} [incomeGoods] - fixed goods per cycle, keyed by goodId (hero destinations only)
  * @property {string[]} [participantHeroIds] - hero IDs for Coin Pig payouts
  * @property {string} [roll] - display/config label for Coin Pig, currently '1d4-1'
  */
@@ -509,7 +509,7 @@
  * @property {string} [buildingKey]
  * @property {string} [yieldBuildingId]
  * @property {string} [actionVariantId]
- * @property {'fixed'|'coinPig'} [manufactureMechanic]
+ * @property {'fixed'|'dailyGold'|'coinPig'} [manufactureMechanic]
  * @property {string} [spellRequestId]
  * @property {string} [requestId]
  * @property {string} [mageGuildId]

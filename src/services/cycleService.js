@@ -52,6 +52,10 @@ function isCoinPigPayout(payout) {
   return payout?.mechanic === 'coinPig'
 }
 
+function isDailyGoldPayout(payout) {
+  return payout?.mechanic === 'dailyGold'
+}
+
 function rollCoinPigTotal(durationDays, rng) {
   const days = Math.max(0, Math.floor(Number(durationDays) || 0))
   let total = 0
@@ -98,6 +102,23 @@ function expandCoinPigEntry(entry, coinPigCycle, rng) {
     cycleStartedAt: coinPigCycle?.startedAt || entry.cycleStartedAt || null,
     cycleFinishedAt: coinPigCycle?.finishedAt || entry.cycleFinishedAt || null,
   }))
+}
+
+function expandDailyGoldEntry(entry, closedCycle) {
+  if (entry.mechanic !== 'dailyGold') return [entry]
+
+  const durationDays = Math.floor(Number(closedCycle?.durationDays) || 0)
+  if (durationDays <= 0) return []
+
+  return [{
+    ...entry,
+    dailyGoldAmount: normalizeAmount(entry.income || 0),
+    dailyGoldDurationDays: durationDays,
+    income: normalizeAmount((entry.income || 0) * durationDays),
+    cycleId: closedCycle?.cycleId || entry.cycleId || null,
+    cycleStartedAt: closedCycle?.startedAt || entry.cycleStartedAt || null,
+    cycleFinishedAt: closedCycle?.finishedAt || entry.cycleFinishedAt || null,
+  }]
 }
 
 export async function resetReligionsSvTemp({
@@ -160,11 +181,13 @@ export async function loadManufacturesByIds(ids, {
           return
         }
 
+        const mechanic = isDailyGoldPayout(payout) ? 'dailyGold' : 'fixed'
         results.push({
           id: `${docSnap.id}:${index}`,
           manufactureId: docSnap.id,
           name,
           description,
+          mechanic,
           income: normalizeAmount(payout.income || 0),
           incomeDestination: normalizeIncomeDestination(payout.destination ?? payout.incomeDestination),
           incomeGoods: payout.incomeGoods && typeof payout.incomeGoods === 'object' ? payout.incomeGoods : {},
@@ -253,6 +276,7 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
   const loadDeps = { collection: collectionFn, getDocs: getDocsFn, query: queryFn, where: whereFn, documentId: documentIdFn, db: firestoreDb }
   const entries = (await loadManufacturesByIds(manufactureIds, loadDeps))
     .flatMap((item) => expandCoinPigEntry(item, coinPigCycle, rng))
+    .flatMap((item) => expandDailyGoldEntry(item, coinPigCycle))
     .filter((item) => (
       item.income !== 0
       || item.mechanic === 'coinPig'
@@ -404,6 +428,8 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
           comment: (
             item.mechanic === 'coinPig'
               ? `Coin Pig "${item.name || 'Без назви'}": ${item.coinPigDurationDays} дн. × 1d4-1 = ${formatAmount(item.coinPigTotal)} зм, частка ${item.coinPigParticipantIndex + 1}/${item.coinPigParticipantCount} за цикл ${formatCycleLabel(item.cycleStartedAt || startedAt, item.cycleFinishedAt || finishedAt)}.`
+              : item.mechanic === 'dailyGold'
+                ? `Автонарахування "${item.name || 'Без назви'}": ${formatAmount(item.dailyGoldAmount)} зм/день × ${item.dailyGoldDurationDays} дн. = ${formatAmount(item.income)} зм за цикл ${formatCycleLabel(item.cycleStartedAt || startedAt, item.cycleFinishedAt || finishedAt)}.`
               : `Автонарахування з мануфактури "${item.name || 'Без назви'}" за цикл ${cycleLabel}.`
           ).slice(0, 500),
           cycleId: item.cycleId || cycleId,
@@ -431,6 +457,8 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
       const label = item.income >= 0 ? 'Дохід' : 'Витрати'
       const commentParts = item.type === 'population'
         ? [`${label} населення групи "${item.name}"`, `(${item.count} осіб × ${formatAmount(item.incomePerPerson)} зм)`]
+        : item.mechanic === 'dailyGold'
+          ? [`${label} "${item.name || 'Без назви'}"`, `(${formatAmount(item.dailyGoldAmount)} зм/день × ${item.dailyGoldDurationDays} дн. = ${formatAmount(item.income)} зм)`]
         : [`${label} мануфактури "${item.name || 'Без назви'}"`]
       if (item.type === 'manufacture' && item.description) commentParts.push(item.description)
       if (item._bureaucratBonus > 0) commentParts.push(`+${formatAmount(item._bureaucratBonus)} зм бонус бюрократів`)
@@ -445,9 +473,9 @@ export async function distributeManufactureIncome(cycleId, startedAt, finishedAt
         nickname: 'Система',
         createdAt: serverTimestampFn(),
         balanceAfter: currentBalance,
-        cycleId,
-        cycleStartedAt: startedAt,
-        cycleFinishedAt: finishedAt || null,
+        cycleId: item.cycleId || cycleId,
+        cycleStartedAt: item.cycleStartedAt || startedAt,
+        cycleFinishedAt: item.cycleFinishedAt || finishedAt || null,
       })
       operationLogs.push({
         targetType: 'treasury',

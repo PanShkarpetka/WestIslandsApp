@@ -131,6 +131,24 @@ test('loadManufacturesByIds preserves Coin Pig payout config', async () => {
   assert.equal(result[0].income, 0);
 });
 
+test('loadManufacturesByIds preserves daily gold payout config', async () => {
+  const mock = createMockFirestore({
+    'manufactures/m1': {
+      name: 'Daily upkeep',
+      payouts: [
+        { mechanic: 'dailyGold', destination: 'treasury', income: -2.5 },
+      ],
+    },
+  });
+
+  const result = await loadManufacturesByIds(['m1'], { ...mock.firebase, db: mock.db });
+
+  assert.equal(result.length, 1);
+  assert.equal(result[0].mechanic, 'dailyGold');
+  assert.equal(result[0].incomeDestination, 'treasury');
+  assert.equal(result[0].income, -2.5);
+});
+
 test('buildGuildMembershipPaymentEntries returns enabled adventure-dues rules for participant members', () => {
   const result = buildGuildMembershipPaymentEntries([
     {
@@ -335,6 +353,50 @@ test('distributeManufactureIncome routes payout rows with incomeDestination', as
   assert.equal(mock.get('heroes/hero-1').goldBalance, 6);
   assert.equal(mock.get('heroes/hero-1').goods.barrel, 1);
   assert.equal(mock.get('treasury/meta').balance, 100);
+});
+
+test('distributeManufactureIncome multiplies daily gold payouts by closed cycle duration', async () => {
+  const mock = createMockFirestore({
+    'islands/island_rock': { manufactures: ['m1'] },
+    'manufactures/m1': {
+      name: 'Daily ledger',
+      type: 'auto',
+      payouts: [
+        { mechanic: 'dailyGold', destination: 'treasury', income: 10 },
+        { mechanic: 'dailyGold', destination: 'guild:guild-a', income: -2.5 },
+        { mechanic: 'dailyGold', destination: 'hero:hero-1', income: 1.25 },
+      ],
+    },
+    'guilds/guild-a': { treasure: 100 },
+    'heroes/hero-1': { name: 'Boromir', goldBalance: 5, goods: {} },
+    'treasury/meta': { balance: 50 },
+  });
+
+  await distributeManufactureIncome(
+    'new-cycle', '5 Hammer 1490', null, 'island_rock', [],
+    {
+      ...mock.firebase,
+      db: mock.db,
+      coinPigCycle: {
+        cycleId: 'prev-cycle',
+        startedAt: '1 Hammer 1490',
+        finishedAt: '4 Hammer 1490',
+        durationDays: 4,
+      },
+    },
+  );
+
+  assert.equal(mock.get('treasury/meta').balance, 90);
+  assert.equal(mock.get('guilds/guild-a').treasure, 90);
+  assert.equal(mock.get('heroes/hero-1').goldBalance, 10);
+
+  const heroTxs = Object.values(mock.list('hero-transactions'));
+  assert.equal(heroTxs.length, 1);
+  assert.equal(heroTxs[0].goldAmount, 5);
+  assert.equal(heroTxs[0].cycleId, 'prev-cycle');
+  assert.equal(heroTxs[0].manufactureMechanic, 'dailyGold');
+  assert.ok(heroTxs[0].comment.includes('1.25'));
+  assert.ok(heroTxs[0].comment.includes('4'));
 });
 
 test('rerunCycleAutoMoney applies money only and records operation status logs', async () => {

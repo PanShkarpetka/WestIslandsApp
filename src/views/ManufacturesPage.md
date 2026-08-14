@@ -25,6 +25,8 @@ Fixed payouts support:
 - `'guild:{guildId}'` — income goes to a specific guild
 - `'hero:{heroId}'` — income/goods go to a hero account balance
 
+Daily gold payouts use `mechanic: 'dailyGold'`, the same destination field, and `income` as the gold delta per in-game day. On cycle rollover the service multiplies that daily delta by the duration of the closed previous cycle, then writes the resulting money transaction. Daily gold is money-only; hero goods remain a fixed-payout feature.
+
 Coin Pig payouts use `mechanic: 'coinPig'` and `participantHeroIds`. On cycle rollover the service rolls `1d4-1` once per day of the closed previous cycle, splits the total between participants, and writes hero balance transactions.
 
 Display labels resolve guild names from `guildStore.guilds` and hero names from `heroesStore.playerHeroes`.
@@ -35,7 +37,7 @@ Single dialog handles both modes (`dialogMode: 'add' | 'edit'`). When adding, `t
 **Add**: creates a new document in `manufactures` collection, then `arrayUnion`s its ID into `island.manufactures`.  
 **Edit**: updates the existing document in place; updates local `manufactures.value` array optimistically.
 
-Form fields: name (required), description, type, and one or more payout rows. Each payout row selects either fixed payout fields or Coin Pig participants.
+Form fields: name (required), description, type, and one or more payout rows. Each payout row selects fixed payout fields, daily gold fields, or Coin Pig participants.
 
 The form uses the shared `WiDialogFrame` and save action button. No payout fields, destinations, or mutations were changed by the visual migration.
 

@@ -89,10 +89,10 @@
                 <div class="invoice-row">
                   <span class="invoice-label">
                     <v-icon size="13" class="mr-1">mdi-gold</v-icon>
-                    Дохід
+                    {{ payout.mechanic === 'dailyGold' ? 'За день' : 'Дохід' }}
                   </span>
                   <span class="invoice-income" :class="payout.income >= 0 ? 'income-positive' : 'income-negative'">
-                    {{ payout.income >= 0 ? '+' : '' }}{{ formatAmount(payout.income) }} зм
+                    {{ payout.income >= 0 ? '+' : '' }}{{ formatAmount(payout.income) }} зм{{ payout.mechanic === 'dailyGold' ? ' / день' : '' }}
                   </span>
                 </div>
                 <div class="invoice-row">
@@ -203,7 +203,7 @@
                 />
                 <v-text-field
                   v-model.number="payout.income"
-                  label="Сума (зм)"
+                  :label="payout.mechanic === 'dailyGold' ? 'Сума / день' : 'Сума (зм)'"
                   type="number"
                   variant="outlined"
                   density="compact"
@@ -225,7 +225,7 @@
             </div>
 
             <!-- Goods sub-form for hero destinations -->
-            <template v-if="payout.mechanic !== 'coinPig' && payout.destination?.startsWith('hero:')">
+            <template v-if="payout.mechanic === 'fixed' && payout.destination?.startsWith('hero:')">
               <div class="goods-section-label mt-2 mb-1">
                 <v-icon size="13" class="mr-1">mdi-package-variant</v-icon>
                 Товари
@@ -377,6 +377,7 @@ const typeOptions = [
 
 const payoutMechanicOptions = [
   { title: 'Фіксоване нарахування', value: 'fixed' },
+  { title: 'Золото за день', value: 'dailyGold' },
   { title: 'Coin Pig', value: 'coinPig' },
 ]
 
@@ -426,7 +427,7 @@ function normalizePayoutForView(p) {
   }
 
   return {
-    mechanic: 'fixed',
+    mechanic: p?.mechanic === 'dailyGold' ? 'dailyGold' : 'fixed',
     destination: normalizeIncomeDestination(p?.destination),
     income: normalizeAmount(p?.income || 0),
     incomeGoods: p?.incomeGoods && typeof p.incomeGoods === 'object' ? p.incomeGoods : {},
@@ -503,7 +504,7 @@ function openEditDialog(item) {
     description: item.description || '',
     type: item.type === 'auto' ? 'auto' : 'manufacture',
     payouts: item.payouts.map((p) => ({
-      mechanic: p.mechanic === 'coinPig' ? 'coinPig' : 'fixed',
+      mechanic: p.mechanic === 'coinPig' ? 'coinPig' : (p.mechanic === 'dailyGold' ? 'dailyGold' : 'fixed'),
       destination: p.destination || 'treasury',
       income: p.income || 0,
       incomeGoods: Object.entries(p.incomeGoods || {}).map(([goodId, qty]) => ({ goodId, qty })),
@@ -552,10 +553,11 @@ async function saveManufacture() {
 
     const destination = normalizeIncomeDestination(p.destination)
     const payout = {
+      mechanic: p.mechanic === 'dailyGold' ? 'dailyGold' : 'fixed',
       destination,
       income: normalizeAmount(p.income || 0),
     }
-    if (destination.startsWith('hero:')) {
+    if (p.mechanic !== 'dailyGold' && destination.startsWith('hero:')) {
       const incomeGoods = {}
       for (const row of (p.incomeGoods || [])) {
         if (row.goodId && row.qty !== 0) incomeGoods[row.goodId] = Number(row.qty) || 0

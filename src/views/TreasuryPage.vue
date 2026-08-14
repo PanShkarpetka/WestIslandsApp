@@ -64,7 +64,7 @@ async function loadManufactureTotals(ids) {
   let outcomeSum = 0
   const payouts = await loadManufacturesByIds(ids)
   for (const payout of payouts) {
-    if (payout.mechanic === 'coinPig' || payout.incomeDestination !== 'treasury') continue
+    if (payout.mechanic !== 'fixed' || payout.incomeDestination !== 'treasury') continue
     const income = roundAmount(Number(payout.income || 0))
     if (income > 0) incomeSum += income
     else if (income < 0) outcomeSum += Math.abs(income)
