@@ -247,13 +247,16 @@
       :spread-religion-error="spreadReligionError"
       :spread-religion-faith-error="spreadReligionFaithError"
       :spread-target-religion-options="spreadTargetReligionOptions"
-      :spread-target-s-v-total="spreadTargetSVTotal"
+      :spread-target-s-v-total="spreadTargetSVBaseTotal"
+      :spread-target-shield-bonus="spreadTargetShieldBonus"
+      :spread-religion-base-dc="spreadReligionBaseDC"
       :spread-religion-dc="spreadReligionDC"
       :spread-religion-result="spreadReligionResult"
       :spread-religion-converted="spreadReligionConverted"
+      :spread-religion-shield-damage="spreadReligionShieldDamage"
+      :spread-religion-shield-remaining="spreadReligionShieldRemaining"
       :spread-religion-loading="spreadReligionLoading"
       :spread-religion-disabled="spreadReligionDisabled"
-      :spread-religion-target-shield-active="spreadReligionTargetShieldActive"
       :apply-spread-religion="applySpreadReligion"
       :downtime-update-error="downtimeUpdateError"
       :downtime-update-success="downtimeUpdateSuccess"
@@ -327,6 +330,7 @@ import { PSEUDO_RELIGION_ID } from '@/config/constants.js'
 import { formatAmount } from '@/utils/formatters'
 import WiEmptyState from '@/components/ui/WiEmptyState.vue'
 import WiPageHeader from '@/components/ui/WiPageHeader.vue'
+import { calculateDefenseShieldBonus, calculateSpreadReligionOutcome } from '@/utils/religionActions'
 
 const iconCache = new Map()
 
@@ -562,6 +566,8 @@ const followersByReligion = computed(() => {
       shieldBonus: Number(religion.shieldBonus),
       svTemp: Number(religion.svTemp),
       svBase: Number(religion.svBase),
+      targetDCBase: Number(religion.svBase) + Number(religion.svTemp),
+      targetDCWithShield: Number(religion.svBase) + Number(religion.svTemp) + (religion.shieldActive ? Number(religion.shieldBonus) : 0),
       minSpreadFollowersResult: Number(religion.minSpreadFollowersResult),
     })
   }
@@ -580,6 +586,9 @@ const followersByReligion = computed(() => {
         shieldActive: false,
         shieldBonus: 0,
         svTemp: 0,
+        svBase: 0,
+        targetDCBase: 0,
+        targetDCWithShield: 0,
       })
     }
   }
@@ -1012,14 +1021,19 @@ const spreadTargetReligion = computed(() =>
   religionStore.religions.find((item) => item.id === spreadReligionForm.targetReligionId) || null,
 )
 const spreadReligionTargetShieldActive = computed(() => Boolean(spreadTargetReligion.value?.shieldActive))
-const spreadTargetSVTotal = computed(() => {
+const spreadTargetShieldBonus = computed(() =>
+  spreadReligionTargetShieldActive.value
+    ? Math.max(0, Number(spreadTargetReligion.value?.shieldBonus ?? DEFAULT_VALUES.shieldBonus))
+    : 0,
+)
+const spreadTargetSVBaseTotal = computed(() => {
   const svBase = Number(spreadTargetReligion.value?.svBase ?? DEFAULT_VALUES.svBase)
   const svTemp = Number(spreadTargetReligion.value?.svTemp ?? DEFAULT_VALUES.svTemp)
-  const shieldBonus = Number(spreadTargetReligion.value?.shieldBonus ?? DEFAULT_VALUES.shieldBonus)
 
-  return svBase + svTemp + shieldBonus
+  return svBase + svTemp
 })
-const spreadReligionDC = computed(() => spreadTargetSVTotal.value + Number(spreadReligionForm.dmMod ?? 0))
+const spreadReligionBaseDC = computed(() => spreadTargetSVBaseTotal.value + Number(spreadReligionForm.dmMod ?? 0))
+const spreadReligionDC = computed(() => spreadReligionBaseDC.value + spreadTargetShieldBonus.value)
 const spreadReligionResult = computed(() => {
   const rollRaw = spreadReligionForm.roll
   const investedRaw = spreadReligionForm.investedOV
@@ -1031,12 +1045,26 @@ const spreadReligionResult = computed(() => {
 
   return roll + Math.floor(invested / 50)
 })
+const spreadReligionOutcome = computed(() =>
+  calculateSpreadReligionOutcome({
+    result: spreadReligionResult.value,
+    baseDC: spreadReligionBaseDC.value,
+    shieldBonus: spreadTargetShieldBonus.value,
+  }),
+)
 const spreadReligionConverted = computed(() => {
   const result = spreadReligionResult.value
   if (result === null) return null
 
-  return result >= spreadReligionDC.value ? 5 + Math.max(0, result - spreadReligionDC.value) : 0
+  return spreadReligionOutcome.value.convertedFollowers
 })
+const spreadReligionShieldDamage = computed(() => {
+  const result = spreadReligionResult.value
+  if (result === null) return 0
+
+  return spreadReligionOutcome.value.shieldDamage
+})
+const spreadReligionShieldRemaining = computed(() => spreadReligionOutcome.value.shieldRemaining)
 const spreadReligionFaithError = computed(() => {
   const available = currentFaithPoints.value
   const invested = Number(spreadReligionForm.investedOV)
@@ -1134,11 +1162,7 @@ const clergyDefenseBonus = computed(() => {
 
   if (result === null) return 0
 
-  if (result >= dc) {
-    return 1 + Math.max(0, Math.floor((result - dc) / 5))
-  }
-
-  return 0
+  return calculateDefenseShieldBonus(result, dc)
 })
 const clergyDefenseFaithError = computed(() => {
   const available = currentFaithPoints.value
@@ -1156,9 +1180,22 @@ const clergyDefenseDisabled = computed(() =>
 )
 
 const recordsWithBonuses = computed(() =>
-  records.value.map((record) => ({
-    ...record,
-    activeBonuses: (() => {
+  records.value.map((record) => {
+    const religion = religionStore.religions.find((item) => item.id === record.religion?.id || item.name === record.religionName)
+    const religionTargetDCBase = religion
+      ? Number(religion.svBase ?? DEFAULT_VALUES.svBase) + Number(religion.svTemp ?? DEFAULT_VALUES.svTemp)
+      : null
+    const religionShieldActive = Boolean(religion?.shieldActive)
+    const religionShieldBonus = religionShieldActive
+      ? Number(religion.shieldBonus ?? DEFAULT_VALUES.shieldBonus)
+      : 0
+
+    return {
+      ...record,
+      religionTargetDCBase,
+      religionShieldBonus,
+      religionShieldActive,
+      activeBonuses: (() => {
       const religionBonuses = bonusesByReligion.value.get(record.religionName) || {
         innateAbilities: [],
         activeMilestoneAbilities: [],
@@ -1191,8 +1228,9 @@ const recordsWithBonuses = computed(() =>
 
       return unique
     })(),
-    religionColor: getReligionColor(record.religionName),
-  })),
+      religionColor: getReligionColor(record.religionName),
+    }
+  }),
 )
 
 const sortedRecords = computed(() => {
@@ -1609,12 +1647,14 @@ async function applyClergyDefense() {
         throw new Error('Недостатньо ОВ для інвестиції.')
       }
 
-      let religionSnapshot = null
-      if (bonus > 0) {
-        religionSnapshot = await transaction.get(religionRef)
-        if (!religionSnapshot.exists()) {
-          throw new Error('Конфесія не знайдена.')
-        }
+      const religionSnapshot = await transaction.get(religionRef)
+      if (!religionSnapshot.exists()) {
+        throw new Error('Конфесія не знайдена.')
+      }
+
+      const religionData = religionSnapshot.data() || {}
+      if (religionData.shieldActive) {
+        throw new Error('Щит цієї конфесії вже активний.')
       }
 
       transaction.update(clergyRef, { faith: currentFaith - invested })
@@ -1689,9 +1729,14 @@ async function applySpreadReligion() {
   const invested = Number(spreadReligionForm.investedOV)
   const roll = Number(spreadReligionForm.roll)
   const dmMod = Number(spreadReligionForm.dmMod ?? 0)
-  const dc = spreadReligionDC.value
   const result = spreadReligionResult.value
-  const converted = spreadReligionConverted.value
+  let dc = spreadReligionDC.value
+  let baseDC = spreadReligionBaseDC.value
+  let targetSVTotal = spreadTargetSVBaseTotal.value
+  let converted = spreadReligionConverted.value
+  let shieldBonusApplied = spreadTargetShieldBonus.value
+  let shieldDamage = spreadReligionShieldDamage.value
+  let shieldRemaining = spreadReligionShieldRemaining.value
   const notes = spreadReligionForm.notes?.trim() || ''
   const cycleId = latestCycle.value?.id || null
 
@@ -1769,6 +1814,16 @@ async function applySpreadReligion() {
       const targetData = targetSnapshot.data() || {}
       const targetFollowers = Number(targetData.followers ?? 0)
       const targetSvTempRaw = Number(targetData.svTemp ?? DEFAULT_VALUES.svTemp)
+      const targetSvBaseRaw = Number(targetData.svBase ?? DEFAULT_VALUES.svBase)
+      const targetShieldActive = Boolean(targetData.shieldActive)
+      targetSVTotal = targetSvBaseRaw + targetSvTempRaw
+      shieldBonusApplied = targetShieldActive ? Math.max(0, Number(targetData.shieldBonus ?? DEFAULT_VALUES.shieldBonus)) : 0
+      baseDC = targetSVTotal + dmMod
+      const outcome = calculateSpreadReligionOutcome({ result, baseDC, shieldBonus: shieldBonusApplied })
+      dc = outcome.dc
+      converted = outcome.convertedFollowers
+      shieldDamage = outcome.shieldDamage
+      shieldRemaining = outcome.shieldRemaining
 
       const religionSnapshot = await transaction.get(religionRef)
       if (!religionSnapshot.exists()) {
@@ -1787,10 +1842,14 @@ async function applySpreadReligion() {
         svTemp: targetSvTempRaw + 1,
       }
 
-      if (targetData.shieldActive) {
+      if (targetShieldActive && outcome.shieldBroken && shieldDamage === 0) {
         targetUpdates.shieldActive = false
         targetUpdates.shieldBonus = 0
         shieldBroken = true
+      } else if (targetShieldActive && shieldDamage > 0) {
+        targetUpdates.shieldActive = shieldRemaining > 0
+        targetUpdates.shieldBonus = shieldRemaining
+        shieldBroken = outcome.shieldBroken
       }
 
       transaction.update(targetReligionRef, targetUpdates)
@@ -1820,11 +1879,15 @@ async function applySpreadReligion() {
         roll,
         dmMod,
         notes,
-        targetSVTotal: spreadTargetSVTotal.value,
+        targetSVTotal,
+        targetShieldBonus: shieldBonusApplied,
+        targetBaseDC: baseDC,
         dc,
         result,
         convertedFollowers: converted,
         shieldBroken,
+        shieldDamage,
+        shieldRemaining,
         downtimeConsumed: true,
         cycleId,
         user: userStore.nickname || 'Адміністратор',

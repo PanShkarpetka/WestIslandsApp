@@ -65,7 +65,7 @@ The fishing game uses D20 rolls + modifiers vs. a DC, bait selection, optional g
 
 - **Islands** — primary entity; most data is scoped to an island ID
 - **Treasury** — silver currency, transactions, chest management
-- **Religion** — faith tracking, distributions, donations (overflow logic)
+- **Religion** — faith/OV tracking, confession follower distribution, passive building OV, defense shields, spread-religion attacks, donations (overflow logic)
 - **Crafting** — discount formulas by category/subcategory/specialization; progress per hero; item slugs as identifiers
 - **Fishing bot** — Telegram-driven mini-game with dice mechanics, bait, weather effects, and daily resets
 - **Cycles, seasons, and weather** — the active cycle has a Faerun start date, a derived season, and a deterministic 7-day seasonal weather forecast. The public widget shows the current weather; admins can view the week-ahead forecast.
@@ -143,6 +143,18 @@ The pirate theme lives in `src/styles/theme.css`. All Vuetify components are glo
 
 ### `src/utils/formatters.js`
 - `formatAmount(value, decimals = 2)` — formats a number to fixed decimal string; returns `'0.00'` for non-finite values. Used for all currency display.
+
+### Religion action rules
+- Passive OV from religion buildings is mandatory: heroes/clergy cannot opt out of this source. On cycle start, `distributeBuildingFaithIncome()` splits a confession building's passive OV across all `clergy` documents for that religion.
+- Religion action formulas live in `src/utils/religionActions.js`; keep UI previews and Firestore transaction resolution using those helpers so they cannot drift.
+- Defense action shield bonus is `+1` at success and `+1` more for each full 4 points the result exceeds DC: `1 + floor((result - dc) / 4)` when `result >= dc`, otherwise `0`.
+- A confession cannot raise a new defense shield while its old shield is active. Enforce this in UI and inside the Firestore transaction, because admins may have stale dialogs open.
+- Spread-religion attacks resolve against two DCs: base DC (`svBase + svTemp + DM Mod`) and shielded DC (`base DC + active shieldBonus`).
+- If spread result is at least shielded DC, followers are converted and the active shield is removed. Converted followers are `5 + max(0, result - shieldedDC)`.
+- If spread result is at least base DC but below shielded DC, no followers are converted and the shield takes `result - baseDC + 1` damage. Remaining shield is `max(0, shieldBonus - damage)`; if it reaches 0 the shield is inactive.
+- If spread result is below base DC, no followers are converted and the shield is unchanged.
+- Spread-religion actions still increment target `svTemp` by 1 after resolution.
+- When changing religion mechanics, update `src/types/firestore.js`, the relevant `src/views/*.md` page docs, and formula tests in `tests/utils/religionActions.test.js`.
 
 ### Faerun date utilities (`faerun-date` package + `src/utils/faerun-date.js`)
 - `parseFaerunDate(value)` — parses a stored date to `{ day, month, year }`

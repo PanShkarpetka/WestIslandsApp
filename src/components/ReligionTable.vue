@@ -46,6 +46,12 @@
           <th class="text-left">
             <b>Активні бонуси</b>
           </th>
+          <th class="text-left">
+            <b>DC конфесії</b>
+          </th>
+          <th class="text-left">
+            <b>Щит</b>
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -115,6 +121,8 @@
             </template>
             <span v-else class="text-medium-emphasis">—</span>
           </td>
+          <td>{{ formatReligionDC(record) }}</td>
+          <td>{{ formatReligionShield(record) }}</td>
         </tr>
       </tbody>
     </v-table>
@@ -148,6 +156,17 @@ function bonusTooltip(bonus) {
   if (bonus?.description) parts.push(bonus.description)
   if (bonus?.active === false) parts.push(bonus.hint || 'Бонус неактивний')
   return parts.join(' • ')
+}
+
+function formatReligionDC(record) {
+  if (record.religionTargetDCBase === null || record.religionTargetDCBase === undefined) return '—'
+  const shieldBonus = record.religionShieldActive ? Number(record.religionShieldBonus || 0) : 0
+  const shielded = Number(record.religionTargetDCBase) + shieldBonus
+  return shieldBonus > 0 ? `${record.religionTargetDCBase} / ${shielded}` : String(record.religionTargetDCBase)
+}
+
+function formatReligionShield(record) {
+  return record.religionShieldActive ? `Активний (+${record.religionShieldBonus})` : 'Неактивний'
 }
 </script>
 

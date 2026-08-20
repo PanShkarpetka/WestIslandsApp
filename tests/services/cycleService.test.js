@@ -621,7 +621,7 @@ test('distributeBuildingFaithIncome skips religions with no building', async () 
   assert.equal(mock.get('clergy/c1').faith, 0);
 });
 
-test('distributeBuildingFaithIncome skips clergy with passiveOVInactive hero', async () => {
+test('distributeBuildingFaithIncome includes passiveOVInactive heroes in confession share', async () => {
   const mock = createMockFirestore({
     'religions/rel1': { name: 'Tyr', buildingLevel: 'chapel' },
     'heroes/h1': { passiveOVInactive: true },
@@ -634,7 +634,7 @@ test('distributeBuildingFaithIncome skips clergy with passiveOVInactive hero', a
 
   await distributeBuildingFaithIncome('cycle-1', { ...mock.firebase, db: mock.db, rng: () => 0 });
 
-  assert.equal(mock.get('clergy/c1').faith, 0);
+  assert.ok(mock.get('clergy/c1').faith > 0);
 });
 
 // ─── consumeDevaFaithForMonthChange ─────────────────────────────────────────

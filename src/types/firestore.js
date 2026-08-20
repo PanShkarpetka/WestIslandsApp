@@ -302,6 +302,11 @@
  * @property {number} [faithPenalty] - Faith points charged as a penalty, such as religion changes.
  * @property {number} convertedFollowers
  * @property {number} result
+ * @property {number} [targetBaseDC] - Target religion DC before shield for spread religion actions.
+ * @property {number} [targetShieldBonus] - Shield bonus present on the target religion during resolution.
+ * @property {number} [shieldDamage] - Damage dealt to the target shield by a blocked spread religion action.
+ * @property {number} [shieldRemaining] - Shield bonus remaining after damage.
+ * @property {boolean} [shieldBroken] - Whether the target shield was removed by success or damage.
  */
 
 // ─── DONATIONS ───────────────────────────────────────────────────────────────

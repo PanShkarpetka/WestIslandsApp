@@ -12,6 +12,8 @@
           <th class="text-left">Базова Стійкість віри</th>
           <th class="text-left">Бонус до Стійкості</th>
           <th class="text-left">Бонус від Захисту</th>
+          <th class="text-left">DC без щита</th>
+          <th class="text-left">DC зі щитом</th>
           <th class="text-left">Мінімальний розмір накопичення Очок Віри</th>
           <th class="text-left">Базова Складність накопичення</th>
           <th class="text-left">Мінімальна кількість послідовників від Поширення</th>
@@ -48,6 +50,8 @@
           <td>{{ item.svBase }}</td>
           <td>{{ item.svTemp }}</td>
           <td>{{ formatShield(item) }}</td>
+          <td>{{ item.targetDCBase }}</td>
+          <td>{{ item.targetDCWithShield }}</td>
           <td>{{ item.farmBase }}</td>
           <td>{{ item.farmDCBase }}</td>
           <td>{{ item.minSpreadFollowersResult }}</td>

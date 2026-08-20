@@ -589,8 +589,6 @@ export async function rerunCycleAutoMoney(cycleId, islandId, populationItems, {
 
 export async function distributeBuildingFaithIncome(cycleId, {
   collection: collectionFn = collection,
-  doc: docFn = doc,
-  getDoc: getDocFn = getDoc,
   getDocs: getDocsFn = getDocs,
   query: queryFn = query,
   where: whereFn = where,
@@ -612,28 +610,14 @@ export async function distributeBuildingFaithIncome(cycleId, {
   for (const religion of religionsWithIncome) {
     const clergySnapshot = await getDocsFn(queryFn(collectionFn(firestoreDb, 'clergy'), whereFn('religion', '==', religion.ref)))
     if (clergySnapshot.empty) continue
-    const eligibilityChecks = await Promise.all(clergySnapshot.docs.map(async (docSnap) => {
-      const data = docSnap.data() || {}
-      const heroRef = data.hero
-      if (!heroRef) return { docSnap, eligible: true }
-
-      try {
-        const heroSnap = await getDocFn(heroRef)
-        const heroData = heroSnap.exists() ? heroSnap.data() || {} : {}
-        return { docSnap, eligible: heroData.passiveOVInactive !== true }
-      } catch (error) {
-        console.error('[cycle] Failed to load hero for passive faith distribution', error)
-        return { docSnap, eligible: true }
-      }
-    }))
-    const eligible = eligibilityChecks.filter((entry) => entry.eligible).map((entry) => entry.docSnap)
-    const heroCount = eligible.length
+    const confessionClergy = clergySnapshot.docs
+    const heroCount = confessionClergy.length
     if (!heroCount) continue
     const baseShare = Math.floor(religion.passiveFaith / heroCount)
     const remainder = religion.passiveFaith - baseShare * heroCount
     const remainderIndex = remainder > 0 ? Math.floor(rng() * heroCount) : -1
 
-    await Promise.all(eligible.map(async (docSnap, index) => {
+    await Promise.all(confessionClergy.map(async (docSnap, index) => {
       const bonus = baseShare + (index === remainderIndex ? remainder : 0)
       if (!bonus) return
       const data = docSnap.data() || {}

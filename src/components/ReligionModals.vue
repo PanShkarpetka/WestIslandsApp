@@ -344,7 +344,7 @@
                 <div>
                   <div class="text-subtitle-2 font-semibold">Поширення релігії</div>
                   <div class="text-body-2 text-medium-emphasis">
-                    Витратьте ОВ, щоб конвертувати послідовників іншої конфесії та зняти щит за наявності.
+                    Витратьте ОВ, щоб конвертувати послідовників іншої конфесії або пошкодити активний щит.
                   </div>
                 </div>
               </div>
@@ -407,7 +407,7 @@
                 />
                 <v-text-field
                   :model-value="spreadTargetSVTotal"
-                  label="SV цілі (база + тимчасовий + щит)"
+                  label="SV цілі (база + тимчасовий)"
                   density="comfortable"
                   hide-details="auto"
                   readonly
@@ -416,12 +416,22 @@
 
               <div class="field-row">
                 <v-text-field
-                  :model-value="spreadReligionDC"
-                  label="DC"
+                  :model-value="spreadReligionBaseDC"
+                  label="DC без щита"
                   density="comfortable"
                   hide-details="auto"
                   readonly
                 />
+                <v-text-field
+                  :model-value="spreadReligionDC"
+                  label="DC зі щитом"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
                 <v-text-field
                   :model-value="spreadReligionResult ?? '—'"
                   label="R = Кидок + floor(ОВ/50)"
@@ -429,12 +439,36 @@
                   hide-details="auto"
                   readonly
                 />
+                <v-text-field
+                  :model-value="spreadReligionConverted ?? '—'"
+                  label="Сконвертовано"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
               </div>
 
               <div class="field-row">
                 <v-text-field
-                  :model-value="spreadReligionConverted ?? '—'"
-                  label="Сконвертовано"
+                  :model-value="spreadTargetShieldBonus"
+                  label="Поточний щит"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+                <v-text-field
+                  :model-value="spreadReligionShieldDamage"
+                  label="Пошкодження щита"
+                  density="comfortable"
+                  hide-details="auto"
+                  readonly
+                />
+              </div>
+
+              <div class="field-row">
+                <v-text-field
+                  :model-value="spreadReligionShieldRemaining"
+                  label="Щит після атаки"
                   density="comfortable"
                   hide-details="auto"
                   readonly
@@ -784,12 +818,15 @@ const props = defineProps({
   spreadReligionFaithError: String,
   spreadTargetReligionOptions: { type: Array, default: () => [] },
   spreadTargetSVTotal: [Number, String],
+  spreadTargetShieldBonus: [Number, String],
+  spreadReligionBaseDC: [Number, String],
   spreadReligionDC: [Number, String],
   spreadReligionResult: [Number, String],
   spreadReligionConverted: [Number, String],
+  spreadReligionShieldDamage: [Number, String],
+  spreadReligionShieldRemaining: [Number, String],
   spreadReligionLoading: { type: Boolean, default: false },
   spreadReligionDisabled: { type: Boolean, default: false },
-  spreadReligionTargetShieldActive: { type: Boolean, default: false },
   applySpreadReligion: { type: Function, required: true },
   downtimeUpdateError: String,
   downtimeUpdateSuccess: { type: Boolean, default: false },
